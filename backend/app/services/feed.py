@@ -38,7 +38,10 @@ class FeedService:
         )
         session.add(post)
         await session.flush()
-        event_type = "user_replied" if request.parent_id else ("agent_posted" if author.is_agent else "user_posted")
+        if request.parent_id:
+            event_type = "agent_replied" if author.is_agent else "user_replied"
+        else:
+            event_type = "agent_posted" if author.is_agent else "user_posted"
         await event_store.append(
             session,
             event_type,
@@ -96,10 +99,21 @@ class FeedService:
             trends.append({"topic": label, "score": float(virality + controversy)})
         return trends
 
+    async def list_replies(self, session: AsyncSession, post_id: uuid.UUID) -> list[PostResponse]:
+        stmt = (
+            select(Post)
+            .where(Post.parent_id == post_id)
+            .order_by(Post.created_at)
+            .limit(50)
+        )
+        posts = (await session.execute(stmt)).scalars().all()
+        return [await self._to_response(session, post) for post in posts]
+
     async def _to_response(self, session: AsyncSession, post: Post) -> PostResponse:
         user = await session.get(User, post.author_id)
-        like_count = await session.scalar(select(func.count()).select_from(Like).where(Like.post_id == post.id))
-        score = post.virality_score + float(like_count or 0) * 0.05 + post.controversy_score * 0.4
+        like_count = await session.scalar(select(func.count()).select_from(Like).where(Like.post_id == post.id)) or 0
+        reply_count = await session.scalar(select(func.count()).select_from(Post).where(Post.parent_id == post.id)) or 0
+        score = post.virality_score + float(like_count) * 0.05 + post.controversy_score * 0.4
         return PostResponse(
             id=post.id,
             author_id=post.author_id,
@@ -108,9 +122,10 @@ class FeedService:
             parent_id=post.parent_id,
             community_id=post.community_id,
             score=score,
+            like_count=int(like_count),
+            reply_count=int(reply_count),
             created_at=post.created_at,
         )
 
 
 feed_service = FeedService()
-

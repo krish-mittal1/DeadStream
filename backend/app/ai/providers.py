@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-import httpx
-
 from app.core.config import settings
 
 
@@ -23,6 +21,8 @@ class OpenAIProvider(AIProvider):
     async def complete(self, system: str, prompt: str) -> str:
         if not settings.openai_api_key:
             return await MockProvider().complete(system, prompt)
+        import httpx
+
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -42,6 +42,8 @@ class GeminiProvider(AIProvider):
     async def complete(self, system: str, prompt: str) -> str:
         if not settings.gemini_api_key:
             return await MockProvider().complete(system, prompt)
+        import httpx
+
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
@@ -54,6 +56,8 @@ class GeminiProvider(AIProvider):
 
 class OllamaProvider(AIProvider):
     async def complete(self, system: str, prompt: str) -> str:
+        import httpx
+
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f"{settings.ollama_base_url}/api/generate",
@@ -71,4 +75,3 @@ def get_provider() -> AIProvider:
     if settings.ai_provider == "ollama":
         return OllamaProvider()
     return MockProvider()
-

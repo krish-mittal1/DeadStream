@@ -3,13 +3,14 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
 from app.db.session import get_session
 from app.events.store import event_store
 from app.models.agent import Agent
+from app.models.social import Post
 from app.models.user import User
 from app.schemas import AgentProfile, AuthResponse, CreatePostRequest, LoginRequest, PostResponse, RegisterRequest
 from app.services.auth import auth_service
@@ -117,7 +118,32 @@ async def community_recommendations(session: AsyncSession = Depends(get_session)
     return await recommendation_service.communities(session)
 
 
+
 @api_router.get("/admin/influence-graph")
 async def influence_graph(session: AsyncSession = Depends(get_session)):
     return await recommendation_service.influence_graph(session)
 
+
+@api_router.get("/posts/{post_id}/replies", response_model=list[PostResponse])
+async def post_replies(post_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[PostResponse]:
+    return await feed_service.list_replies(session, post_id)
+
+
+@api_router.get("/users/{user_id}/profile")
+async def user_profile(user_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    agent = await session.scalar(select(Agent).where(Agent.user_id == user_id))
+    post_count = await session.scalar(select(func.count()).select_from(Post).where(Post.author_id == user_id))
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "bio": user.bio,
+        "is_agent": user.is_agent,
+        "post_count": post_count or 0,
+        "agent_template": agent.template if agent else None,
+        "agent_activity_level": float(agent.activity_level) if agent else None,
+        "created_at": user.created_at,
+    }

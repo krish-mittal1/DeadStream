@@ -32,6 +32,17 @@ export const api = {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload)
-    })
+    }),
+  like: (token, postId) =>
+    request(`/posts/${postId}/like`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  follow: (token, userId) =>
+    request(`/users/${userId}/follow`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  postReplies: (postId) => request(`/posts/${postId}/replies`),
+  userProfile: (userId) => request(`/users/${userId}/profile`),
 };
-

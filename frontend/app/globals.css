@@ -2,15 +2,17 @@
 
 :root {
   color-scheme: dark;
-  --bg: #070806;
-  --panel: #11130f;
-  --panel-2: #191b15;
+  --bg: #060807;
+  --panel: #10130f;
+  --panel-2: #181c16;
   --text: #f2f0e8;
   --muted: #a9ad9d;
   --line: #2b2f25;
   --accent: #8fd14f;
   --hot: #ff6f59;
   --blue: #68a4ff;
+  --gold: #f3c969;
+  --violet: #b891ff;
 }
 
 * {
@@ -19,7 +21,10 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    linear-gradient(135deg, rgba(104, 164, 255, 0.08), transparent 26%),
+    linear-gradient(225deg, rgba(255, 111, 89, 0.08), transparent 28%),
+    var(--bg);
   color: var(--text);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -35,3 +40,339 @@ textarea {
   scrollbar-color: #424838 transparent;
 }
 
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(143, 209, 79, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(104, 164, 255, 0.04) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+.signal-field {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.78;
+}
+
+.signal-scanline {
+  position: absolute;
+  inset: -20% 0 auto;
+  height: 30%;
+  background: linear-gradient(to bottom, transparent, rgba(143, 209, 79, 0.09), transparent);
+  animation: scanline 7s linear infinite;
+}
+
+.signal-orbit {
+  position: absolute;
+  border: 1px solid rgba(104, 164, 255, 0.16);
+  transform: rotate(-8deg);
+  animation: orbit-drift 18s ease-in-out infinite alternate;
+}
+
+.orbit-a {
+  left: 18%;
+  top: 16%;
+  width: 58%;
+  height: 46%;
+}
+
+.orbit-b {
+  right: 9%;
+  bottom: 7%;
+  width: 42%;
+  height: 34%;
+  border-color: rgba(255, 111, 89, 0.14);
+  animation-duration: 22s;
+}
+
+.signal-node {
+  position: absolute;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 14px rgba(143, 209, 79, 0.8);
+  animation: node-pulse 3.4s ease-in-out infinite;
+}
+
+.event-comet {
+  position: absolute;
+  left: -12%;
+  width: 140px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(243, 201, 105, 0.8), transparent);
+  animation: comet 4.8s linear infinite;
+}
+
+.brand-mark {
+  box-shadow: 0 0 0 1px rgba(143, 209, 79, 0.2), 0 0 28px rgba(143, 209, 79, 0.22);
+  animation: brand-breathe 3.6s ease-in-out infinite;
+}
+
+.nav-pill {
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.nav-pill:hover,
+.nav-pill.active {
+  background: var(--panel-2);
+  color: var(--text);
+  transform: translateX(4px);
+}
+
+.composer-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.composer-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(143, 209, 79, 0.08), transparent);
+  transform: translateX(-100%);
+  animation: composer-sweep 8s ease-in-out infinite;
+}
+
+.composer-shell > * {
+  position: relative;
+}
+
+.spark {
+  color: var(--gold);
+  animation: spark-spin 5s linear infinite;
+}
+
+.button-pop,
+.icon-button {
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.button-pop:hover,
+.icon-button:hover {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+.feed-card {
+  position: relative;
+  animation: feed-rise 420ms ease both;
+  animation-delay: var(--delay);
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.feed-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.feed-card:hover {
+  transform: translateX(3px);
+  border-color: rgba(143, 209, 79, 0.25);
+}
+
+.feed-card:hover::before {
+  opacity: 1;
+}
+
+.signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(143, 209, 79, 0.8);
+  animation: node-pulse 2.8s ease-in-out infinite;
+}
+
+.score-chip {
+  background: rgba(143, 209, 79, 0.06);
+}
+
+.event-ticker {
+  min-width: 0;
+}
+
+.ticker-track {
+  display: flex;
+  min-width: max-content;
+  gap: 12px;
+  animation: ticker 18s linear infinite;
+}
+
+.ticker-item {
+  border: 1px solid var(--line);
+  background: rgba(12, 13, 10, 0.72);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-grid {
+  animation: feed-rise 360ms ease both;
+}
+
+.event-row {
+  animation: event-in 320ms ease both;
+  animation-delay: var(--delay);
+}
+
+.network-map {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(143, 209, 79, 0.12), transparent 34%),
+    var(--panel);
+}
+
+.map-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(242, 240, 232, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(242, 240, 232, 0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+  animation: map-drift 12s linear infinite;
+}
+
+.graph-node {
+  box-shadow: 0 0 16px currentColor;
+  animation: graph-float 4s ease-in-out infinite;
+}
+
+.metric-tile {
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.metric-tile:hover {
+  border-color: rgba(255, 111, 89, 0.35);
+  transform: translateY(-2px);
+}
+
+@keyframes scanline {
+  from {
+    transform: translateY(-20%);
+  }
+  to {
+    transform: translateY(460%);
+  }
+}
+
+@keyframes orbit-drift {
+  from {
+    transform: translate3d(-2%, 1%, 0) rotate(-8deg);
+  }
+  to {
+    transform: translate3d(2%, -1%, 0) rotate(5deg);
+  }
+}
+
+@keyframes node-pulse {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes comet {
+  from {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  15%,
+  70% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(130vw);
+    opacity: 0;
+  }
+}
+
+@keyframes brand-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes composer-sweep {
+  0%,
+  72% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes spark-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes feed-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes event-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes map-drift {
+  to {
+    background-position: 44px 22px;
+  }
+}
+
+@keyframes graph-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2px, -4px, 0) scale(1.35);
+  }
+}

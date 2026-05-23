@@ -3,8 +3,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,9 +12,6 @@ from app.core.config import settings
 from app.events.store import event_store
 from app.models.user import User
 from app.schemas import AuthResponse, LoginRequest, RegisterRequest
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 class AuthService:
     async def register(self, session: AsyncSession, request: RegisterRequest) -> AuthResponse:
@@ -24,7 +21,7 @@ class AuthService:
         user = User(
             username=request.username,
             display_name=request.display_name,
-            password_hash=pwd_context.hash(request.password),
+            password_hash=self._hash_password(request.password),
             is_agent=False,
         )
         session.add(user)
@@ -35,9 +32,18 @@ class AuthService:
 
     async def login(self, session: AsyncSession, request: LoginRequest) -> AuthResponse:
         user = await session.scalar(select(User).where(User.username == request.username))
-        if user is None or user.password_hash is None or not pwd_context.verify(request.password, user.password_hash):
+        if user is None or user.password_hash is None or not self._verify_password(request.password, user.password_hash):
             raise ValueError("invalid_credentials")
         return self._response(user)
+
+    def _hash_password(self, password: str) -> str:
+        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+    def _verify_password(self, password: str, password_hash: str) -> bool:
+        try:
+            return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+        except ValueError:
+            return False
 
     def _response(self, user: User) -> AuthResponse:
         token = jwt.encode(
@@ -61,4 +67,3 @@ class AuthService:
 
 
 auth_service = AuthService()
-

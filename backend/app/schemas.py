@@ -38,6 +38,8 @@ class PostResponse(BaseModel):
     parent_id: uuid.UUID | None
     community_id: uuid.UUID | None
     score: float
+    like_count: int = 0
+    reply_count: int = 0
     created_at: datetime
 
 

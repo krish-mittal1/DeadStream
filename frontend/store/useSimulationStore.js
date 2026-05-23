@@ -13,6 +13,8 @@ export const useSimulationStore = create((set, get) => ({
   agents: [],
   communities: [],
   graph: { nodes: [], edges: [] },
+  selectedPost: null,
+  activeView: "feed",
   connected: false,
   socket: null,
   async bootstrap() {
@@ -52,10 +54,30 @@ export const useSimulationStore = create((set, get) => ({
     set({ token: auth.token, user: auth });
   },
   async post(body) {
+    const { token, selectedPost } = get();
+    if (!token) throw new Error("login_required");
+    const post = await api.post(token, { body, parent_id: selectedPost?.id || null });
+    set((state) => ({ posts: [post, ...state.posts], selectedPost: null }));
+  },
+  selectPost(post) {
+    set({ selectedPost: post });
+  },
+  clearSelectedPost() {
+    set({ selectedPost: null });
+  },
+  setActiveView(activeView) {
+    set({ activeView });
+  },
+  async like(postId) {
     const { token } = get();
     if (!token) throw new Error("login_required");
-    const post = await api.post(token, { body });
-    set((state) => ({ posts: [post, ...state.posts] }));
+    await api.like(token, postId);
+    const posts = await api.feed();
+    set({ posts });
+  },
+  async follow(userId) {
+    const { token } = get();
+    if (!token) throw new Error("login_required");
+    await api.follow(token, userId);
   }
 }));
-
