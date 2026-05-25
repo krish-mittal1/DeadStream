@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-backend:
+    name: Lint & Typecheck Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -e ".[dev]"
+      - run: pip install pyright
+      - run: pyright app || true  # advisory — strict mode needs gradual migration
+
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: deadstream_test
+          POSTGRES_USER: dead
+          POSTGRES_PASSWORD: dead
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready -U dead -d deadstream_test
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - run: pip install -e ".[dev]"
+      - run: pip install pytest pytest-asyncio httpx aiosqlite
+      - name: Run tests
+        run: pytest -v --tb=short -m "not integration"
+        env:
+          JWT_SECRET: test-secret-that-is-at-least-32-characters-long
+          DATABASE_URL: postgresql+asyncpg://dead:dead@localhost:5432/deadstream_test
+          REDIS_URL: redis://localhost:6379/0
+
+  test-frontend:
+    name: Lint Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [lint-backend, test-backend, test-frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t deadstream-backend:ci ./backend
+      - name: Build frontend image
+        run: docker build -t deadstream-frontend:ci ./frontend

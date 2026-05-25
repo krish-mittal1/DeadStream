@@ -35,7 +35,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dead}:${POSTGRES_PASSWORD:-dead}@postgres:5432/${POSTGRES_DB:-deadstream}
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET:-dev-compose-secret-change-me}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate a 32+ char secret}
       AI_PROVIDER: ${AI_PROVIDER:-mock}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

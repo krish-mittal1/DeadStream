@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text
+from sqlalchemy import DateTime, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -30,3 +30,4 @@ class CommunityMembership(Base):
     role: Mapped[str] = mapped_column(String(40), default="member")
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
+    __table_args__ = (UniqueConstraint("user_id", "community_id", name="uq_community_membership"),)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from typing import Optional
 
 import redis.asyncio as redis
 import socketio
@@ -12,7 +13,7 @@ from app.core.metrics import ACTIVE_WS
 
 logger = get_logger(__name__)
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.cors_origins)
-_listener_task: asyncio.Task[None] | None = None
+_listener_task: Optional[asyncio.Task[None]] = None
 
 
 @sio.event

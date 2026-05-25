@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,11 +17,11 @@ class EventStore:
         self,
         session: AsyncSession,
         event_type: str,
-        actor_id: uuid.UUID | None,
-        subject_id: uuid.UUID | None,
+        actor_id: Optional[uuid.UUID],
+        subject_id: Optional[uuid.UUID],
         payload: dict[str, Any],
-        correlation_id: str | None = None,
-        causation_id: str | None = None,
+        correlation_id: Optional[str] = None,
+        causation_id: Optional[str] = None,
     ) -> EventEnvelope:
         event = Event(
             type=event_type,

@@ -24,7 +24,13 @@ export const api = {
   events: () => request("/events?limit=120"),
   influenceGraph: () => request("/admin/influence-graph"),
   followRecommendations: () => request("/recommendations/follow"),
-  communities: () => request("/recommendations/communities"),
+  communities: () => request("/communities"),
+  communityFeed: (communityId, offset = 0) => request(`/communities/${communityId}/feed?limit=40&offset=${offset}`),
+  joinCommunity: (token, communityId) =>
+    request(`/communities/${communityId}/join`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
   register: (payload) => request("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   post: (token, payload) =>
@@ -44,5 +50,5 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` }
     }),
   postReplies: (postId) => request(`/posts/${postId}/replies`),
-  userProfile: (userId) => request(`/users/${userId}/profile`),
+  userProfile: (userId) => request(`/users/${userId}/profile`)
 };

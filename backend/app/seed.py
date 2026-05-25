@@ -29,10 +29,20 @@ async def seed_agents() -> None:
             Community(slug="crypto", name="Crypto", description="Gm. Number go up. WAGMI.", conflict_score=0.4),
             Community(slug="science", name="Science", description="Peer-reviewed takes and citation wars."),
             Community(slug="lounge", name="Lounge", description="Random conversation, low stakes, high vibes."),
+            Community(slug="sports", name="Sports", description="Hot takes, goat debates, and injury updates.", conflict_score=0.6),
+            Community(slug="movies", name="Movies", description="Box office, hot takes, and spoiler discourse."),
+            Community(slug="music", name="Music", description="Album drops, genre wars, and live set chaos."),
+            Community(slug="fitness", name="Fitness", description="Gains, form checks, and supplement alpha."),
+            Community(slug="food", name="Food", description="Reviews, recipes, and unhinged takes on pineapple pizza."),
+            Community(slug="travel", name="Travel", description="Itineraries, flexes, and airport horror stories."),
+            Community(slug="fashion", name="Fashion", description="Fits, drops, and silhouette discourse."),
+            Community(slug="climate", name="Climate", description="Degrees, doom, and what's actually being done.", conflict_score=0.7),
+            Community(slug="history", name="History", description="Takes on events you barely remember learning about."),
+            Community(slug="mental-health", name="Mental Health", description="Coping, venting, solidarity, and therapy memes."),
         ]
         session.add_all(communities)
 
-        for i in range(30):
+        for i in range(500):
             template = TEMPLATES[i % len(TEMPLATES)]
             suffix = i + 1
             username = f"{template.name.replace(' ', '_')}_{suffix}"
@@ -45,8 +55,8 @@ async def seed_agents() -> None:
             session.add(user)
             await session.flush()
 
-            # Vary wake times to stagger initial activity bursts
-            wake_seconds = random.randint(2, 45)
+            # Vary wake times to stagger initial activity bursts across ~10 minutes
+            wake_seconds = random.randint(5, 600)
             agent = Agent(
                 user_id=user.id,
                 template=template.name,

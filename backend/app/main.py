@@ -9,11 +9,15 @@ import socketio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import make_asgi_app
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.exceptions import global_exception_handler
 from app.core.logging import configure_logging, get_logger
 from app.core.metrics import REQUEST_COUNT
+from app.core.ratelimit import limiter
 from app.db.session import close_engine, init_models
 from app.realtime.gateway import sio, start_realtime_listener, stop_realtime_listener
 from app.scheduler.runner import scheduler
@@ -41,7 +45,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("app_stopped")
 
 
-fastapi_app = FastAPI(title="DeadStream API", version="0.1.0", lifespan=lifespan)
+fastapi_app = FastAPI(
+    title="DeadStream API",
+    version="0.1.0",
+    lifespan=lifespan,
+    exception_handlers={Exception: global_exception_handler},
+)
+
+# CORS
 fastapi_app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -49,6 +60,10 @@ fastapi_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting
+fastapi_app.state.limiter = limiter
+fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 @fastapi_app.middleware("http")

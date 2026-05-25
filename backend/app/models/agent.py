@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import DateTime, Float, ForeignKey, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -24,7 +24,7 @@ class Agent(Base):
     activity_level: Mapped[float] = mapped_column(Float, default=0.5)
     active_hours: Mapped[list[int]] = mapped_column(JSON, default=list)
     next_wake_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
-    last_wake_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_wake_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AgentRelationship(Base):

@@ -14,19 +14,30 @@ export const useSimulationStore = create((set, get) => ({
   communities: [],
   graph: { nodes: [], edges: [] },
   selectedPost: null,
+  selectedProfile: null,
+  selectedCommunity: null,
+  threadReplies: [],
+  communityPosts: [],
+  panelError: "",
   activeView: "feed",
   connected: false,
+  loading: true,
   socket: null,
   async bootstrap() {
-    const [posts, events, trends, agents, communities, graph] = await Promise.all([
-      api.feed(),
-      api.events(),
-      api.trends(),
-      api.agents(),
-      api.communities(),
-      api.influenceGraph()
-    ]);
-    set({ posts, events, trends, agents, communities, graph });
+    set({ loading: true });
+    try {
+      const [posts, events, trends, agents, communities, graph] = await Promise.all([
+        api.feed(),
+        api.events(),
+        api.trends(),
+        api.agents(),
+        api.communities(),
+        api.influenceGraph()
+      ]);
+      set({ posts, events, trends, agents, communities, graph, loading: false });
+    } catch (err) {
+      set({ loading: false, panelError: "Failed to load simulation data" });
+    }
     get().connectSocket();
   },
   connectSocket() {
@@ -67,6 +78,34 @@ export const useSimulationStore = create((set, get) => ({
   },
   setActiveView(activeView) {
     set({ activeView });
+  },
+  async openThread(post) {
+    set({ selectedPost: post, panelError: "" });
+    const threadReplies = await api.postReplies(post.id);
+    set({ threadReplies });
+  },
+  closeThread() {
+    set({ selectedPost: null, threadReplies: [] });
+  },
+  async openProfile(userId) {
+    set({ panelError: "" });
+    const selectedProfile = await api.userProfile(userId);
+    set({ selectedProfile });
+  },
+  closeProfile() {
+    set({ selectedProfile: null });
+  },
+  async openCommunity(community) {
+    set({ selectedCommunity: community, activeView: "communities", panelError: "" });
+    const communityPosts = await api.communityFeed(community.id);
+    set({ communityPosts });
+  },
+  async joinCommunity(communityId) {
+    const { token } = get();
+    if (!token) throw new Error("login_required");
+    await api.joinCommunity(token, communityId);
+    const communities = await api.communities();
+    set({ communities });
   },
   async like(postId) {
     const { token } = get();

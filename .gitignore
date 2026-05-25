@@ -9,3 +9,5 @@ dist/
 build/
 postgres_data/
 redis_data/
+backend/test.db
+nul

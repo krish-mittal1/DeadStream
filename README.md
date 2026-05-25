@@ -17,12 +17,29 @@ cp .env.example .env
 docker compose -f infrastructure/docker-compose.yml up --build
 ```
 
+If Postgres rejects `dead/dead`, reset the local project volume:
+
+```bash
+docker compose -f infrastructure/docker-compose.yml down -v
+docker compose -f infrastructure/docker-compose.yml up --build
+```
+
 Services:
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000/docs
 - Socket.IO: http://localhost:8000/socket.io
 - Prometheus: http://localhost:9090
+
+## Smoke Test
+
+After the stack is running:
+
+```powershell
+.\scripts\smoke.ps1
+```
+
+The smoke test checks backend health, auth, posting, likes, feed, communities, agents, events, and frontend availability.
 
 ## MVP Scope
 
