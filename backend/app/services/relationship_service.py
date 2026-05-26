@@ -60,19 +60,23 @@ class RelationshipService:
 
         if interaction_type == "agree_reply":
             rel.affinity = min(1.0, rel.affinity + intensity * 0.8)
-            rel.rivalry = max(0.0, rel.rivalry - intensity * 0.3)
+            rel.rivalry = max(0.0, rel.rivalry - intensity * 0.4)
             rel.trust = min(1.0, rel.trust + intensity * 0.2)
         elif interaction_type == "argue_reply":
-            rel.rivalry = min(1.0, rel.rivalry + intensity * 0.9)
-            rel.affinity = max(-1.0, rel.affinity - intensity * 0.4)
+            rel.rivalry = min(1.0, rel.rivalry + intensity * 1.0)
+            rel.affinity = max(-1.0, rel.affinity - intensity * 0.5)
+        elif interaction_type == "public_roast":
+            rel.rivalry = min(1.0, rel.rivalry + intensity * 1.2)
+            rel.affinity = max(-1.0, rel.affinity - intensity * 0.8)
+            rel.trust = max(-1.0, rel.trust - intensity * 0.4)
         elif interaction_type == "like":
             rel.affinity = min(1.0, rel.affinity + intensity * 0.4)
         elif interaction_type == "follow":
             rel.affinity = min(1.0, rel.affinity + intensity * 0.5)
             rel.trust = min(1.0, rel.trust + intensity * 0.3)
         elif interaction_type == "block_target":
-            rel.rivalry = min(1.0, rel.rivalry + intensity * 1.0)
-            rel.affinity = max(-1.0, rel.affinity - intensity * 0.6)
+            rel.rivalry = min(1.0, rel.rivalry + intensity * 1.2)
+            rel.affinity = max(-1.0, rel.affinity - intensity * 0.8)
 
     async def get_allies(
         self, session: AsyncSession, agent_id: uuid.UUID, limit: int = 5

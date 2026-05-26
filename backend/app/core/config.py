@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # JWT — must be set via env in production; no insecure default
     jwt_secret: str = Field(min_length=32)
 
-    ai_provider: str = Field(default="mock")
+    ai_provider: str = Field(default="mock")  # auto-detected as 'gemini' if gemini_api_key is set
     openai_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
     ollama_base_url: str = "http://localhost:11434"

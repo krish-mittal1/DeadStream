@@ -25,7 +25,6 @@ export function Composer() {
   const isNearLimit = charCount > maxChars * 0.85;
   const isAtLimit = charCount >= maxChars;
 
-  // Focus title input on mount
   useEffect(() => {
     if (user) titleRef.current?.focus();
   }, [user]);
@@ -81,7 +80,7 @@ export function Composer() {
               <button
                 type="button"
                 onClick={clearSelectedPost}
-                className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel-2)] hover:text-white"
+                className="btn-icon mt-0.5 shrink-0"
               >
                 <X size={13} />
               </button>
@@ -91,10 +90,9 @@ export function Composer() {
       </AnimatePresence>
 
       <div className="px-4 py-4 md:px-6">
-        {/* Avatar + Inputs */}
         <div className="flex gap-3">
           {user && (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-sm font-bold text-white shadow-sm">
+            <div className="avatar avatar-lg bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
               {user.username[0].toUpperCase()}
             </div>
           )}
@@ -117,11 +115,7 @@ export function Composer() {
                       ? "Reply title... (optional)"
                       : "Post a title..."
                 }
-                className={`w-full rounded-xl border bg-[var(--color-bg)] pl-8 pr-3 py-2.5 text-sm font-semibold outline-none transition-all duration-200 placeholder:text-[var(--color-text-muted)] placeholder:font-normal disabled:cursor-not-allowed disabled:opacity-40 ${
-                  focusedTitle
-                    ? "border-[var(--color-accent)] shadow-[0_0_0_1px_var(--color-accent)]"
-                    : "border-[var(--color-line)] hover:border-[var(--color-line-light)]"
-                }`}
+                className="input-premium pl-8 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
               />
             </div>
             {/* Body textarea */}
@@ -144,11 +138,7 @@ export function Composer() {
                     ? "Add fuel, empathy, or confusion..."
                     : "Write something detailed... (optional if title provided)"
               }
-              className={`w-full resize-none rounded-xl border bg-[var(--color-bg)] p-3.5 text-sm outline-none transition-all duration-200 placeholder:text-[var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-40 ${
-                focusedBody
-                  ? "border-[var(--color-accent)] shadow-[0_0_0_1px_var(--color-accent)]"
-                  : "border-[var(--color-line)] hover:border-[var(--color-line-light)]"
-              }`}
+              className="input-premium resize-none p-3.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
             />
           </div>
         </div>
@@ -162,7 +152,7 @@ export function Composer() {
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)] px-3 py-2.5 transition-all focus-within:border-[var(--color-accent)] focus-within:shadow-[0_0_0_1px_var(--color-accent)]">
+              <div className="mt-3 input-premium flex items-center gap-2 px-3 py-2.5">
                 <Link2 size={14} className="text-[var(--color-text-muted)] shrink-0" />
                 <input
                   value={imageUrl}
@@ -174,14 +164,18 @@ export function Composer() {
                   <button
                     type="button"
                     onClick={() => setImageUrl("")}
-                    className="flex h-5 w-5 items-center justify-center rounded text-[var(--color-text-muted)] hover:text-white transition-colors"
+                    className="btn-icon w-5 h-5 shrink-0"
                   >
                     <X size={12} />
                   </button>
                 )}
               </div>
               {imageUrl && (
-                <div className="mt-2 overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)]">
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mt-2 overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)]"
+                >
                   <img
                     src={imageUrl}
                     alt="Preview"
@@ -190,7 +184,7 @@ export function Composer() {
                       e.target.style.display = "none";
                     }}
                   />
-                </div>
+                </motion.div>
               )}
             </motion.div>
           )}
@@ -220,25 +214,70 @@ export function Composer() {
           </div>
 
           <div className="flex items-center gap-3">
-            <span
-              className={`text-xs tabular-nums transition-colors duration-200 ${
-                isNearLimit ? "text-[var(--color-red)]" : "text-[var(--color-text-muted)]"
-              }`}
-            >
-              {charCount}/{maxChars}
-            </span>
-            <button
+            {/* ─── Character Ring Counter ─── */}
+            <div className="relative flex items-center justify-center">
+              <svg
+                width="28"
+                height="28"
+                className="transform -rotate-90"
+              >
+                {/* Background circle */}
+                <circle
+                  cx="14"
+                  cy="14"
+                  r="11"
+                  fill="none"
+                  stroke="var(--color-line)"
+                  strokeWidth="2.5"
+                />
+                {/* Progress circle */}
+                <motion.circle
+                  cx="14"
+                  cy="14"
+                  r="11"
+                  fill="none"
+                  stroke={isAtLimit ? "var(--color-red)" : isNearLimit ? "var(--color-gold)" : "var(--color-accent)"}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 11}
+                  initial={false}
+                  animate={{
+                    strokeDashoffset: 2 * Math.PI * 11 * (1 - charCount / maxChars),
+                  }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  className="transition-colors duration-300"
+                />
+              </svg>
+              <span
+                className={`absolute text-[10px] font-bold tabular-nums transition-colors duration-200 ${
+                  isAtLimit
+                    ? "text-[var(--color-red)]"
+                    : isNearLimit
+                      ? "text-[var(--color-gold)]"
+                      : "text-[var(--color-text-muted)]"
+                }`}
+              >
+                {charCount > 999 ? "1k+" : charCount}
+              </span>
+            </div>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
               type="submit"
               disabled={!user || busy || (!body.trim() && !title.trim()) || isAtLimit}
-              className="flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-hover)] px-5 text-sm font-semibold text-white transition-all duration-200 hover:shadow-[var(--shadow-accent)] disabled:cursor-not-allowed disabled:opacity-40 active:scale-[0.97]"
+              className="btn-primary"
             >
               {busy ? (
-                <Loader2 size={15} className="animate-spin" />
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
+                  <Loader2 size={15} />
+                </motion.div>
               ) : (
                 <Send size={15} />
               )}
               {selectedPost ? "Reply" : "Post"}
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -248,7 +287,7 @@ export function Composer() {
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              className="mt-3 text-xs text-[var(--color-red)]"
+              className="mt-3 text-xs text-[var(--color-red)] font-medium"
             >
               {error}
             </motion.div>

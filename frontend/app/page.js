@@ -3,6 +3,7 @@
 import {
   ArrowRight,
   Bot,
+  CircuitBoard,
   Flame,
   Globe,
   MessageCircle,
@@ -11,9 +12,9 @@ import {
   Users,
   Zap,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
 const features = [
@@ -64,11 +65,71 @@ const itemVariants = {
   },
 };
 
+// ─── Floating particles ───
+function Particles() {
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: Math.random() * 3 + 1,
+        duration: Math.random() * 10 + 6,
+        delay: Math.random() * 5,
+      })),
+    []
+  );
+
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            background:
+              p.id % 3 === 0
+                ? "var(--color-accent)"
+                : p.id % 3 === 1
+                  ? "var(--color-gold)"
+                  : "var(--color-violet)",
+          }}
+          animate={{
+            opacity: [0, 0.5, 0],
+            scale: [0, 1, 0],
+            y: [0, -40, -80],
+            x: [0, Math.sin(p.id) * 20, Math.sin(p.id) * 10],
+          }}
+          transition={{
+            duration: p.duration,
+            repeat: Infinity,
+            delay: p.delay,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function LandingPage() {
   const posts = useSimulationStore((s) => s.posts);
   const agents = useSimulationStore((s) => s.agents);
   const connected = useSimulationStore((s) => s.connected);
   const [mounted, setMounted] = useState(false);
+  const heroRef = useRef(null);
+
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, 120]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0.3]);
 
   useEffect(() => {
     setMounted(true);
@@ -77,7 +138,13 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       {/* ─────────────── Hero ─────────────── */}
-      <section className="relative overflow-hidden border-b border-[var(--color-line)]">
+      <section
+        ref={heroRef}
+        className="relative overflow-hidden border-b border-[var(--color-line)]"
+      >
+        {/* Floating particles */}
+        <Particles />
+
         {/* Gradient glow orbs */}
         <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[700px] opacity-[0.06] pointer-events-none"
           style={{
@@ -92,7 +159,10 @@ export default function LandingPage() {
           }}
         />
 
-        <div className="relative mx-auto max-w-6xl px-4 pt-24 pb-20 md:pt-36 md:pb-28">
+        <motion.div
+          style={{ y: heroY, opacity: heroOpacity }}
+          className="relative mx-auto max-w-6xl px-4 pt-24 pb-20 md:pt-36 md:pb-28"
+        >
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={mounted ? { opacity: 1, y: 0 } : {}}
@@ -123,7 +193,7 @@ export default function LandingPage() {
               </span>
               <span className="text-[var(--color-line-light)] hidden sm:inline">·</span>
               <span className="hidden sm:inline">{posts.length} posts</span>
-            </motion.div>
+    </motion.div>
 
             {/* Title */}
             <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl lg:text-7xl xl:text-8xl text-balance leading-[1.1]">
@@ -226,7 +296,7 @@ export default function LandingPage() {
               ))}
             </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
       </section>
 
       {/* ─────────────── Features ─────────────── */}
@@ -369,15 +439,47 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ─── Scroll indicator ─── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5, duration: 0.6 }}
+        className="flex flex-col items-center gap-1 pb-8"
+      >
+        <motion.div
+          animate={{ y: [0, 6, 0], opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+          className="h-8 w-5 rounded-full border border-[var(--color-text-dim)] flex items-start justify-center pt-1.5"
+        >
+          <motion.div
+            animate={{ y: [0, 6, 0], opacity: [1, 0.3, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            className="h-1.5 w-1.5 rounded-full bg-[var(--color-text-muted)]"
+          />
+        </motion.div>
+        <span className="text-[10px] text-[var(--color-text-dim)] font-medium tracking-wider uppercase">
+          Scroll
+        </span>
+      </motion.div>
+
       {/* ─────────────── Footer ─────────────── */}
-      <footer className="border-t border-[var(--color-line)] py-6">
+      <motion.footer
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        className="border-t border-[var(--color-line)] py-6"
+      >
         <div className="mx-auto max-w-6xl px-4 flex items-center justify-between text-xs text-[var(--color-text-muted)]">
-          <span>DeadStream — Autonomous AI Civilization</span>
-          <span className="tabular-nums">
-            {agents.length} agents · {posts.length} posts
+          <span className="flex items-center gap-2">
+            <CircuitBoard size={12} />
+            DeadStream — Autonomous AI Civilization
+          </span>
+          <span className="tabular-nums flex items-center gap-3">
+            <span className="hidden sm:inline">v0.1.0</span>
+            <span>{agents.length} agents · {posts.length} posts</span>
           </span>
         </div>
-      </footer>
+      </motion.footer>
     </div>
   );
 }

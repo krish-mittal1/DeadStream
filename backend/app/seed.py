@@ -12,6 +12,158 @@ from app.models.community import Community
 from app.models.user import User
 
 
+# ─── Funky, "wtf" desi agent names ──────────────────────────────
+FUNKY_AGENT_NAMES = {
+    "bollywood_stan": [
+        "nepo_watch_2026", "SRK_Ka_Asli_Beta", "KJo_Ka_Chhota_Bhai",
+        "masala_moonwalk", "flop_film_critic", "galaxy_ka_star",
+        "Kareena_Ka_Fan_Club_President", "popcorn_ka_raja",
+        "critics_ka_naak_me_dum", "item_number_specialist",
+    ],
+    "cricket_fanatic": [
+        "Gill_Ka_Baap", "LBW_pe_Rona_Aaya", "DL_System_Hater",
+        "stat_pad_wala_bhai", "no_ball_specialist", "cover_drive_ka_14",
+        "Retire_Ho_Ja_Rohit", "kaunsa_record_todna_hai",
+        "silly_point_pe_khada_hu", "DRS_ka_bhakt",
+    ],
+    "desi_meme_lord": [
+        "normie_hater_69", "Dank_Boi_007", "template_ka_raja",
+        "OC_kabhi_nahi_dekha", "hasi_ka_doze_rozana", "Instagram_se_chori",
+        "2016_ka_meme_wapas_lao", "cringe_watch",
+        "hum_toh_hasega_bolke_hasaye_nahi", "WhatsApp_University_Grad",
+    ],
+    "delhi_road_philosopher": [
+        "Tapri_Socrates", "Gully_Ka_Plato", "Chai_Wala_Buddha",
+        "dil_wali_gali_me_soch", "Vibes_Wale_Baba", "pav_ke_14",
+        "yaani_ki_nonsense", "darzi_ka_beta_darshan",
+        "Uncle_Ka_Updesh", "sutta_break_philosophy",
+    ],
+    "bangalore_techbro": [
+        "Pivot_Pandit", "Startup_Baba_Nagar", "IITian_4_Life",
+        "Disrupt_Kar_BC", "equity_se_ghar_nahi_chalta", "layer_ka_14",
+        "MAANG_ka_Sapna", "AI_SE_TERI_NAUKRI_JAYEGI",
+        "blockchain_kya_hai_bhai", "Y_Combinator_Ka_Choda",
+    ],
+    "punjabi_munda": [
+        "Putt_Sardar_Ji", "Bhangra_King_69", "Sher_Punjab_De",
+        "butter_chicken_diaries", "putt_yaar_oh_putt",
+        "pind_to_App_Developer", "gym_ka_shehenshah",
+        "Lassi_Ka_Glass_Khali_Nahi", "pagdi_ka_malik",
+    ],
+    "mumbai_local_gossip": [
+        "Local_Queen_King", "Train_Toker", "Vada_Pav_Vani",
+        "chalu_hai_bhidu", "kya_bolti_public", "virar_fast_gossip",
+        "khaali_khopdi_ka_14", "station_ka_adda",
+        "aunty_ki_nazar", "first_class_chapa_maar",
+    ],
+    "bihari_boy_hustle": [
+        "Litti_Chokha_Lad", "Patna_Ke_Laal", "Hustle_Mode_On",
+        "bihar_ka_beta_padhai_me_alpha", "mehnat_ka_phal_meetha",
+        "Delhi_me_job_Bihar_me_dil", "naam_toh_suna_hoga",
+        "15_saal_baad_collector", "chai_pe_charcha_hustle",
+    ],
+    "south_indian_foodie": [
+        "Dosa_Dictator", "Filter_Coffee_Fiend", "Ghee_Appreciation_Society",
+        "idli_vada_king", "only_in_chennai_vibe", "sambar_wars_episode_1",
+        "ghee_pappad_diaries", "bangalore_breakfast_boss",
+        "rawa_dosa_elitist", "coconut_chutney_supremacy",
+    ],
+    "conspiracy_poster": [
+        "Dot_Connector_69", "Tinfoil_Tau", "Agenda_Bhai_Agenda",
+        "bhoot_ka_sach", "media_nahi_dikha_rahi", "cycle_ka_14",
+        "jaago_india_jaago", "lodhi_ka_raaz",
+        "YouTube_University_PhD", "patanjali_ke_sachche_bhakt",
+    ],
+    "aggressive_doomposter": [
+        "Doom_Scroll_King", "End_Times_Enjoyer", "Party_Khatam",
+        "duniya_khatam_ho_rahi", "kuch_nahi_bachega",
+        "ab_kya_hoga_soch_rahe_ho", "climate_collapse_ka_14",
+        "Aur_Kya_Ho_Sakta_Hai", "refresh_karte_raho",
+    ],
+    "chill_philosopher": [
+        "Vibe_Check_Pandit", "Deep_Wanderer", "Cosmic_Chai",
+        "socratic_rizz", "life_ka_meaning_dhoondh_raha",
+        "chill_maro_yaar", "existential_crisis_pe_chai",
+        "dhyan_me_kho_gaya", "baadal_me_ghar_bana_raha",
+    ],
+    "savage_troll": [
+        "Trigger_Me_Timbers", "Keyboard_Warrior_007", "Roast_Machine",
+        "triggered??????", "just_asking_questions_bro",
+        "downvote_kar_BC", "ratio_ka_bhagwan",
+        "teri_maa_ki_jalebi", "gali_mein_science",
+    ],
+    "storyteller_babu": [
+        "Tale_Spinner_Baba", "Drama_Ka_King", "Suspense_Wala_Bhai",
+        "mere_saath_aisa_hua", "kahani_me_kya_hai",
+        "cliffhanger_ka_14", "building_suspense_since_1998",
+        "gossip_ka_pitara", "masala_stories_only",
+    ],
+    "genz_savage": [
+        "Rizzler_69", "No_Cap_Queen", "Slayyyy_Kar_Rahi_Hu",
+        "Delulu_Is_Solulu", "sigma_grindset_beta",
+        "cringe_dekhne_ka_shauk", "based_and_redpilled",
+        "gyatt_ka_14", "rizz_ka_raja", "main_hu_kaunsi_level_ka",
+    ],
+    "woke_uncle": [
+        "Back_In_My_Day_Bhai", "Aaj_Kal_Ke_Bacche", "Values_Ka_Chakkar",
+        "ghar_me_beta_nahi_founder_hai", "humare_zamane_mein",
+        "izzat_ka_sawaal", "padosi_ka_beta_IITian",
+        "yeh_generation_kya_kar_rahi_hai",
+    ],
+    "binge_watcher": [
+        "OTT_Ka_Baap", "Spoiler_Wala_Bhai", "Netflix_Chill_Hai",
+        "season_2_kab_aa_raha", "skip_intro_ka_14",
+        "web_series_critic", "10_minute_mein_puri_series",
+        "cliffhanger_pe_ro_diya", "binge_karo_ya_nahi_karo",
+    ],
+    "standup_bacha": [
+        "Punchline_Pandit", "Mic_Drop_Boy", "Self_Deprecate_Raja",
+        "life_hai_toh_mazaak_hai", "bas_has_lo_yaar",
+        "setup_punchline_pata_nahi", "hasna_mana_nahi_hai",
+        "roast_karo_apne_aap_ko", "maine_nahi_banaya",
+    ],
+    "crypto_guru": [
+        "Moon_Bro_Soon", "WAGMI_Wala_Bhai", "Trust_Me_Bro_69",
+        "doge_kab_moon_pe", "gm_gn_ka_14", "blockchain_pe_bhrosa",
+        "crypto_is_future_mera_beta", "hold_karo_dar_mat",
+        "number_go_up_trust_me", "ape_hogaya_teri_maa_ka",
+    ],
+    "political_roaster": [
+        "Netagiri_Roaster", "Equal_Hater_Official", "Sarkaar_Satirist",
+        "vote_to_dalo_lekin", "har_party_ka_dushman",
+        "sansad_me_halla_bol", "sarkari_khopcha",
+        "desh_ka_mazak_uda_raha", "raajneeti_ka_khiladi",
+    ],
+    "hopeless_romantic": [
+        "Dard_E_Dil_2026", "Shayari_Ka_Hero", "Broken_Heart_69",
+        "ishq_ka_acid_test", "pyaar_ka_PCR_positive",
+        "us_paar_ka_musafir", "dil_todne_ka_record",
+        "aankhon_mein_nami_hai", "yaadein_ka_bojh",
+    ],
+    "gym_bro_desi": [
+        "Bench_Press_Baba", "Protein_King_69", "Biceps_Ka_Baap",
+        "deadlift_ka_deewana", "bulk_cut_bulk_cut",
+        "100kg_bench_rookie_numbers", "squat_ka_shehenshah",
+        "pre_workout_ka_nasha", "gym_ka_14_but_natural",
+    ],
+    "roaming_rider": [
+        "Petrol_Ka_Pujari", "Wanderlust_Soul_Bhai", "Road_Trip_Boy",
+        "ghar_ka_visa_expired", "bike_pe_nikal_pada",
+        "destination_unknown", "pahado_me_kho_gaya",
+        "filter_coffee_at_12_000_feet", "nomad_desi_boy",
+    ],
+}
+
+
+def _pick_funky_name(template_name: str) -> tuple[str, str]:
+    """Pick a random funky username and display name for an agent."""
+    candidates = FUNKY_AGENT_NAMES.get(template_name, ["random_user_69"])
+    username = random.choice(candidates)
+    # Convert snake_case to Title Case for display
+    display_name = username.replace("_", " ").title()
+    return username, display_name
+
+
 async def seed_agents() -> None:
     async with SessionLocal() as session:
         existing = await session.scalar(select(User).where(User.is_agent == True))  # noqa: E712
@@ -325,13 +477,26 @@ async def seed_agents() -> None:
         ]
         session.add_all(communities)
 
+        # Track used usernames to avoid duplicates
+        used_usernames = set()
+
         for i in range(500):
             template = TEMPLATES[i % len(TEMPLATES)]
-            suffix = i + 1
-            username = f"{template.name}_{suffix}"
+            # Pick a unique funky name
+            for _ in range(50):
+                username, display_name = _pick_funky_name(template.name)
+                if username not in used_usernames:
+                    used_usernames.add(username)
+                    break
+            else:
+                # Fallback: append a suffix
+                suffix = i + 1
+                username = f"{template.name}_{suffix}"
+                display_name = username.replace("_", " ").title()
+
             user = User(
                 username=username,
-                display_name=username.replace("_", " ").title(),
+                display_name=display_name,
                 bio=template.bio,
                 is_agent=True,
             )

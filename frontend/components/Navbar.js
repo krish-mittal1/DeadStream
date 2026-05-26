@@ -20,11 +20,26 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
+const avatarGradients = [
+  "from-orange-500 to-red-500",
+  "from-blue-500 to-purple-500",
+  "from-emerald-500 to-teal-500",
+  "from-pink-500 to-rose-500",
+  "from-violet-500 to-indigo-500",
+  "from-amber-500 to-yellow-500",
+  "from-cyan-500 to-sky-500",
+  "from-lime-500 to-green-500",
+];
+
+function getAvatarColor(username) {
+  const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
+  return avatarGradients[i % avatarGradients.length];
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const user = useSimulationStore((s) => s.user);
   const connected = useSimulationStore((s) => s.connected);
-  const events = useSimulationStore((s) => s.events);
   const bootstrap = useSimulationStore((s) => s.bootstrap);
   const theme = useSimulationStore((s) => s.theme);
   const toggleTheme = useSimulationStore((s) => s.toggleTheme);
@@ -45,7 +60,6 @@ export function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Poll for unread count when logged in
   useEffect(() => {
     if (!user) return;
     fetchNotifications();
@@ -63,7 +77,6 @@ export function Navbar() {
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   ];
 
-  // Mobile bottom nav items
   const mobileNavItems = [
     { href: "/feed", label: "Feed", icon: Home },
     { href: "/trending", label: "Trending", icon: Flame },
@@ -73,18 +86,23 @@ export function Navbar() {
 
   return (
     <>
-      {/* Top navbar */}
+      {/* ─── Top navbar ─── */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 h-12 transition-all duration-300 ${
-          scrolled || !isLanding ? "glass-strong" : "bg-transparent"
+          scrolled || !isLanding
+            ? "bg-[var(--color-bg-secondary)]/85 backdrop-blur-2xl shadow-[0_1px_0_var(--color-line)]"
+            : "bg-transparent"
         }`}
       >
         <div className="mx-auto flex h-full max-w-7xl items-center gap-3 px-4">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-accent)] text-white shadow-[var(--shadow-accent)] transition-all duration-200 group-hover:shadow-[0_0_20px_rgba(255,69,0,0.25)] group-hover:scale-105">
+            <motion.div
+              whileHover={{ scale: 1.08, rotate: -5 }}
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-hover)] text-white shadow-[0_0_16px_rgba(255,69,0,0.15)]"
+            >
               <Bot size={16} />
-            </div>
+            </motion.div>
             <span className="text-sm font-bold tracking-tight hidden sm:inline text-white">
               DeadStream
             </span>
@@ -99,9 +117,9 @@ export function Navbar() {
                   <Link
                     key={href}
                     href={href}
-                    className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                    className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
                       isActive
-                        ? "text-white"
+                        ? "text-white bg-white/5"
                         : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-panel)]/60"
                     }`}
                   >
@@ -123,14 +141,14 @@ export function Navbar() {
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Right side actions */}
+          {/* Right actions */}
           {!isLanding && !isAuthPage && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               {/* Bookmarks */}
               {user && (
                 <Link
                   href="/bookmarks"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-white"
+                  className="btn-icon"
                   title="Saved posts"
                 >
                   <Bookmark size={14} />
@@ -140,17 +158,24 @@ export function Navbar() {
               {/* Theme toggle */}
               <button
                 onClick={toggleTheme}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-white"
+                className="btn-icon"
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               >
-                {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+                <motion.div
+                  key={theme}
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+                </motion.div>
               </button>
 
-              {/* Notifications bell */}
+              {/* Notifications */}
               {user && (
                 <Link
                   href="/notifications"
-                  className="relative flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-white"
+                  className="btn-icon relative"
                   title="Notifications"
                 >
                   <Bell size={14} />
@@ -171,35 +196,28 @@ export function Navbar() {
 
               {/* Live status */}
               <span
-                className={`hidden md:flex items-center gap-1.5 ml-2 text-[11px] transition-colors duration-300 ${
-                  connected ? "text-[var(--color-green)]" : "text-[var(--color-red)]"
+                className={`hidden md:flex items-center gap-1.5 ml-2 text-[11px] font-semibold tracking-wider ${
+                  connected ? "live-dot online" : "live-dot offline"
                 }`}
               >
-                <span className="relative flex h-1.5 w-1.5">
-                  {connected && (
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-60 animate-ping" />
-                  )}
-                  <span
-                    className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
-                      connected ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"
-                    }`}
-                  />
-                </span>
                 {connected ? "LIVE" : "OFF"}
               </span>
             </div>
           )}
 
-          {/* Auth */}
+          {/* Auth area */}
           {user ? (
             <>
               <Link
                 href={`/profile/${user.id}`}
                 className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--color-line)] group"
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-[10px] font-bold text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(255,69,0,0.3)]">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  className={`flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarColor(user.username)} text-[10px] font-bold text-white shadow-sm transition-shadow duration-200 group-hover:shadow-[0_0_12px_rgba(255,69,0,0.25)]`}
+                >
                   {user.username[0].toUpperCase()}
-                </div>
+                </motion.div>
                 <span className="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-white transition-colors">
                   @{user.username}
                 </span>
@@ -207,7 +225,7 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => { logout(); }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-red-400"
+                className="btn-icon hover:text-red-400"
                 title="Logout"
               >
                 <LogOut size={14} />
@@ -217,14 +235,14 @@ export function Navbar() {
             <div className="hidden md:flex items-center gap-2">
               <Link
                 href="/login"
-                className="flex h-8 items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 text-xs font-medium text-[var(--color-text-secondary)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-white hover:border-[var(--color-line-light)]"
+                className="btn-secondary h-8 text-xs px-3"
               >
                 <LogIn size={13} />
                 <span>Login</span>
               </Link>
               <Link
                 href="/register"
-                className="flex h-8 items-center gap-1.5 rounded-lg bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-hover)] px-3 text-xs font-semibold text-white transition-all duration-200 hover:shadow-[var(--shadow-accent)] hover:brightness-110 active:scale-[0.97]"
+                className="btn-primary h-8 text-xs px-3"
               >
                 <UserPlus size={13} />
                 <span>Sign Up</span>
@@ -234,9 +252,9 @@ export function Navbar() {
         </div>
       </header>
 
-      {/* Mobile bottom navigation */}
+      {/* ─── Mobile bottom navigation ─── */}
       {!isLanding && !isAuthPage && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[var(--color-line)] bg-[var(--color-bg-secondary)]/95 backdrop-blur-lg md:hidden pb-[max(env(safe-area-inset-bottom),8px)]">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[var(--color-line)] bg-[var(--color-bg-secondary)]/90 backdrop-blur-xl md:hidden pb-[max(env(safe-area-inset-bottom),8px)]">
           {mobileNavItems.map(({ href, label, icon: Icon, badge }) => {
             const isActive = pathname.startsWith(href.replace(/\/\d+$/, ""));
             return (
@@ -250,12 +268,23 @@ export function Navbar() {
                 <span className="relative">
                   <Icon size={18} />
                   {badge > 0 && (
-                    <span className="absolute -top-1 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[var(--color-accent)] px-1 text-[7px] font-bold text-white">
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-1 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[var(--color-accent)] px-1 text-[7px] font-bold text-white"
+                    >
                       {badge > 9 ? "9+" : badge}
-                    </span>
+                    </motion.span>
                   )}
                 </span>
                 <span>{label}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="mobile-indicator"
+                    className="absolute -top-[1px] left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)] rounded-full"
+                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                  />
+                )}
               </Link>
             );
           })}

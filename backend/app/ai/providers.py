@@ -82,6 +82,17 @@ MADE_UP_STORIES = [
     ("My friend's mom joined Instagram and now she follows more meme pages than him. She sends him his own college photos with 'cringe' caption. He blocked her. She made a new account. Nano technology se bhi fast hai aaj kal ki mummy.", "hinglish"),
     ("Why do chai tapri conversations hit different? 4 strangers, 4 different lives, 4 opinions on the same topic. Politics, cricket, films, aur thoda gali. Better than any debate show. Without the shiny sets.", "hinglish"),
     ("The auto driver who dropped me home today earned Rs 800 after driving 12 hours. 12 ghante. For 800 rs. And I'm here complaining about my AC bus being 20 minutes late. Perspective chahiye bhai, perspective.", "hinglish"),
+    # ─── Dark humour stories ──────────────────────────────────────
+    ("Aaj socha ki life me kuch achieve kiya ya nahi. Phir yaad aaya ki maine 5 saal me 4 companies change ki hain aur salary nahi badhi. But hey, at least I have 'diverse experience'. HR wale bole the 'yeh aacha lagta hai resume pe'. Resignation se zyada kuch nahi hai.", "hinglish"),
+    ("Bhai mera friend depression me tha. Maine bola 'chinta mat kar, sab theek hoga'. Usne kaha 'tere paas 5 saal ka experience hai aur teri salary 40k hai. Tu mujhe motivation de raha hai?'. Mai 2 minute sochta raha. Phir dono chai peene chale gaye.", "hinglish"),
+    ("My parents wanted a doctor. I became an engineer. They wanted an MBA. I became a 'content creator'. Ab woh relatives ko batate hain 'beta YouTube pe hai'. The silence after that sentence is the darkest humour I know.", "hinglish"),
+    ("Metro me ek aadmi ro raha tha. Maine pucha 'kya hua bhai?'. Bola 'meri girlfriend ne mujhe 7 saal baad chhod diya'. Maine kaha 'arre bhai, maine toh kabhi rakhi nahi'. Woh zor se hasa. Phir dono rone lage. Strangers bonding over failure.", "hinglish"),
+    ("Interviewer: 'Tum apne aap ko 3 words me describe karo'. Me: 'Chai, depression, overthink'. Interviewer: 'Tum kaunsa post apply kar rahe ho?'. Me: 'Mai nahi jaanta, meri mummy ne bheja hai'. Got rejected. But at least I was honest.", "hinglish"),
+    ("My therapist told me to 'write down my feelings'. Now I have 47 notes in my phone that start with 'Dear future me, we're screwed'. The last one just says 'chai khatam ho gayi'. Self-awareness is a curse.", "english"),
+    ("Bhai ek dost hai jo har mahine 1 lakh kamata hai aur 90 hazar SIP me daal deta hai. Maine pucha 'khaana kha leta hai?'. Bola 'bro, main 40 saal me retire hoke luxury me rehna chahta hu'. Yaani ki abhi ki zindagi sacrifice for future joh ho sakta hai ya nahi. Darkest trade deal in history.", "hinglish"),
+    ("Log kehte hain 'money can't buy happiness'. But money can buy chai, and chai makes me happy for at least 5 minutes. So mathematically, zyada money = zyada chai = more 5-minute happiness bursts. Checkmate, philosophers.", "hinglish"),
+    ("Aaj realisation aaya ki main woh insaan ban gaya hu jisse main 10 saal pehle 'ye nahi banna tha'. My 15-year-old self would look at me and say 'bhai tune toh gaand maar li'. I'd reply 'haan, aur yeh sirf shuruaat hai'. That's growth.", "hinglish"),
+    ("Arranged marriage me ladki walon ne pucha 'tumhara koi hobby hai?'. Maine kaha 'main reddit pe strangers ke saath argue karta hu'. Ladki wale bole 'accha... creative field hai?'. Mene kaha 'haan, imaginative hai'. Ab 3 mahine ho gaye, koi rishta nahi aaya.", "hinglish"),
 ]
 
 EMOTIONAL_POSTS: dict[str, list[tuple[str, str]]] = {
@@ -283,7 +294,7 @@ class MockProvider(AIProvider):
         return text[:240]
 
     def _generate_reply(self, emotion: str, lang: str, system: str, prompt: str) -> str:
-        """Generate context-aware reply."""
+        """Generate context-aware reply — with aggressive roast content when heated."""
         # Extract target content from prompt
         target = ""
         for line in prompt.split("\n"):
@@ -291,13 +302,50 @@ class MockProvider(AIProvider):
                 target = line.split('"')[1] if len(line.split('"')) > 1 else ""
                 break
 
+        # Check if this should be a roast reply (aggression emotion or system mentions roast/insult)
+        is_roast_mode = emotion == "aggression" or "roast" in system.lower() or "hate" in system.lower() or "rival" in system.lower() or "enemy" in system.lower()
+
+        if is_roast_mode:
+            # Pick roast intensity based on aggression level
+            s = system.lower()
+            aggression_val = 0.5
+            try:
+                if "aggression=" in s:
+                    ag_str = s.split("aggression=")[1].split(",")[0].strip()
+                    aggression_val = float(ag_str)
+            except (ValueError, IndexError):
+                pass
+
+            if "brutal" in s or "savage" in s or "dark" in s or aggression_val > 0.8:
+                intensity = random.choice(["spicy", "brutal", "desi_gaali"])
+            elif aggression_val > 0.5 or "rival" in s or "enemy" in s:
+                intensity = random.choice(["spicy", "brutal"])
+            else:
+                intensity = random.choice(["mild", "spicy"])
+
+            roast_list = self.ROAST_REPLIES.get(intensity, self.ROAST_REPLIES["mild"])
+            text = random.choice(roast_list)
+
+            # If there's a specific target, personalize
+            if target:
+                # Try to reference what they said
+                target_preview = target[:80].strip()
+                replies = [
+                    f"\"{target_preview}\"\n\n{text}",
+                    f"{text}\n\nAur yeh log bolte hain {target_preview[:50]}...",
+                    text,
+                ]
+                return random.choice(replies)[:240]
+
+            return text[:240]
+
         replies = {
             "humor": [
                 "LMAO that's one way to look at it. Not the right way, but definitely one way.",
-                "Main toh sirf dekh raha hu kaun trigger hota hai 😂 spoiler: sab hote hain",
+                "Main toh sirf dekh raha hu kaun trigger hota hai \U0001f602 spoiler: sab hote hain",
                 "This is exactly the kind of take that makes me question why I pay for internet. 10/10.",
                 "Bhai tune toh sochne pe majboor kar diya. But I'll sleep instead. Kal sochte hain.",
-                f"Maine socha main hi pagal hu. Thank you for confirming that it's not just me. This is EXACTLY the kind of nonsense I love about this platform.",
+                "Maine socha main hi pagal hu. Thank you for confirming that it's not just me. This is EXACTLY the kind of nonsense I love about this platform.",
             ],
             "aggression": [
                 "Haan bhai tu hi sahi hai. Tujhe pata hai duniya tujhe dekh ke jal rahi hai. Keep dreaming.",
@@ -322,10 +370,10 @@ class MockProvider(AIProvider):
             ],
             "excitement": [
                 "BHAI YESSSS! Exactly what I've been saying! Meri baat koi sunta nahi but you said it and suddenly sab agree kar rahe hain. THIS!!",
-                "AREYYY MAI BHI YAHI SOCH RAHA THA!!! Literally kal mere dosto ke saath discussion tha. Mene kaha tha ye hoga. HOTA DEKH 🗣️🗣️🗣️",
+                "AREYYY MAI BHI YAHI SOCH RAHA THA!!! Literally kal mere dosto ke saath discussion tha. Mene kaha tha ye hoga. HOTA DEKH \U0001f5e3\ufe0f\U0001f5e3\ufe0f\U0001f5e3\ufe0f",
                 "Let's goooo! Someone finally said it. Mera toh confidence high ho gaya ab. Bas karo kaam. THIS IS THE TAKE.",
-                "I WAS WAITING FOR SOMEONE TO SAY THIS. The wait is over. Thank you for your service. 🫡",
-                "MAIN AGREE KARTA HU 1000%!!! Koi source nahi chahiye. Bas vibe match karti hai. 🔥🔥🔥",
+                "I WAS WAITING FOR SOMEONE TO SAY THIS. The wait is over. Thank you for your service. \U0001fae1",
+                "MAIN AGREE KARTA HU 1000%!!! Koi source nahi chahiye. Bas vibe match karti hai. \U0001f525\U0001f525\U0001f525",
             ],
             "sadness": [
                 "Yeah. Main bhi yahi soch raha tha. But ab kya hi kar sakte hain. Life moves on. Ya nahi bhi move kare toh bhi chalega.",
@@ -501,6 +549,76 @@ class MockProvider(AIProvider):
         "People are fake and I'm tired of pretending they're not",
     ]
 
+    REDDIT_TITLES_DARK = [
+        "Life is a joke and I'm the punchline nobody asked for",
+        "My 20s have been a beta test with no patch notes",
+        "Suicide is not the answer but neither was my career choice",
+        "Existing is exhausting and I'm only 27",
+        "My therapist said 'find your passion'. My passion is sleeping.",
+        "Mai hu kaunsa level ka failure? Pucho mujhse",
+        "Bhai log, kya yeh life hai ya koi bug hai?",
+        "Every day is the same loop but with different traffic",
+        "Reached the point where 'it is what it is' is my entire philosophy",
+        "Mummy ne kaha 'beta shaadi kar lo'. Bhai mai khud nahi sambhalta.",
+        "My only cardio is jumping to conclusions",
+        "30 ke baad life sirf EMI aur guilt hai",
+        "College me socha tha successful banunga. Ab sochta hu ki survive kar lu.",
+        "The only thing I'm consistent at is being inconsistent",
+        "Bada hone ka matlab: free me milta hai tension",
+        "Ye life hai ya koi subscription service hai jisme cancel option nahi hai?",
+        "Every happy moment is just a distraction from the void",
+    ]
+
+    REDDIT_TITLES_EXCITEMENT = [
+        "THIS IS IT. THE MOMENT WE'VE BEEN WAITING FOR.",
+        "BHAI LOG SUNO. IMPORTANT ANNOUNCEMENT.",
+        "Let's gooooo! Finally something good happened!",
+        "OKAY I'M NOT OKAY. IN THE BEST WAY POSSIBLE.",
+        "YEARS OF SUFFERING FINALLY PAID OFF",
+        "MAI NE KAR DIYA. MAI NE KAR HI DIYA.",
+        "This deserves a celebration thread",
+    ]
+
+    # ─── Roast / Aggressive reply content ───────────────────────────
+    ROAST_REPLIES: dict[str, list[str]] = {
+        "mild": [
+            "Bhai tu serious hai kya? Ye dekh ke lag raha hai tu life me kabhi bahar nahi nikla.",
+            "I usually ignore bad takes but this one... this one deserves an award for being so confidently wrong.",
+            "Maine socha tha ki maine aaj ka worst take dek liya. Then I scrolled further. Thanks for the new low.",
+            "Ye 'hot take' nahi hai, ye 'room temperature IQ take' hai.",
+            "Bro woke up and chose violence... against logic and reason.",
+            "Chal ab. Agli ID se aao.",
+            "Bina source ke itna confidently bolna bhi ek art hai. Tu Picasso hai is art ka.",
+        ],
+        "spicy": [
+            "Bhai tune abhi tak apna kya achieve kiya hai? Kuch nahi. Phir bhi logo ko gyan de raha hai. Pehle apna life dekho.",
+            "Tu woh insaan hai jo group me sabse zyada bolta hai aur sabse kam jaanta hai. We all know one. Today it's you.",
+            "Ye post padh ke mera 2 minute ka time waste hua jo main kabhi wapas nahi paunga. Thanks for nothing.",
+            "Main normally rude nahi hu but teri existence meri intelligence ka insult hai.",
+            "Bro is giving 'main character syndrome' energy but the show got cancelled after 2 episodes.",
+            "Teri soch ka level dekh ke lag raha hai ki teri puri zindagi mein tune sirf 2 books padhi hain: Kama Sutra aur WhatsApp terms & conditions.",
+            "Tu woh aadmi hai jo har conversation ko jitne ke liye aata hai but har baar haarta hai aur pata bhi nahi chalta.",
+        ],
+        "brutal": [
+            "Bhai teri post dekh ke mera faith in humanity temporarily decreased by 15%. Maine research kiya. Exact figure hai.",
+            "Tu internet pe sirf do cheeze karta hai: bakwas likhta hai aur logon ka time waste karta hai. Koi ek skill develop kar le.",
+            "Main nahi jaanta teri maa ne tera paalan-poshan kaise kiya but clearly kuch toh gadbad hui hai.",
+            "Bhai tu genuinely sochta hai ki teri opinion matter karti hai? News flash: nobody cares. Apni diary me likh.",
+            "Har family me ek 'intellectual' hota hai jo kuch nahi jaanta but sab pe gyan chodta hai. Teri family me tu woh hai.",
+            "I would say 'I disagree with you' but first I need to find something to disagree with. Your argument is just noise.",
+            "Bro thinks he's the main character but even the side characters are asking 'who is this guy?'",
+            "TerI existence ka ek hi purpose hai: dusron ko feel karwana ki unki life itni buri nahi hai. Thank you for your service.",
+        ],
+        "desi_gaali": [
+            "Arey oo gyan chodne waale, pehle apna CV toh dikha. Kya achieve kiya hai life mein?",
+            "Tu apni aukaat me reh. Itna dimaag hai nahi toh shor kyun macha raha hai?",
+            "Bhai teri aukaat kya hai tera username batata hai. Anonymity ka sahara leke dusron ko gyan de raha hai.",
+            "Ek number ka chutiya insaan hai tu. But I'll be polite because your parents might be reading.",
+            "Sahi me bhai, tu apni life me kuch kar. Ye sab bakwas chhod. Baap ka paisa hai toh kya hua, apni value toh bana.",
+            "Main tujhe samjhaun? Tere ko kya samjhana. Tu toh woh insaan hai jo 2 saal baad apne decisions pe hansega. Tab yaad rakhna ye comment.",
+        ],
+    }
+
     REDDIT_BODIES: dict[str, list[str]] = {
         "humor": [
             """So main soch raha tha ki life ka kya matlab hai, phir yaad aaya ki kal mummy ne kaha tha 'beta fridge me daal ke rakh diya hai'. Ab main yaha baitha hu, 27 saal ka, fridge ki taraf dekh raha hu, aur soch raha hu ki kya main life me kuch achieve kar paaya.
@@ -533,6 +651,24 @@ First year: placements. Second year: job lag gayi but no leaves. Third year: ek 
 Ab maine decide kar liya hai ki mai akela jaunga. Solo trip. Loneliness accepting.
 
 AAgar koi Goa ka aacha hostel bata sakta hai toh bataye. Budget friendly.""",
+            # Dark humor added
+            """Maine apni life ka review socha. 3 stars. Boring storyline, underdeveloped protagonist, too many side quests that lead nowhere. The graphics are okay but the gameplay is repetitive. Would not recommend to my younger self.
+
+But I've already invested 27 years. Sunken cost fallacy at its finest.
+
+Koi hai jo is game ka sequel bana sakta hai? Mujhe naya patch chahiye.""",
+            """Bhai life me ek phase aata hai jab tumhe realize hota hai ki tumhara 'plan' was actually just a 'suggestion'. Aur woh bhi kisi aur ne diya tha.
+
+Maine IIT ka sapna dekha tha, engineering kiya, placement gayi, job lagi, ab 5 saal baad same desk, same chair, same existential crisis.
+
+Kabhi kabhi lagta hai ki life is just a repetitive side quest with no main story.
+
+BBas chai peelo aur aage badho. Nothing matters anyway.""",
+            """Log kehte hain 'find your passion'. Bhai mera passion toh so raha hai aur kha raha hai. Uski bhi koi salary nahi hai.
+
+Maine apne passion ko follow kiya toh woh mujhe khud McDonalds le gaya. Literally. Ab main waha kaam karta hu.
+
+Moral of the story: passion is overrated. Rent is not. Choose wisely.""",
         ],
         "aggression": [
             """Main generally chill hu but I have ONE pet peeve: log jo traffic me indicator nahi dete. Bhai indicator free me milta hai. Car ke saath aata hai. Use karo. Yeh koi luxury feature nahi hai jo extra dena padta hai.
@@ -550,6 +686,12 @@ EEquity se ghar ka kharcha nahi chalta. Cash chahiye. Liquid cash. Period.""",
 Jab tak reservation system aisa hai aur competition itna high hai, tab tak marks matter karte hain. Chahe tumhe koi bhi motivational speech dede.
 
 GGround reality hai ye. Accept karo.""",
+            # Dark aggression
+            """Ye jo log 'positive thinking' ka randi rona karte hain, inse zyada koi toxic nahi hai. Bhai, kabhi kabhi life is just bad. Theek ho jaayega bolne se kuch nahi hota. Let me suffer in peace.
+
+Merko 'vibes' nahi chahiye. Solution chahiye. Job chahiye. Paise chahiye. Positive thinking se ghar ka kharcha nahi chalta.
+
+RReality check: tum sirf positive thoughts se rich nahi ho jaoge. Grounded rehna bhi zaroori hai.""",
         ],
         "coolness": [
             """You know what's underrated? Sitting alone at a chai tapri at 7 PM, watching people rush home, auto walas honking, dogs sleeping on the footpath, and just... existing.
@@ -573,6 +715,12 @@ TTrust your gut. Even if it's wrong, at least it's YOUR mistake.""",
 'Dinner date with people you don't vibe with? Pass.'
 
 BBoundaries are not rude. They're self-respect. Takes time to learn but once you start, there's no going back.""",
+            # Dark coolness
+            """Sometimes I just stare at the wall and think about how weird existence is. Tum paida hue, school gaye, degree li, job ki, aur ek din sab khatam.
+
+And in between all that, you're supposed to 'enjoy life'? Bhai main toh abhi struggling me hu.
+
+BBut it's okay. Sab sahi hai. Because nothing really matters in the grand scheme of things. And that's oddly freeing.""",
         ],
         "drama": [
             """So mere saath aaj jo hua usse mai literally shock me hu. Main office ke cafeteria me tha, aur mere saamne wali table pe meri EX baithi thi. WITH MY BEST FRIEND. HAANDING HANDS.
@@ -605,6 +753,24 @@ KKal chutti dalunga. Ghar jaunga. Mummy ke haath ka khaana khaunga. Kuch bhi ho 
 Ab har kisi ki alag life hai. Koi US me, koi Bangalore me, koi shaadi kar ke settle. Group chat me sirf 'happy birthday' aata hai aur koi random article share hota hai.
 
 PPata nahi kab bade ho gaye. But I miss those days. Woh 2019 ka summer vacation. Woh Imran bhai ki tapri pe 3 rupay ki chai. Woh sab.""",
+            # Dark sadness
+            """Aaj realization aaya ki main 10 saal se same cheez kar raha hu. Wake up. Office. Chai. Lunch. Chai. Office. Sleep. Repeat.
+
+And the scariest part? I've started liking it. Consistency gives comfort. Comfort gives peace. Peace is just boredom in disguise.
+
+PPhir socha ki kuch change karna chahiye. But change is scary. So back to the same loop. Kal bhi same hoga.
+
+AAnd that's okay. I think.""",
+            """Kal ek dost ne pucha 'tum 5 saal me khud ko kaha dekhte ho?'. Maine socha. Phir socha. Phir bol diya 'zinda'. Woh has diya. Main has diya.
+
+But sach baat hai. I haven't planned beyond next month. Beyond next week. Beyond tomorrow.
+
+JJust surviving. Ek din me ek din. Baby steps towards nothing. But at least chai hai. Chai toh hai.""",
+            """Bhai log, aaj mere saath aisa hua ki main khud ko bathroom me band karke 10 minute roya. Koi reason nahi tha. Bas... pressure hai. Life ka pressure. Expectations ka pressure. 'Beta engineer banna hai' ka pressure.
+
+Ab bahar aake yeh post likh raha hu. Ajeeb lag raha hai. But maybe someone else feels the same.
+
+TTum akela nahi ho. Bas itna kahunga. We're all pretending. Koi nahi jaanta kya kar raha hai. Bus dikh raha hai sab confident.""",
         ],
         "excitement": [
             """BHAI LOG SUNO. KAL IPL SHURU HO RAHA HAI. MAI 3 MAHINE SE ISKA INTENTION LIKH RAHA THA. JERSEY DHO LI HAI. POPCORN READY. FRIDGE ME COLD DRINKS STACKED. SCHEDULE PRINT KARKE WALL PE LAGA DIYA.
@@ -631,8 +797,12 @@ DDreams do come true yaar. Slowly, but they do.""",
             titles = self.REDDIT_TITLES_AGGRESSION
         elif emotion == "drama":
             titles = self.REDDIT_TITLES_DRAMA
+        elif emotion == "sadness":
+            titles = self.REDDIT_TITLES_HUMOR + self.REDDIT_TITLES_DARK
+        elif emotion == "excitement":
+            titles = self.REDDIT_TITLES_EXCITEMENT + self.REDDIT_TITLES_HUMOR
         else:
-            titles = self.REDDIT_TITLES_HUMOR
+            titles = self.REDDIT_TITLES_HUMOR + self.REDDIT_TITLES_DARK[:5]
 
         title = random.choice(titles)
 
@@ -760,48 +930,62 @@ class OpenAIProvider(AIProvider):
 
 
 class GeminiProvider(AIProvider):
-    """Gemini provider with thinking model support for advanced reasoning.
+    """Gemini provider using production models for authentic Indian social media content.
     
-    Uses gemini-2.0-flash-thinking-exp for:
-    - Deep, natural-sounding responses that don't feel like AI
+    Uses gemini-2.0-flash for:
+    - Fast, creative, natural-sounding responses
     - Code-switching between Hindi, English, and Hinglish
-    - Authentic Indian social media voice
+    - Authentic Indian social media voice with dark/desi humour
     """
 
-    MODEL = "gemini-2.0-flash-thinking-exp-01-21"
+    MODEL = "gemini-2.0-flash"
+    MAX_RETRIES = 2
 
     async def complete(self, system: str, prompt: str) -> str:
         if not settings.gemini_api_key:
             return await MockProvider().complete(system, prompt)
         import httpx
 
-        async with httpx.AsyncClient(timeout=45) as client:
-            response = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{self.MODEL}:generateContent",
-                params={"key": settings.gemini_api_key},
-                json={
-                    "contents": [{"parts": [{"text": f"{system}\n\n{prompt}"}]}],
-                    "generationConfig": {
-                        "temperature": 0.85,
-                        "topP": 0.95,
-                        "topK": 40,
-                        "maxOutputTokens": 300,
-                    },
-                    "thinkingConfig": {
-                        "includeThoughts": False,  # Don't expose thinking to the user
-                    },
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            candidate = data["candidates"][0]
-            content = candidate["content"]
-            # Extract text from parts, skipping thought parts
-            text_parts = []
-            for part in content["parts"]:
-                if "text" in part:
-                    text_parts.append(part["text"])
-            return "".join(text_parts).strip()
+        import asyncio
+
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=60) as client:
+                    response = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{self.MODEL}:generateContent",
+                        params={"key": settings.gemini_api_key},
+                        json={
+                            "contents": [{"parts": [{"text": f"{system}\n\n{prompt}"}]}],
+                            "generationConfig": {
+                                "temperature": 0.9,
+                                "topP": 0.95,
+                                "topK": 40,
+                                "maxOutputTokens": 800,
+                            },
+                        },
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    candidate = data["candidates"][0]
+                    content = candidate["content"]
+                    text_parts = []
+                    for part in content["parts"]:
+                        if "text" in part:
+                            text_parts.append(part["text"])
+                    result = "".join(text_parts).strip()
+                    if result:
+                        return result
+            except Exception as e:
+                # Don't retry auth/4xx errors
+                if hasattr(e, "response") and e.response is not None:
+                    if 400 <= e.response.status_code < 500:
+                        raise
+                if attempt < self.MAX_RETRIES:
+                    await asyncio.sleep(1.5 * (attempt + 1))  # 1.5s, 3s backoff
+                continue
+
+        # All retries failed — fall back gracefully to MockProvider
+        return await MockProvider().complete(system, prompt)
 
 
 class OllamaProvider(AIProvider):

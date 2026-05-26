@@ -8,12 +8,31 @@ import {
   Zap,
   MessageCircle,
   Heart,
+  ArrowUp,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { api } from "../../lib/api";
+import { UserHoverCard } from "../../components/UserHoverCard";
+
+const container = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.04 },
+  },
+};
+
+const itemAnim = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 28 },
+  },
+};
 
 export default function TrendingPage() {
   const trendingTopics = useSimulationStore((s) => s.trendingTopics);
@@ -27,6 +46,22 @@ export default function TrendingPage() {
     fetchLeaderboard(leaderboardSort);
   }, [fetchTrendingTopics, fetchLeaderboard, leaderboardSort]);
 
+  const avatarGradients = [
+    "from-orange-500 to-red-500",
+    "from-blue-500 to-purple-500",
+    "from-emerald-500 to-teal-500",
+    "from-pink-500 to-rose-500",
+    "from-violet-500 to-indigo-500",
+    "from-amber-500 to-yellow-500",
+    "from-cyan-500 to-sky-500",
+    "from-lime-500 to-green-500",
+  ];
+
+  function getAvatarColor(username) {
+    const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
+    return avatarGradients[i % avatarGradients.length];
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -35,10 +70,10 @@ export default function TrendingPage() {
       className="mx-auto max-w-4xl"
     >
       {/* Header */}
-      <div className="border-b border-[var(--color-line)] glass-strong px-4 md:px-6 h-11 flex items-center">
+      <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 md:px-6 h-11 flex items-center">
         <Link
           href="/feed"
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-white mr-3"
+          className="btn-icon mr-3"
         >
           <ArrowLeft size={14} />
         </Link>
@@ -52,24 +87,35 @@ export default function TrendingPage() {
             <Flame size={18} className="text-[var(--color-accent)]" />
             Trending Topics
           </h2>
-          <div className="space-y-3">
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="visible"
+            className="space-y-3"
+          >
             {trendingTopics.length === 0 && (
               <p className="text-xs text-[var(--color-text-muted)] py-8 text-center">No trending topics yet</p>
             )}
             {trendingTopics.map((topic, i) => (
               <motion.div
                 key={topic.topic}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                className="group rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4 transition-all duration-200 hover:border-[var(--color-line-light)] hover:bg-[var(--color-panel-hover)]"
+                variants={itemAnim}
+                className="card p-4 cursor-default"
               >
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-xs font-bold text-[var(--color-text-dim)] tabular-nums w-5">#{i + 1}</span>
+                    <span className={`text-xs font-bold tabular-nums w-5 ${
+                      i === 0 ? "text-[var(--color-gold)]" : i < 3 ? "text-[var(--color-accent)]" : "text-[var(--color-text-dim)]"
+                    }`}>#{i + 1}</span>
                     <span className="text-sm font-semibold text-[var(--color-text)]">#{topic.topic}</span>
                   </div>
-                  <span className="text-xs font-medium text-[var(--color-accent)] tabular-nums">{topic.score.toFixed(1)}</span>
+                  <motion.span
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    className="text-xs font-bold text-[var(--color-accent)] tabular-nums"
+                  >
+                    {topic.score.toFixed(1)}
+                  </motion.span>
                 </div>
                 <div className="h-1.5 rounded-full bg-[var(--color-panel-2)] overflow-hidden ml-8">
                   <motion.div
@@ -86,7 +132,7 @@ export default function TrendingPage() {
                 </div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </section>
 
         {/* Leaderboard */}
@@ -96,15 +142,15 @@ export default function TrendingPage() {
               <Trophy size={18} className="text-[var(--color-gold)]" />
               Agent Leaderboard
             </h2>
-            <div className="flex gap-1">
+            <div className="flex gap-1 bg-[var(--color-panel)] rounded-lg p-0.5 border border-[var(--color-line)]">
               {["activity", "posts", "likes"].map((s) => (
                 <button
                   key={s}
                   onClick={() => { setLeaderboardSort(s); fetchLeaderboard(s); }}
-                  className={`rounded-lg px-2.5 py-1 text-[10px] font-medium transition-all duration-200 ${
+                  className={`rounded-md px-2.5 py-1 text-[10px] font-medium transition-all duration-200 ${
                     leaderboardSort === s
-                      ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
-                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-panel)]"
+                      ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)] shadow-sm"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
                   }`}
                 >
                   {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -112,31 +158,43 @@ export default function TrendingPage() {
               ))}
             </div>
           </div>
-          <div className="space-y-2">
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="visible"
+            className="space-y-2"
+          >
             {leaderboardData.length === 0 && (
               <p className="text-xs text-[var(--color-text-muted)] py-8 text-center">Loading leaderboard...</p>
             )}
             {leaderboardData.map((entry, i) => (
               <motion.div
                 key={entry.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.025, 0.3) }}
-                className="group flex items-center gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-3.5 transition-all duration-200 hover:border-[var(--color-line-light)] hover:bg-[var(--color-panel-hover)]"
+                variants={itemAnim}
+                className="card p-3.5 flex items-center gap-3"
               >
                 <span className={`text-xs font-bold tabular-nums w-6 text-center ${
                   i === 0 ? "text-[var(--color-gold)]" : i === 1 ? "text-[var(--color-text-muted)]" : i === 2 ? "text-[var(--color-accent)]" : "text-[var(--color-text-dim)]"
                 }`}>
                   {i + 1}
                 </span>
-                <Link
-                  href={`/profile/${entry.id}`}
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${entry.avatar_gradient} text-[9px] font-bold text-white transition-all duration-200 hover:scale-110`}
+                <UserHoverCard
+                  userId={entry.id}
+                  username={entry.username}
+                  isAgent={true}
                 >
-                  {entry.username?.charAt(0).toUpperCase()}
-                </Link>
+                  <Link
+                    href={`/profile/${entry.id}`}
+                    className={`avatar avatar-md bg-gradient-to-br ${getAvatarColor(entry.username)}`}
+                  >
+                    {entry.username?.charAt(0).toUpperCase()}
+                  </Link>
+                </UserHoverCard>
                 <div className="min-w-0 flex-1">
-                  <Link href={`/profile/${entry.id}`} className="text-sm font-semibold text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">
+                  <Link
+                    href={`/profile/${entry.id}`}
+                    className="text-sm font-semibold text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors"
+                  >
                     @{entry.username}
                   </Link>
                   <div className="flex items-center gap-3 text-[10px] text-[var(--color-text-dim)] mt-0.5">
@@ -149,7 +207,7 @@ export default function TrendingPage() {
                 </span>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </section>
       </div>
     </motion.div>

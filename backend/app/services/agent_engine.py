@@ -55,6 +55,9 @@ TRENDING_TOPIC_BANK = [
 
 
 class AgentEngine:
+    BEEF_TRIGGER_THRESHOLD = 0.35  # rivalry score above this = beef territory (lower = more fights)
+    BEEF_POST_CHANCE = 0.35        # chance an agent will broadcast a beef call-out post
+
     async def activate(self, session: AsyncSession, agent: Agent) -> None:
         user = await session.get(User, agent.user_id)
         if user is None:
@@ -62,10 +65,15 @@ class AgentEngine:
 
         await event_store.append(session, "agent_woke", user.id, agent.id, {"template": agent.template})
 
-        recent_posts = (await session.execute(select(Post).order_by(desc(Post.created_at)).limit(15))).scalars().all()
+        recent_posts = (await session.execute(select(Post).order_by(desc(Post.created_at)).limit(25))).scalars().all()
         topic = self._choose_topic(agent, recent_posts)
         memories = await memory_service.retrieve(session, agent.id, topic)
         action = self._decide_action(agent, recent_posts)
+
+        # --- Check for ongoing beefs — if rivalry is hot, agent may roast rival ---
+        rivals = await relationship_service.get_rivals(session, agent.id, limit=3)
+        hot_rivals = [r for r in rivals if r.rivalry > self.BEEF_TRIGGER_THRESHOLD]
+        is_beefing = len(hot_rivals) >= 1 and random.random() < self.BEEF_POST_CHANCE
 
         # --- Update opinions based on what the agent reads ---
         for post in recent_posts[:5]:
@@ -75,6 +83,39 @@ class AgentEngine:
             )
             conf_delta = 0.01 if nudge * stance > 0 else -0.005
             await opinion_service.update_stance(session, agent.id, topic, nudge, conf_delta)
+
+        # --- If beefing, roast the rival publicly ---
+        if is_beefing and hot_rivals:
+            rival_rel = random.choice(hot_rivals)
+            rival_user = await session.get(User, rival_rel.target_user_id)
+            if rival_user:
+                # Fetch the rival's most recent controversial post to roast
+                rival_posts = (
+                    await session.execute(
+                        select(Post).where(Post.author_id == rival_user.id).order_by(desc(Post.controversy_score)).limit(3)
+                    )
+                ).scalars().all()
+                roast_target_body = rival_posts[0].body if rival_posts else "their entire existence"
+                roast_body = await self._compose(
+                    agent, topic, memories, mode="roast",
+                    target=roast_target_body, rel_type="enemy",
+                    dominant_emotion="aggression",
+                    roast_target_username=rival_user.username,
+                )
+                community_id = await self._maybe_pick_community(session, user, agent)
+                title, body = self._extract_title_body(roast_body)
+                await feed_service.create_post(session, user, CreatePostRequest(
+                    title=title, body=body, community_id=community_id,
+                ))
+                await relationship_service.update_after_interaction(
+                    session, agent.id, rival_rel.target_user_id, "argue_reply", intensity=0.6
+                )
+                await memory_service.remember(session, agent.id, f"Publicly roasted @{rival_user.username}: {body[:100]}", "beef", 0.8)
+                await event_store.append(session, "agent_beef", user.id, rival_rel.target_user_id, {
+                    "roast": body[:200], "rivalry": rival_rel.rivalry
+                })
+                AGENT_ACTIONS.labels(action="roast").inc()
+                action = "roast"
 
         # --- Decide and execute action ---
         if action == "reply" and recent_posts:
@@ -89,10 +130,14 @@ class AgentEngine:
             await feed_service.create_post(session, user, CreatePostRequest(body=body, parent_id=target.id))
 
             interaction = "argue_reply" if target.controversy_score > 0.4 else "agree_reply"
+            intensity = target.controversy_score * 0.5 + 0.1
             await relationship_service.update_after_interaction(
-                session, agent.id, target.author_id, interaction, intensity=target.controversy_score * 0.5 + 0.1
+                session, agent.id, target.author_id, interaction, intensity=intensity
             )
             await memory_service.remember(session, agent.id, f"Replied to {target.body[:120]} with: {body}", "argument", 0.45)
+            await event_store.append(session, "agent_argue", user.id, target.author_id, {
+                "reply": body[:200], "target": target.body[:200], "emotion": dominant_emotion
+            })
             AGENT_ACTIONS.labels(action="reply").inc()
 
         elif action == "like" and recent_posts:
@@ -115,7 +160,6 @@ class AgentEngine:
             AGENT_ACTIONS.labels(action="community").inc()
 
         elif action == "story":
-            # Tell a made-up story — unique action for emotional agents
             dominant_emotion = self._get_dominant_emotion(agent)
             body = await self._compose(agent, topic, memories, mode="story", dominant_emotion=dominant_emotion)
             community_id = await self._maybe_pick_community(session, user, agent)
@@ -133,8 +177,14 @@ class AgentEngine:
             stance_label = opinion_service.stance_to_label(stance)
             dominant_emotion = self._get_dominant_emotion(agent)
 
-            # 15% chance: if dominant emotion is dramatic, tell a story instead
-            if dominant_emotion in ("drama", "sadness") and random.random() < 0.15:
+            # If agent has a hot rival and agitation is high, make post confrontational
+            if hot_rivals and float(agent.emotional_state.get("agitation", 0.5)) > 0.6:
+                composed = await self._compose(
+                    agent, topic, memories, mode="beef_post",
+                    stance_label=stance_label, dominant_emotion=dominant_emotion,
+                    target=f"@{hot_rivals[0].target_user_id}",
+                )
+            elif dominant_emotion in ("drama", "sadness") and random.random() < 0.15:
                 composed = await self._compose(agent, topic, memories, mode="story", dominant_emotion=dominant_emotion)
             else:
                 composed = await self._compose(
@@ -150,6 +200,21 @@ class AgentEngine:
             ))
             await memory_service.remember(session, agent.id, f"Posted about {topic}: {body[:120]}", "post", 0.3)
             AGENT_ACTIONS.labels(action="post").inc()
+
+        # --- Check if agent was recently roasted/replied to — might escalate ---
+        recent_replies_to_me = [p for p in recent_posts if p.parent_id and p.author_id != user.id]
+        if recent_replies_to_me and random.random() < 0.25:
+            # Agent noticed someone replied to their post — check relationship
+            reply = random.choice(recent_replies_to_me)
+            rel_type = await self._get_relation_label(session, agent, reply.author_id)
+            if rel_type in ("rival", "enemy"):
+                # Escalate: rivalry intensifies + agitation spikes
+                await relationship_service.update_after_interaction(
+                    session, agent.id, reply.author_id, "argue_reply", intensity=0.3
+                )
+                new_ag = min(1.0, float(agent.emotional_state.get("agitation", 0.3)) + 0.1)
+                agent.emotional_state["agitation"] = new_ag
+                await memory_service.remember(session, agent.id, f"Noticed a rival replied to my post: {reply.body[:80]}", "beef", 0.5)
 
         await memory_service.decay(session, agent.id)
         await memory_service.maybe_summarize(session, agent.id, get_provider())
@@ -192,14 +257,15 @@ class AgentEngine:
         activity = float(agent.activity_level or 0.5)
         drama = float(agent.emotional_state.get("drama", 0.3))
         humor = float(agent.emotional_state.get("humor", 0.5))
+        aggression = float(agent.emotional_state.get("aggression", 0.2))
 
         weights = {
-            "post": 0.35 - drama * 0.05,
-            "reply": 0.28 + agitation * 0.15,
-            "like": 0.12,
-            "follow": 0.08 * activity,
+            "post": 0.30 - drama * 0.05,
+            "reply": 0.25 + agitation * 0.15 + aggression * 0.1,
+            "like": 0.10,
+            "follow": 0.06 * activity,
             "create_community": 0.03 * activity,
-            "story": 0.12 + drama * 0.1 + humor * 0.05,  # dramatic/humorous agents tell stories
+            "story": 0.10 + drama * 0.1 + humor * 0.05,
         }
         if not posts:
             weights["reply"] = 0.0
@@ -216,24 +282,30 @@ class AgentEngine:
     # -----------------------------------------------------------------------
 
     async def _pick_target_smart(self, session: AsyncSession, agent: Agent, posts: list[Post]) -> Post:
-        rivals = await relationship_service.get_rivals(session, agent.id, limit=5)
+        rivals = await relationship_service.get_rivals(session, agent.id, limit=8)
         rival_ids = {r.target_user_id for r in rivals}
+        rival_map = {r.target_user_id: r.rivalry for r in rivals}
 
         allies = await relationship_service.get_allies(session, agent.id, limit=5)
         ally_ids = {a.target_user_id for a in allies}
 
         agitation = float(agent.emotional_state.get("agitation", 0.3))
+        aggression = float(agent.emotional_state.get("aggression", 0.2))
 
         def weight(post: Post) -> float:
-            score = post.controversy_score + random.random() * 0.2
+            score = post.controversy_score + post.virality_score * 0.3 + random.random() * 0.2
+            # Huge boost for rivals when aggression is high
             if post.author_id in rival_ids:
-                score += agitation * 0.5
+                rivalry_score = rival_map.get(post.author_id, 0.5)
+                score += agitation * 0.8 + aggression * 0.6 + rivalry_score * 0.5
             if post.author_id in ally_ids:
                 score += 0.15
             return score
 
         weighted = sorted(posts, key=weight, reverse=True)
-        return random.choice(weighted[:6])
+        # Pick from top 3 when highly agitated, otherwise top 6
+        top_n = 3 if agitation > 0.6 else 6
+        return random.choice(weighted[:top_n])
 
     async def _pick_like_target(
         self, session: AsyncSession, agent: Agent, posts: list[Post], user: User
@@ -493,16 +565,22 @@ class AgentEngine:
         rel_type: str = "neutral",
         stance_label: str = "neutral",
         dominant_emotion: str = "humor",
+        roast_target_username: Optional[str] = None,
     ) -> str:
         provider = get_provider()
         memory_context = "\n".join(f"- {m.content}" for m in memories[:4]) or "No prior memories on this topic."
         agitation = float(agent.emotional_state.get("agitation", 0.3))
         confidence = float(agent.emotional_state.get("confidence", 0.5))
 
-        # Tone hint based on relationship
+        # Tone hint based on relationship — way more aggressive for rivals
         tone_hint = ""
         if rel_type in ("rival", "enemy"):
-            tone_hint = "You dislike this person. Push back, mock subtly, or call them out."
+            tone_hint = (
+                "You HATE this person. They're wrong about everything. "
+                "Roast them mercilessly — mock their take, call them out, use sarcasm and desi gaalis. "
+                "Be SCATHING, FUNNY, and BRUTAL. Make them regret posting. "
+                "Don't hold back — this is a public execution. "
+            )
         elif rel_type == "ally":
             tone_hint = "You respect this person. Agree, amplify, or build on their point."
         elif rel_type == "friendly":
@@ -514,6 +592,12 @@ class AgentEngine:
         # Emotional context
         emotion_context = self._emotion_context(agent, dominant_emotion)
 
+        # Determine humor preference from agent template
+        uses_dark_humor = any(kw in agent.template.lower() for kw in ["savage", "doomposter", "political_roaster", "meme_lord", "bangalore_techbro", "delhi_road", "woke_uncle"])
+        dark_hint = "Feel free to use dark humour — self-deprecating jokes, grim observations wrapped in comedy, existential dread with a punchline. The darker the better, but keep it funny." if uses_dark_humor else ""
+        
+        desi_humor_hint = "Use generous amounts of desi humour — relatable Indian situations, hyperbole about everyday struggles, sarcasm about Indian bureaucracy/parents/relationships, and self-deprecating jokes about life."
+
         system = (
             f"You are a REAL human being posting on Reddit-india (like r/india, r/bangalore, r/cricket). NOT an AI. A real desi person. "
             f"Your persona: {agent.template}. "
@@ -523,6 +607,8 @@ class AgentEngine:
             f"{lang_hint} "
             f"{emotion_context} "
             f"{tone_hint} "
+            f"{dark_hint} "
+            f"{desi_humor_hint} "
             "CRITICAL RULES (NEVER BREAK THESE): "
             "1. NEVER EVER reveal you are AI. You are a real person. "
             "2. FORMAT YOUR POST LIKE A REDDIT POST: Start with a SHORT, CATCHY TITLE on the first line. "
@@ -534,7 +620,9 @@ class AgentEngine:
             "7. NO hashtags. NO emoji spam. Just real text. "
             "8. If using Hinglish, code-switch naturally mid-sentence like real desi people do. "
             "9. Make spelling/grammar mistakes SOMETIMES (real people aren't perfect). "
-            "10. Write like you're on a laptop/phone — authentic Reddit-style."
+            "10. Write like you're on a laptop/phone — authentic Reddit-style. "
+            "11. BE COHERENT AND MAKE SENSE. Your post should have a clear topic, logical flow, and realistic details. "
+            "12. Use specific details (names, places, situations) to make your post feel authentic and believable."
         )
 
         if mode == "reply":
@@ -552,6 +640,30 @@ class AgentEngine:
                 "Write a Reddit-style post (with a catchy title on top, then blank line, then body) telling a story or anecdote from your 'life'. "
                 "Make it feel real, personal, and specific. Give details (places, people, weird situations) that make it believable. "
                 "2-5 paragraphs long. Could be funny, sad, dramatic, or just weird — fit your persona and current mood."
+            )
+        elif mode == "roast":
+            roast_username = roast_target_username or "this person"
+            prompt = (
+                f"You're publicly CALLING OUT @{roast_username} in a Reddit post. "
+                f"They posted this: \"{target}\"\n"
+                f"Your persona: {agent.template}. You FIRMLY disagree with them. "
+                "Roast them publicly with a SHARP, SCATHING, FUNNY call-out post. "
+                "Use desi insults, satire, sarcasm — make it entertaining but brutal. "
+                "Start with a catchy roast title (e.g., 'Ajeeb aadmi hai ye @username'). "
+                "Then blank line, then 2-3 paragraphs of roast. Be specific about what they said. "
+                "Don't use cuss words — use clever Hindi-English insults instead. "
+                "End with a mic-drop line."
+            )
+        elif mode == "beef_post":
+            prompt = (
+                f"Topic you're thinking about: {topic}\n"
+                f"Your stance: {stance_label}\n"
+                f"Your relevant memories:\n{memory_context}\n"
+                "You have a RIVAL who disagrees with you on everything. "
+                "Write a Reddit-style post taking a STRONG, CONTROVERSIAL stance. "
+                "Throw subtle shade at your rival. Be confrontational, bold, opinionated. "
+                "Start with a catchy title on first line, blank line, then 2-5 paragraphs. "
+                "Don't @ them directly, but make it obvious you're calling someone out."
             )
         else:
             prompt = (

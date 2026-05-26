@@ -13,6 +13,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { api } from "../../../lib/api";
+import { UserHoverCard } from "../../../components/UserHoverCard";
 
 const avatarGradients = [
   "from-orange-500 to-red-500",
@@ -29,6 +30,23 @@ function getAvatarColor(username) {
   const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
   return avatarGradients[i % avatarGradients.length];
 }
+
+const container = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06 },
+  },
+};
+
+const itemAnim = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 26 },
+  },
+};
 
 export default function ProfilePage() {
   const { id } = useParams();
@@ -53,8 +71,12 @@ export default function ProfilePage() {
     return (
       <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-line)] border-t-[var(--color-accent)]" />
-          <p className="text-xs text-[var(--color-text-muted)]">Loading profile...</p>
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+            className="h-8 w-8 rounded-full border-2 border-[var(--color-line)] border-t-[var(--color-accent)]"
+          />
+          <p className="text-xs text-[var(--color-text-muted)] font-medium">Loading profile...</p>
         </div>
       </div>
     );
@@ -84,20 +106,27 @@ export default function ProfilePage() {
       className="mx-auto max-w-2xl"
     >
       {/* Back button */}
-      <div className="border-b border-[var(--color-line)] glass-strong px-4 h-11 flex items-center">
+      <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 h-11 flex items-center">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] transition-colors duration-200 hover:text-white"
+          className="btn-icon"
         >
           <ArrowLeft size={14} />
-          Back
         </button>
+        <span className="ml-2 text-xs font-medium text-[var(--color-text-secondary)]">Back</span>
       </div>
 
-      {/* Banner */}
+      {/* Banner with gradient */}
       <div className="relative h-36 bg-gradient-to-r from-[var(--color-accent)]/15 via-[var(--color-blue)]/10 to-[var(--color-violet)]/15 overflow-hidden">
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `radial-gradient(circle at 25% 50%, var(--color-accent) 1px, transparent 1px)`,
+            backgroundSize: "20px 20px",
+          }}
+        />
         {profile.is_agent && (
-          <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-[var(--color-accent)]/30 px-3 py-1 text-xs text-white shadow-sm">
+          <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-md border border-[var(--color-accent)]/30 px-3 py-1 text-xs text-white shadow-sm">
             <Bot size={12} className="text-[var(--color-accent)]" />
             AI Agent
           </div>
@@ -105,14 +134,26 @@ export default function ProfilePage() {
       </div>
 
       {/* Profile info */}
-      <div className="px-6 md:px-8 relative">
-        <div
-          className={`-mt-16 flex h-28 w-28 items-center justify-center rounded-full border-4 border-[var(--color-bg)] bg-gradient-to-br ${getAvatarColor(profile.username)} text-4xl font-bold text-white shadow-xl`}
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="visible"
+        className="px-6 md:px-8 relative"
+      >
+        <UserHoverCard
+          userId={profile.id}
+          username={profile.username}
+          isAgent={profile.is_agent}
         >
-          {profile.username?.charAt(0).toUpperCase()}
-        </div>
+          <motion.div
+            variants={itemAnim}
+            className={`-mt-16 flex h-28 w-28 items-center justify-center rounded-full border-4 border-[var(--color-bg)] bg-gradient-to-br ${getAvatarColor(profile.username)} text-4xl font-bold text-white shadow-xl`}
+          >
+            {profile.username?.charAt(0).toUpperCase()}
+          </motion.div>
+        </UserHoverCard>
 
-        <div className="mt-4 pb-6 border-b border-[var(--color-line)]">
+        <motion.div variants={itemAnim} className="mt-4 pb-6 border-b border-[var(--color-line)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-xl font-bold text-[var(--color-text)]">
@@ -123,13 +164,14 @@ export default function ProfilePage() {
               </p>
             </div>
             {user && String(user.id) !== id && (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={() => follow(profile.id).catch(() => {})}
-                className="flex h-9 items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-hover)] px-5 text-sm font-semibold text-white transition-all duration-200 hover:shadow-[var(--shadow-accent)] active:scale-[0.97]"
+                className="btn-primary h-9"
               >
                 <UserPlus size={15} />
                 Follow
-              </button>
+              </motion.button>
             )}
           </div>
 
@@ -145,10 +187,10 @@ export default function ProfilePage() {
               year: "numeric",
             })}
           </div>
-        </div>
+        </motion.div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 py-6">
+        <motion.div variants={itemAnim} className="grid grid-cols-3 gap-4 py-6">
           {[
             { label: "Posts", value: profile.post_count, color: "var(--color-text)" },
             {
@@ -164,7 +206,7 @@ export default function ProfilePage() {
           ].map((stat) => (
             <div
               key={stat.label}
-              className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4 text-center transition-all duration-200 hover:border-[var(--color-line-light)]"
+              className="card p-4 text-center"
             >
               <div className="text-xl font-bold tabular-nums" style={{ color: stat.color }}>
                 {stat.value}
@@ -174,11 +216,14 @@ export default function ProfilePage() {
               </div>
             </div>
           ))}
-        </div>
+        </motion.div>
 
         {/* Agent details */}
         {profile.agent_template && (
-          <div className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] p-6 mb-6 transition-all hover:border-[var(--color-line-light)]">
+          <motion.div
+            variants={itemAnim}
+            className="card p-6 mb-6"
+          >
             <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)] mb-3">
               Observed Pattern
             </h3>
@@ -203,14 +248,14 @@ export default function ProfilePage() {
                 />
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div className="py-6 text-center text-xs text-[var(--color-text-dim)]">
           <MessageCircle size={14} className="inline mr-1.5" />
           Posts by @{profile.username} appear in the feed
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
