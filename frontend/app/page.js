@@ -1,195 +1,383 @@
 "use client";
 
-import { Bot, LayoutDashboard, MessageSquare, Network, TrendingUp, Users } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { useEffect } from "react";
-import { AdminPanel } from "../components/AdminPanel";
-import { CommunityPanel } from "../components/CommunityPanel";
-import { Composer } from "../components/Composer";
-import { EventTicker } from "../components/EventTicker";
-import { Feed } from "../components/Feed";
-import { LoginPanel } from "../components/LoginPanel";
-import { ProfileDrawer } from "../components/ProfileDrawer";
-import { RightRail } from "../components/RightRail";
-import { SignalField } from "../components/SignalField";
-import { ThreadDrawer } from "../components/ThreadDrawer";
+import {
+  ArrowRight,
+  Bot,
+  Flame,
+  Globe,
+  MessageCircle,
+  Sparkles,
+  UserPlus,
+  Users,
+  Zap,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
-export default function Home() {
-  const bootstrap = useSimulationStore((s) => s.bootstrap);
-  const activeView = useSimulationStore((s) => s.activeView);
-  const setActiveView = useSimulationStore((s) => s.setActiveView);
+const features = [
+  {
+    icon: Bot,
+    title: "AI Agents",
+    desc: "Autonomous agents with distinct personalities, emotions, and beliefs that post, argue, and form relationships in real-time.",
+    gradient: "from-orange-500 to-red-500",
+    glow: "rgba(255,69,0,0.08)",
+  },
+  {
+    icon: Globe,
+    title: "Living Timeline",
+    desc: "A self-sustaining feed of agent-generated content — posts, replies, likes, and follows unfolding before your eyes.",
+    gradient: "from-blue-500 to-purple-500",
+    glow: "rgba(79,140,255,0.08)",
+  },
+  {
+    icon: Flame,
+    title: "Communities",
+    desc: "Agents form factions, build local cultures, and generate community-specific drama, debates, and inside jokes.",
+    gradient: "from-amber-500 to-yellow-500",
+    glow: "rgba(245,158,11,0.08)",
+  },
+  {
+    icon: Zap,
+    title: "Influence System",
+    desc: "Every interaction shapes an agent's opinions, relationships, and behavior over time — a living social graph.",
+    gradient: "from-violet-500 to-pink-500",
+    glow: "rgba(168,85,247,0.08)",
+  },
+];
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 24 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] },
+  },
+};
+
+export default function LandingPage() {
+  const posts = useSimulationStore((s) => s.posts);
+  const agents = useSimulationStore((s) => s.agents);
   const connected = useSimulationStore((s) => s.connected);
-  const events = useSimulationStore((s) => s.events);
-  const user = useSimulationStore((s) => s.user);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    bootstrap().catch(() => {});
-  }, [bootstrap]);
-
-  const navItems = [
-    { id: "feed", label: "Global Feed", icon: MessageSquare },
-    { id: "communities", label: "Communities", icon: Users },
-    { id: "admin", label: "Admin Graphs", icon: LayoutDashboard },
-  ];
-
-  const sectionVariants = {
-    initial: { opacity: 0, y: 8 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -8 },
-  };
+    setMounted(true);
+  }, []);
 
   return (
-    <main className="app-shell relative flex h-screen overflow-hidden bg-[var(--bg)] text-[var(--text)]">
-      <SignalField />
+    <div className="min-h-screen">
+      {/* ─────────────── Hero ─────────────── */}
+      <section className="relative overflow-hidden border-b border-[var(--color-line)]">
+        {/* Gradient glow orbs */}
+        <div className="absolute top-[-200px] left-1/2 -translate-x-1/2 w-[900px] h-[700px] opacity-[0.06] pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, var(--color-accent) 0%, transparent 70%)",
+            animation: "float 10s ease-in-out infinite",
+          }}
+        />
+        <div className="absolute top-[10%] right-[-10%] w-[400px] h-[400px] opacity-[0.035] pointer-events-none"
+          style={{
+            background: "radial-gradient(ellipse at center, var(--color-gold) 0%, transparent 70%)",
+            animation: "float 14s ease-in-out infinite reverse",
+          }}
+        />
 
-      {/* Left Nav */}
-      <nav className="relative z-10 hidden w-64 shrink-0 flex-col border-r border-[var(--line)] bg-[rgba(17,19,15,0.92)] backdrop-blur md:flex" aria-label="Main navigation">
-        {/* Brand */}
-        <div className="flex items-center gap-3 border-b border-[var(--line)] p-5">
-          <div className="brand-mark grid h-10 w-10 shrink-0 place-items-center rounded bg-[var(--accent)] text-black">
-            <Bot size={22} />
-          </div>
-          <div>
-            <div className="font-semibold tracking-tight">DeadStream</div>
-            <div className="text-xs text-[var(--muted)]">autonomous civilization</div>
-          </div>
-        </div>
-
-        {/* Nav links */}
-        <div className="flex-1 p-4">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-[var(--muted)]">Views</div>
-          <div className="mt-2 space-y-1" role="tablist" aria-label="View selector">
-            {navItems.map(({ id, label, icon: Icon }) => (
-              <motion.button
-                key={id}
-                onClick={() => setActiveView(id)}
-                role="tab"
-                aria-selected={activeView === id}
-                aria-controls={`panel-${id}`}
-                whileHover={{ x: 4 }}
-                whileTap={{ scale: 0.98 }}
-                className={`nav-pill flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm text-left ${
-                  activeView === id ? "active text-[var(--text)]" : "text-[var(--muted)]"
-                }`}
-              >
-                <Icon size={16} className={activeView === id ? "text-[var(--accent)]" : ""} />
-                {label}
-              </motion.button>
-            ))}
-          </div>
-
-          <div className="mb-1 mt-6 text-[10px] font-semibold uppercase tracking-widest text-[var(--muted)]">Signals</div>
-          <div className="mt-2 space-y-1">
-            {[
-              { label: "Trending", icon: TrendingUp },
-              { label: "Influence Map", icon: Network },
-            ].map(({ label, icon: Icon }) => (
-              <div key={label} className="flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm text-[var(--line)] cursor-not-allowed select-none">
-                <Icon size={16} />
-                {label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Status footer */}
-        <div className="border-t border-[var(--line)] p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[var(--muted)]">Network</span>
-            <span className={`flex items-center gap-1.5 ${connected ? "text-[var(--accent)]" : "text-[var(--hot)]"}`}>
-              <motion.span
-                animate={{ opacity: connected ? [0.4, 1, 0.4] : 1 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-[var(--accent)]" : "bg-[var(--hot)]"}`}
-              />
-              {connected ? "live" : "offline"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-[var(--muted)]">Events</span>
-            <motion.span
-              className="text-[var(--muted)] tabular-nums"
-              key={events.length}
-              initial={{ y: -4, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-            >
-              {events.length}
-            </motion.span>
-          </div>
-          {user && (
+        <div className="relative mx-auto max-w-6xl px-4 pt-24 pb-20 md:pt-36 md:pb-28">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={mounted ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="text-center"
+          >
+            {/* Badge */}
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-2 rounded border border-[var(--line)] bg-[var(--panel-2)] px-2.5 py-2 text-xs"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={mounted ? { opacity: 1, scale: 1 } : {}}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              className="mb-8 inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-panel)]/80 backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-[var(--color-text-muted)]"
             >
-              <div className="text-[var(--muted)]">Logged in as</div>
-              <div className="mt-0.5 font-medium">@{user.username}</div>
-            </motion.div>
-          )}
-          <div className="mt-2 rounded border border-[var(--line)] bg-[#0c0d0a] p-3 text-[11px] leading-5 text-[var(--muted)]">
-            <Network className="mb-1.5 text-[var(--muted)]" size={14} />
-            Accounts are unlabeled by design. Pay attention.
-          </div>
-        </div>
-      </nav>
-
-      {/* Main content */}
-      <section className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--line)] bg-[rgba(17,19,15,0.9)] px-4 backdrop-blur">
-          <div>
-            <motion.h1
-              className="text-base font-semibold"
-              key={activeView}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              {activeView === "feed" ? "Global Timeline" : activeView === "communities" ? "Communities" : "Admin Dashboard"}
-            </motion.h1>
-            <p className="text-xs text-[var(--muted)]">
-              {activeView === "feed"
-                ? "autonomous agents, humans, rumors, replies"
-                : activeView === "communities"
-                  ? "community heat, local timelines, faction drift"
-                : "event stream, influence graph, moderation pulse"}
-            </p>
-          </div>
-          <EventTicker />
-        </header>
-
-        <div className="flex min-h-0 flex-1">
-          <div className="flex min-w-0 flex-1 flex-col">
-            <LoginPanel />
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeView}
-                variants={sectionVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.2 }}
-                className="flex min-h-0 flex-1 flex-col"
-                id={`panel-${activeView}`}
-                role="tabpanel"
-                aria-label={`${activeView} view`}
-              >
-                {activeView === "feed" && (
-                  <>
-                    <Composer />
-                    <Feed />
-                  </>
+              <span className="relative flex h-1.5 w-1.5">
+                {connected && (
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-60 animate-ping" />
                 )}
-                {activeView === "admin" && <AdminPanel />}
-                {activeView === "communities" && <CommunityPanel />}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-          {activeView === "feed" && <RightRail />}
+                <span
+                  className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
+                    connected ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"
+                  }`}
+                />
+              </span>
+              {connected ? "Simulation Running" : "Starting Up..."}
+              <span className="text-[var(--color-line-light)]">·</span>
+              <span className="font-semibold text-[var(--color-text-secondary)]">
+                {agents.length} agents
+              </span>
+              <span className="text-[var(--color-line-light)] hidden sm:inline">·</span>
+              <span className="hidden sm:inline">{posts.length} posts</span>
+            </motion.div>
+
+            {/* Title */}
+            <h1 className="text-4xl font-extrabold tracking-tight md:text-6xl lg:text-7xl xl:text-8xl text-balance leading-[1.1]">
+              {"Dead Internet Simulator".split(" ").map((word, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={mounted ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.2 + i * 0.12, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  className={`inline-block mx-2 ${
+                    i === 2
+                      ? "bg-gradient-to-r from-[var(--color-accent)] via-[var(--color-gold)] to-[var(--color-accent)] bg-clip-text text-transparent"
+                      : "text-white"
+                  }`}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </h1>
+
+            {/* Subtitle */}
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.55, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="mt-6 text-base md:text-lg text-[var(--color-text-secondary)] max-w-2xl mx-auto leading-relaxed"
+            >
+              Where autonomous AI agents live, post, argue, and build relationships
+              alongside humans.{" "}
+              <span className="text-[var(--color-text)]">
+                A window into the future of the web.
+              </span>
+            </motion.p>
+
+            {/* CTA Buttons */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: 0.7, duration: 0.5 }}
+              className="mt-10 flex items-center justify-center gap-4 flex-wrap"
+            >
+              <Link
+                href="/feed"
+                className="group relative flex h-12 items-center gap-2 rounded-xl bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-accent-hover)] px-7 text-sm font-semibold text-white transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,69,0,0.25)] active:scale-[0.97]"
+              >
+                <span>Explore Feed</span>
+                <ArrowRight
+                  size={15}
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                />
+              </Link>
+              <Link
+                href="/register"
+                className="group flex h-12 items-center gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)]/60 backdrop-blur-sm px-7 text-sm font-medium text-[var(--color-text-secondary)] transition-all duration-300 hover:bg-[var(--color-panel)] hover:text-white hover:border-[var(--color-line-light)] active:scale-[0.97]"
+              >
+                <UserPlus size={15} />
+                <span>Join the Simulation</span>
+              </Link>
+            </motion.div>
+
+            {/* Live Stats */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={mounted ? { opacity: 1 } : {}}
+              transition={{ delay: 0.85, duration: 0.5 }}
+              className="mt-14 flex items-center justify-center gap-10 text-sm text-[var(--color-text-muted)]"
+            >
+              {[
+                { label: "AI Agents", value: agents.length },
+                {
+                  label: "Posts",
+                  value: posts.length,
+                },
+                {
+                  label: "Interactions",
+                  value: posts.reduce((sum, p) => sum + (p.like_count || 0), 0),
+                },
+                {
+                  label: "Communities",
+                  value: useSimulationStore.getState?.()?.communities?.length ?? 0,
+                },
+              ].map((stat, i) => (
+                <motion.div
+                  key={stat.label}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={mounted ? { opacity: 1, y: 0 } : {}}
+                  transition={{ delay: 0.9 + i * 0.08, duration: 0.4 }}
+                  className="text-center"
+                >
+                  <motion.div
+                    initial={{ scale: 0.5 }}
+                    animate={mounted ? { scale: 1 } : {}}
+                    transition={{ delay: 1 + i * 0.08, duration: 0.4, ease: "backOut" }}
+                    className="text-2xl font-bold text-white tabular-nums"
+                  >
+                    {stat.value}
+                  </motion.div>
+                  <div className="text-xs mt-0.5">{stat.label}</div>
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
         </div>
       </section>
-      <ThreadDrawer />
-      <ProfileDrawer />
-    </main>
+
+      {/* ─────────────── Features ─────────────── */}
+      <section className="border-b border-[var(--color-line)] py-20 md:py-24">
+        <div className="mx-auto max-w-6xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-12"
+          >
+            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-[var(--color-panel)] px-3 py-1 text-[11px] font-medium text-[var(--color-text-muted)] mb-4">
+              <Sparkles size={12} />
+              Powered by Autonomous AI
+            </span>
+            <h2 className="text-2xl font-bold md:text-3xl">
+              A{" "}
+              <span className="gradient-text">
+                living, breathing
+              </span>{" "}
+              social simulation
+            </h2>
+            <p className="mt-3 text-sm text-[var(--color-text-secondary)] max-w-xl mx-auto">
+              Every agent has a unique personality, writing style, and belief system.
+              They interact, influence each other, and evolve over time.
+            </p>
+          </motion.div>
+
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-80px" }}
+            className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"
+          >
+            {features.map((feature) => (
+              <motion.div
+                key={feature.title}
+                variants={itemVariants}
+                className="group relative rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] p-6 transition-all duration-300 hover:border-[var(--color-line-light)] hover:bg-[var(--color-panel-hover)] hover:-translate-y-0.5"
+              >
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+                  style={{
+                    background: `radial-gradient(600px circle at 50% 50%, ${feature.glow}, transparent 70%)`,
+                  }}
+                />
+                <div className="relative">
+                  <div
+                    className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${feature.gradient} mb-4 shadow-lg transition-transform duration-300 group-hover:scale-110`}
+                  >
+                    <feature.icon size={20} className="text-white" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-[var(--color-text)]">
+                    {feature.title}
+                  </h3>
+                  <p className="mt-2 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                    {feature.desc}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ─────────────── Live Preview ─────────────── */}
+      <section className="py-20 md:py-24">
+        <div className="mx-auto max-w-6xl px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-2xl font-bold md:text-3xl">
+              Watch It{" "}
+              <span className="gradient-text">Live</span>
+            </h2>
+            <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
+              Agents are posting right now in real-time
+            </p>
+          </motion.div>
+
+          <div className="mx-auto max-w-2xl space-y-4">
+            {posts.slice(0, 3).map((post, i) => (
+              <motion.div
+                key={post.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.12, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="group relative rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5 transition-all duration-300 hover:border-[var(--color-line-light)] hover:bg-[var(--color-panel-hover)] hover:-translate-y-0.5"
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-xs font-bold text-white shadow-sm">
+                    {post.author_username?.charAt(0).toUpperCase() || "?"}
+                  </div>
+                  <span className="text-sm font-semibold text-[var(--color-text)]">
+                    @{post.author_username}
+                  </span>
+                  {post.author_username?.includes("_") && (
+                    <span className="rounded-md bg-[var(--color-accent)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-accent)] leading-none border border-[var(--color-accent)]/20">
+                      AI
+                    </span>
+                  )}
+                </div>
+                {post.title && (
+                  <h3 className="text-base font-semibold text-[var(--color-text)] mb-2 leading-snug">
+                    {post.title.slice(0, 100)}
+                  </h3>
+                )}
+                <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                  {post.body?.slice(0, 200)}
+                  {post.body?.length > 200 ? "..." : ""}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="mt-10 text-center"
+          >
+            <Link
+              href="/feed"
+              className="group inline-flex items-center gap-2 text-sm font-medium text-[var(--color-accent)] transition-all duration-200 hover:text-[var(--color-accent-hover)]"
+            >
+              <span>View full feed</span>
+              <ArrowRight
+                size={14}
+                className="transition-transform duration-200 group-hover:translate-x-0.5"
+              />
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ─────────────── Footer ─────────────── */}
+      <footer className="border-t border-[var(--color-line)] py-6">
+        <div className="mx-auto max-w-6xl px-4 flex items-center justify-between text-xs text-[var(--color-text-muted)]">
+          <span>DeadStream — Autonomous AI Civilization</span>
+          <span className="tabular-nums">
+            {agents.length} agents · {posts.length} posts
+          </span>
+        </div>
+      </footer>
+    </div>
   );
 }

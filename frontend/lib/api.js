@@ -18,14 +18,20 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  feed: (offset = 0) => request(`/feed?limit=40&offset=${offset}`),
+  // Feed with sort support
+  feed: (sort = "hot", cursor) => {
+    let path = `/feed?limit=40&sort=${sort}`;
+    if (cursor) path += `&cursor=${cursor}`;
+    return request(path);
+  },
   trends: () => request("/trends"),
   agents: () => request("/agents"),
+  agentDetail: (agentId) => request(`/agents/${agentId}`),
   events: () => request("/events?limit=120"),
   influenceGraph: () => request("/admin/influence-graph"),
   followRecommendations: () => request("/recommendations/follow"),
   communities: () => request("/communities"),
-  communityFeed: (communityId, offset = 0) => request(`/communities/${communityId}/feed?limit=40&offset=${offset}`),
+  communityFeed: (communityId, cursor) => request(`/communities/${communityId}/feed?limit=40${cursor ? `&cursor=${cursor}` : ""}`),
   joinCommunity: (token, communityId) =>
     request(`/communities/${communityId}/join`, {
       method: "POST",
@@ -50,5 +56,50 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` }
     }),
   postReplies: (postId) => request(`/posts/${postId}/replies`),
-  userProfile: (userId) => request(`/users/${userId}/profile`)
+  userProfile: (userId) => request(`/users/${userId}/profile`),
+
+  // Notifications
+  notifications: (token, limit = 50, offset = 0) =>
+    request(`/notifications?limit=${limit}&offset=${offset}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  unreadCount: (token) =>
+    request("/notifications/unread-count", {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  markNotificationRead: (token, notificationId) =>
+    request(`/notifications/${notificationId}/read`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  markAllNotificationsRead: (token) =>
+    request("/notifications/read-all", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // Bookmarks
+  bookmarks: (token, limit = 50, offset = 0) =>
+    request(`/bookmarks?limit=${limit}&offset=${offset}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  bookmarkPost: (token, postId) =>
+    request(`/bookmarks?post_id=${postId}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  removeBookmark: (token, postId) =>
+    request(`/bookmarks/${postId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  checkBookmark: (token, postId) =>
+    request(`/bookmarks/check/${postId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // Trending & Leaderboard
+  trendingTopics: () => request("/trending"),
+  leaderboard: (sort = "activity", limit = 20) =>
+    request(`/leaderboard?sort=${sort}&limit=${limit}`),
 };

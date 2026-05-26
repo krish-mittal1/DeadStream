@@ -12,11 +12,28 @@ from app.api.deps import current_user
 from app.db.session import get_session
 from app.events.store import event_store
 from app.models.agent import Agent
+from app.models.bookmark import Bookmark
+from app.models.notification import Notification
 from app.models.user import User
-from app.schemas import AgentProfile, AuthResponse, CommunityResponse, CreatePostRequest, LoginRequest, PostResponse, RegisterRequest, UserProfileResponse
+from app.schemas import (
+    AgentDetailResponse,
+    AgentProfile,
+    AuthResponse,
+    BookmarkResponse,
+    CommunityResponse,
+    CreatePostRequest,
+    LeaderboardEntry,
+    LoginRequest,
+    NotificationResponse,
+    PostResponse,
+    RegisterRequest,
+    TrendingTopicResponse,
+    UserProfileResponse,
+)
 from app.core.exceptions import AppError
 from app.services.auth import auth_service
 from app.services.feed import feed_service
+from app.services.notification_service import notification_service
 from app.services.recommendation import recommendation_service
 
 api_router = APIRouter()
@@ -73,9 +90,10 @@ async def login(request: LoginRequest, session: AsyncSession = Depends(get_sessi
 async def feed(
     cursor: Optional[str] = Query(default=None, description="Opaque cursor for pagination"),
     limit: int = Query(50, ge=1, le=100),
+    sort: str = Query("hot", description="Sort: hot, new, top, controversial"),
     session: AsyncSession = Depends(get_session),
 ) -> list[PostResponse]:
-    return await feed_service.list_feed(session, limit, cursor=cursor)
+    return await feed_service.list_feed(session, limit, cursor=cursor, sort=sort)
 
 
 @api_router.post("/posts", response_model=PostResponse)
@@ -193,3 +211,111 @@ async def user_profile(user_id: uuid.UUID, session: AsyncSession = Depends(get_s
     if profile is None:
         raise HTTPException(status_code=404, detail="user_not_found")
     return profile
+
+
+# ── Agent Detail ────────────────────────────────────────────────────
+
+@api_router.get("/agents/{agent_id}", response_model=AgentDetailResponse)
+async def agent_detail(agent_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> AgentDetailResponse:
+    detail = await feed_service.agent_detail(session, agent_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="agent_not_found")
+    return detail
+
+
+# ── Notifications ────────────────────────────────────────────────────
+
+@api_router.get("/notifications", response_model=list[NotificationResponse])
+async def list_notifications(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[NotificationResponse]:
+    return await notification_service.list_notifications(session, user.id, limit, offset)
+
+
+@api_router.get("/notifications/unread-count")
+async def unread_notification_count(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, int]:
+    count = await notification_service.unread_count(session, user.id)
+    return {"count": count}
+
+
+@api_router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    await notification_service.mark_read(session, notification_id, user.id)
+    return {"status": "ok"}
+
+
+@api_router.post("/notifications/read-all")
+async def mark_all_notifications_read(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    await notification_service.mark_all_read(session, user.id)
+    return {"status": "ok"}
+
+
+# ── Bookmarks ────────────────────────────────────────────────────────
+
+@api_router.get("/bookmarks", response_model=list[PostResponse])
+async def list_bookmarks(
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[PostResponse]:
+    return await feed_service.list_bookmarks(session, user.id, limit, offset)
+
+
+@api_router.post("/bookmarks", response_model=BookmarkResponse)
+async def bookmark_post(
+    post_id: uuid.UUID = Query(..., description="Post ID to bookmark"),
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> BookmarkResponse:
+    return await feed_service.bookmark_post(session, user.id, post_id)
+
+
+@api_router.delete("/bookmarks/{post_id}")
+async def remove_bookmark(
+    post_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, str]:
+    await feed_service.remove_bookmark(session, user.id, post_id)
+    return {"status": "ok"}
+
+@api_router.get("/bookmarks/check/{post_id}")
+async def check_bookmark(
+    post_id: uuid.UUID,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict[str, bool]:
+    is_bookmarked = await feed_service.is_bookmarked(session, user.id, post_id)
+    return {"bookmarked": is_bookmarked}
+
+
+# ── Trending & Leaderboard ───────────────────────────────────────────
+
+@api_router.get("/trending", response_model=list[TrendingTopicResponse])
+async def trending_topics(
+    session: AsyncSession = Depends(get_session),
+) -> list[TrendingTopicResponse]:
+    return await feed_service.trending_topics(session)
+
+
+@api_router.get("/leaderboard", response_model=list[LeaderboardEntry])
+async def leaderboard(
+    sort: str = Query("activity", description="Sort: activity, posts, likes"),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_session),
+) -> list[LeaderboardEntry]:
+    return await feed_service.leaderboard(session, sort, limit)

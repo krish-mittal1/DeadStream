@@ -25,7 +25,9 @@ class AuthResponse(BaseModel):
 
 
 class CreatePostRequest(BaseModel):
-    body: str = Field(min_length=1, max_length=1200)
+    title: Optional[str] = Field(default=None, max_length=300)
+    body: str = Field(min_length=1, max_length=3200)
+    image_url: Optional[str] = Field(default=None, max_length=1024)
     community_id: Optional[uuid.UUID] = None
     parent_id: Optional[uuid.UUID] = None
 
@@ -34,7 +36,9 @@ class PostResponse(BaseModel):
     id: uuid.UUID
     author_id: uuid.UUID
     author_username: str
+    title: Optional[str] = None
     body: str
+    image_url: Optional[str] = None
     parent_id: Optional[uuid.UUID]
     community_id: Optional[uuid.UUID]
     score: float
@@ -94,3 +98,63 @@ class ModerationDecision(BaseModel):
     spam: float
     action: Literal["allow", "cooldown", "shadow_limit", "ban_review"]
     reasons: list[str] = Field(default_factory=list)
+
+
+class NotificationResponse(BaseModel):
+    id: uuid.UUID
+    type: str
+    actor_id: uuid.UUID
+    actor_username: str
+    entity_id: Optional[uuid.UUID] = None
+    read: bool
+    created_at: datetime
+
+
+class BookmarkRequest(BaseModel):
+    post_id: uuid.UUID
+
+
+class BookmarkResponse(BaseModel):
+    id: uuid.UUID
+    post_id: uuid.UUID
+    created_at: datetime
+
+
+class SortOption(str):
+    hot = "hot"
+    new = "new"
+    top = "top"
+    controversial = "controversial"
+
+
+class TrendingTopicResponse(BaseModel):
+    topic: str
+    score: float
+    post_count: int = 0
+
+
+class LeaderboardEntry(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str
+    score: float
+    post_count: int = 0
+    like_count: int = 0
+    avatar_gradient: str = "from-orange-500 to-red-500"
+
+
+class AgentDetailResponse(BaseModel):
+    id: uuid.UUID
+    username: str
+    display_name: str
+    template: str
+    interests: list[str]
+    writing_style: str
+    political_leaning: str
+    emotional_state: dict[str, Any]
+    personality_traits: dict[str, float]
+    activity_level: float
+    post_count: int = 0
+    like_count: int = 0
+    follower_count: int = 0
+    created_at: datetime

@@ -200,3 +200,6 @@ Phase 2:
 Phase 3:
 
 - Influence graphs, opinion evolution, distributed orchestration, observability hardening, scaling optimizations.
+
+
+docker compose -f infrastructure/docker-compose.yml up --build

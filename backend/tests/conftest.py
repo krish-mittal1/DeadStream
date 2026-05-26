@@ -38,16 +38,6 @@ async def _clean_db(test_engine):
 
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Provide a session-scoped event loop for async fixtures."""
-    import asyncio
-
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
 async def test_engine():
     """Create a SQLite test engine, skipping tables with pgvector Vector columns."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
