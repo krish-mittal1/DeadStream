@@ -203,3 +203,4 @@ Phase 3:
 
 
 docker compose -f infrastructure/docker-compose.yml up --build
+cd infrastructure && docker compose down && docker compose up -d --build

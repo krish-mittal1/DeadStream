@@ -3,6 +3,7 @@ from app.models.bookmark import Bookmark
 from app.models.community import Community, CommunityMembership
 from app.models.event import Event
 from app.models.memory import AgentMemory
+from app.models.notification import Notification
 from app.models.social import Follow, Like, Post
 from app.models.user import User
 
@@ -15,6 +16,7 @@ __all__ = [
     "CommunityMembership",
     "Event",
     "AgentMemory",
+    "Notification",
     "Follow",
     "Like",
     "Post",

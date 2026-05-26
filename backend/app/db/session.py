@@ -32,12 +32,17 @@ async def init_models() -> None:
         try:
             await conn.execute(text("ALTER TABLE posts ADD COLUMN image_url VARCHAR(1024)"))
         except Exception:
-            pass  # column already exists
+            pass
         # ─── Migration: add title column to posts if not exists ──
         try:
             await conn.execute(text("ALTER TABLE posts ADD COLUMN title VARCHAR(500)"))
         except Exception:
-            pass  # column already exists
+            pass
+        # ─── Migration: add notification columns if table was missing ──
+        try:
+            await conn.execute(text("SELECT 1 FROM notifications LIMIT 0"))
+        except Exception:
+            await conn.run_sync(Base.metadata.create_all)
 
 
 async def close_engine() -> None:
