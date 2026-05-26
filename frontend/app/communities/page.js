@@ -92,7 +92,8 @@ export default function CommunitiesPage() {
           <motion.div
             variants={container}
             initial="hidden"
-            animate="visible"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-40px" }}
             className="space-y-2"
           >
             <AnimatePresence mode="popLayout">
@@ -155,7 +156,12 @@ export default function CommunitiesPage() {
           )}
           {selectedCommunity && (
             <>
-              <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] p-6 md:p-8">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="border-b border-[var(--color-line)] bg-[var(--color-panel)] p-6 md:p-8"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <h2 className="text-xl font-bold text-[var(--color-text)]">
@@ -188,8 +194,14 @@ export default function CommunitiesPage() {
                     {Number(selectedCommunity.conflict_score).toFixed(1)}
                   </span>
                 </div>
-              </div>
-              <div className="p-5 md:p-6 space-y-4">
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.3 }}
+                className="p-5 md:p-6 space-y-4"
+              >
                 {communityPosts.length === 0 && (
                   <div className="flex items-center justify-center py-16">
                     <div className="text-center">
@@ -206,7 +218,8 @@ export default function CommunitiesPage() {
                 <motion.div
                   variants={container}
                   initial="hidden"
-                  animate="visible"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: "-60px" }}
                   className="space-y-4"
                 >
                   {communityPosts.map((post, index) => (
@@ -266,7 +279,7 @@ export default function CommunitiesPage() {
                     </motion.div>
                   ))}
                 </motion.div>
-              </div>
+              </motion.div>
             </>
           )}
         </div>

@@ -6,7 +6,7 @@ import {
   ShieldAlert,
   Zap,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import Link from "next/link";
 import { useMemo } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
@@ -143,7 +143,13 @@ export default function AdminPage() {
         {/* Metrics */}
         <div className="flex flex-col overflow-hidden lg:col-span-2">
           {/* Influence Network */}
-          <section className="border-b border-[var(--color-line)] p-5">
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="border-b border-[var(--color-line)] p-5"
+          >
             <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)] mb-4">
               <GitFork size={16} className="text-[var(--color-violet)]" />
               Influence Network
@@ -197,15 +203,39 @@ export default function AdminPage() {
                 Humans ({graph.nodes.filter((n) => n.group === "human").length})
               </span>
             </div>
-          </section>
+          </motion.section>
 
           {/* Stats */}
-          <section className="flex-1 overflow-auto p-5 space-y-5">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
+          <motion.section
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.3 }}
+            className="flex-1 overflow-auto p-5 space-y-5"
+          >
+            <motion.h2
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]"
+            >
               <ShieldAlert size={16} className="text-[var(--color-accent)]" />
               Moderation & Metrics
-            </h2>
-            <div className="grid grid-cols-2 gap-4">
+            </motion.h2>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-60px" }}
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: { staggerChildren: 0.08 },
+                },
+              }}
+              className="grid grid-cols-2 gap-4"
+            >
               {[
                 {
                   label: "Moderation actions",
@@ -228,8 +258,16 @@ export default function AdminPage() {
                   color: "var(--color-blue)",
                 },
               ].map((stat) => (
-                <div
+                <motion.div
                   key={stat.label}
+                  variants={{
+                    hidden: { opacity: 0, y: 16 },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                      transition: { type: "spring", stiffness: 300, damping: 26 },
+                    },
+                  }}
                   className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5 transition-all duration-200 hover:border-[var(--color-line-light)]"
                 >
                   <div className="text-xs text-[var(--color-text-muted)]">{stat.label}</div>
@@ -239,12 +277,18 @@ export default function AdminPage() {
                   >
                     {stat.value}
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
 
             {/* Event Breakdown */}
-            <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5"
+            >
               <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)] mb-4">
                 Event Breakdown
               </h3>
@@ -281,8 +325,8 @@ export default function AdminPage() {
                     </div>
                   ))}
               </div>
-            </div>
-          </section>
+            </motion.div>
+          </motion.section>
         </div>
       </div>
     </motion.div>

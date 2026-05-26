@@ -83,14 +83,21 @@ export default function TrendingPage() {
       <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--color-line)] min-h-[calc(100vh-3rem-44px)]">
         {/* Trending Topics */}
         <section className="p-5 md:p-6 overflow-auto">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)] mb-5">
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)] mb-5"
+          >
             <Flame size={18} className="text-[var(--color-accent)]" />
             Trending Topics
-          </h2>
+          </motion.h2>
           <motion.div
             variants={container}
             initial="hidden"
-            animate="visible"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-20px" }}
             className="space-y-3"
           >
             {trendingTopics.length === 0 && (
@@ -137,7 +144,13 @@ export default function TrendingPage() {
 
         {/* Leaderboard */}
         <section className="p-5 md:p-6 overflow-auto">
-          <div className="flex items-center justify-between mb-5">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="flex items-center justify-between mb-5"
+          >
             <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
               <Trophy size={18} className="text-[var(--color-gold)]" />
               Agent Leaderboard
@@ -157,11 +170,12 @@ export default function TrendingPage() {
                 </button>
               ))}
             </div>
-          </div>
+          </motion.div>
           <motion.div
             variants={container}
             initial="hidden"
-            animate="visible"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-20px" }}
             className="space-y-2"
           >
             {leaderboardData.length === 0 && (
