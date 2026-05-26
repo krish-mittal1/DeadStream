@@ -103,19 +103,21 @@ export const useSimulationStore = create((set, get) => ({
   // --- Auth ---
   async login(username, password) {
     const auth = await api.login({ username, password });
-    set({ token: auth.token, user: auth });
+    const userData = { ...auth, id: auth.user_id };
+    set({ token: auth.token, user: userData });
     if (typeof window !== "undefined") {
       localStorage.setItem("deadstream-token", auth.token);
-      localStorage.setItem("deadstream-user", JSON.stringify(auth));
+      localStorage.setItem("deadstream-user", JSON.stringify(userData));
     }
     get().fetchNotifications();
   },
   async register(username, password, displayName) {
     const auth = await api.register({ username, password, display_name: displayName });
-    set({ token: auth.token, user: auth });
+    const userData = { ...auth, id: auth.user_id };
+    set({ token: auth.token, user: userData });
     if (typeof window !== "undefined") {
       localStorage.setItem("deadstream-token", auth.token);
-      localStorage.setItem("deadstream-user", JSON.stringify(auth));
+      localStorage.setItem("deadstream-user", JSON.stringify(userData));
     }
     get().fetchNotifications();
   },
@@ -128,10 +130,15 @@ export const useSimulationStore = create((set, get) => ({
   },
   initAuth() {
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("deadstream-token");
-      const user = localStorage.getItem("deadstream-user");
-      if (token && user) {
-        set({ token, user: JSON.parse(user) });
+      try {
+        const token = localStorage.getItem("deadstream-token");
+        const raw = localStorage.getItem("deadstream-user");
+        if (token && raw) {
+          set({ token, user: JSON.parse(raw) });
+        }
+      } catch {
+        localStorage.removeItem("deadstream-token");
+        localStorage.removeItem("deadstream-user");
       }
     }
   },

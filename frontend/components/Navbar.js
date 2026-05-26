@@ -8,6 +8,7 @@ import {
   Home,
   LayoutDashboard,
   LogIn,
+  LogOut,
   Moon,
   Sun,
   UserPlus,
@@ -30,6 +31,7 @@ export function Navbar() {
   const initTheme = useSimulationStore((s) => s.initTheme);
   const unreadCount = useSimulationStore((s) => s.unreadCount);
   const fetchNotifications = useSimulationStore((s) => s.fetchNotifications);
+  const logout = useSimulationStore((s) => s.logout);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -190,17 +192,27 @@ export function Navbar() {
 
           {/* Auth */}
           {user ? (
-            <Link
-              href={`/profile/${user.id}`}
-              className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--color-line)] group"
-            >
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-[10px] font-bold text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(255,69,0,0.3)]">
-                {user.username[0].toUpperCase()}
-              </div>
-              <span className="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-white transition-colors">
-                @{user.username}
-              </span>
-            </Link>
+            <>
+              <Link
+                href={`/profile/${user.id}`}
+                className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--color-line)] group"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-[10px] font-bold text-white transition-all duration-200 group-hover:scale-110 group-hover:shadow-[0_0_12px_rgba(255,69,0,0.3)]">
+                  {user.username[0].toUpperCase()}
+                </div>
+                <span className="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-white transition-colors">
+                  @{user.username}
+                </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => { logout(); }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-all duration-200 hover:bg-[var(--color-panel)] hover:text-red-400"
+                title="Logout"
+              >
+                <LogOut size={14} />
+              </button>
+            </>
           ) : !isAuthPage ? (
             <div className="hidden md:flex items-center gap-2">
               <Link
