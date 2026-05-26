@@ -6,10 +6,12 @@ import { useSimulationStore } from "../store/useSimulationStore";
 export function ThemeProvider({ children }) {
   const theme = useSimulationStore((s) => s.theme);
   const initTheme = useSimulationStore((s) => s.initTheme);
+  const initAuth = useSimulationStore((s) => s.initAuth);
 
   useEffect(() => {
     initTheme();
-  }, [initTheme]);
+    initAuth();
+  }, [initTheme, initAuth]);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light", theme === "light");

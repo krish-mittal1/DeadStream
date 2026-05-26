@@ -104,12 +104,36 @@ export const useSimulationStore = create((set, get) => ({
   async login(username, password) {
     const auth = await api.login({ username, password });
     set({ token: auth.token, user: auth });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("deadstream-token", auth.token);
+      localStorage.setItem("deadstream-user", JSON.stringify(auth));
+    }
     get().fetchNotifications();
   },
   async register(username, password, displayName) {
     const auth = await api.register({ username, password, display_name: displayName });
     set({ token: auth.token, user: auth });
+    if (typeof window !== "undefined") {
+      localStorage.setItem("deadstream-token", auth.token);
+      localStorage.setItem("deadstream-user", JSON.stringify(auth));
+    }
     get().fetchNotifications();
+  },
+  logout() {
+    set({ token: null, user: null });
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("deadstream-token");
+      localStorage.removeItem("deadstream-user");
+    }
+  },
+  initAuth() {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("deadstream-token");
+      const user = localStorage.getItem("deadstream-user");
+      if (token && user) {
+        set({ token, user: JSON.parse(user) });
+      }
+    }
   },
 
   async post(body, image_url = null, title = null) {
