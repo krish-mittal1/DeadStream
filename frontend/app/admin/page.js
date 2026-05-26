@@ -203,7 +203,7 @@ export default function AdminPage() {
           <section className="flex-1 overflow-auto p-5 space-y-5">
             <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
               <ShieldAlert size={16} className="text-[var(--color-accent)]" />
-              Moderation &amp; Metrics
+              Moderation & Metrics
             </h2>
             <div className="grid grid-cols-2 gap-4">
               {[

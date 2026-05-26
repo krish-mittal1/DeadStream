@@ -503,86 +503,86 @@ class MockProvider(AIProvider):
 
     REDDIT_BODIES: dict[str, list[str]] = {
         "humor": [
-            "So main soch raha tha ki life ka kya matlab hai, phir yaad aaya ki kal mummy ne kaha tha 'beta fridge me daal ke rakh diya hai'. Ab main yaha baitha hu, 27 saal ka, fridge ki taraf dekh raha hu, aur soch raha hu ki kya main life me kuch achieve kar paaya.
+            """So main soch raha tha ki life ka kya matlab hai, phir yaad aaya ki kal mummy ne kaha tha 'beta fridge me daal ke rakh diya hai'. Ab main yaha baitha hu, 27 saal ka, fridge ki taraf dekh raha hu, aur soch raha hu ki kya main life me kuch achieve kar paaya.
 
 Lekin phir khaya toh acha laga. So maybe life is about the food we ate along the way.
 
-Idk yaar, ye existential crisis aur chai ka combination khatarnak hai.",
-            "Bhai kal mere office me kya hua pucho mat. Maine apne boss ko 'good morning' bola, unhone 'what's so good about it' karke reply diya. Mera toh poora din kharab ho gaya.
+IIdk yaar, ye existential crisis aur chai ka combination khatarnak hai.""",
+            """Bhai kal mere office me kya hua pucho mat. Maine apne boss ko 'good morning' bola, unhone 'what's so good about it' karke reply diya. Mera toh poora din kharab ho gaya.
 
 Mai abhi tak soch raha hu ki kya jawab dena chahiye tha. 'The fact that I'm not resigning today?' 'The fact that AC is working?' 'Sir aapne toh mera mood kharab kar diya?'
 
-Anyway, main 2 mahine me resign dene wala hu. Joining letter ready hai. Bas courage chahiye.",
-            "Aaj subah uth ke socha ki gym jaunga. Par phir mirror dekha aur laga... arre acha toh lag raha hu. Kya zaroorat hai gym ki? Body banane ke chakkar me kyu padna.
+AAnyway, main 2 mahine me resign dene wala hu. Joining letter ready hai. Bas courage chahiye.""",
+            """Aaj subah uth ke socha ki gym jaunga. Par phir mirror dekha aur laga... arre acha toh lag raha hu. Kya zaroorat hai gym ki? Body banane ke chakkar me kyu padna.
 
 Phir vada pav khaya. Life is good.
 
-Ye 'self love' wala trend sahi me kaam karta hai yaar. Bas motivation nahi chahiye gym jaane ka.",
-            "My WhatsApp group has 3 categories of forwards:
+YYe 'self love' wala trend sahi me kaam karta hai yaar. Bas motivation nahi chahiye gym jaane ka.""",
+            """My WhatsApp group has 3 categories of forwards:
 1. Good morning messages with flowers (sent by uncles)
 2. 'Beta yeh padh lo exam me aayega' (sent by aunties)
 3. 'Is desh ka kya hoga' with some random news article (sent by everyone)
 
 And then there's me sending memes at 2 AM which nobody replies to.
 
-Kya life hai yaar. Group admin banne ka sapna tha, lekin kisi ne attention nahi di.",
-            "Me and my college friends planned a Goa trip for 3 years straight. Every year: 'iss baar pakka'. Every year: kuch na kuch ho jata hai.
+KKya life hai yaar. Group admin banne ka sapna tha, lekin kisi ne attention nahi di.""",
+            """Me and my college friends planned a Goa trip for 3 years straight. Every year: 'iss baar pakka'. Every year: kuch na kuch ho jata hai.
 
 First year: placements. Second year: job lag gayi but no leaves. Third year: ek friend ka breakup hua, ab woh depressed hai.
 
 Ab maine decide kar liya hai ki mai akela jaunga. Solo trip. Loneliness accepting.
 
-Agar koi Goa ka aacha hostel bata sakta hai toh bataye. Budget friendly.",
+AAgar koi Goa ka aacha hostel bata sakta hai toh bataye. Budget friendly.""",
         ],
         "aggression": [
-            "Main generally chill hu but I have ONE pet peeve: log jo traffic me indicator nahi dete. Bhai indicator free me milta hai. Car ke saath aata hai. Use karo. Yeh koi luxury feature nahi hai jo extra dena padta hai.
+            """Main generally chill hu but I have ONE pet peeve: log jo traffic me indicator nahi dete. Bhai indicator free me milta hai. Car ke saath aata hai. Use karo. Yeh koi luxury feature nahi hai jo extra dena padta hai.
 
 Kal ek aadmi ne mere saamne aise sudden brake maara ki main 2 minute tak horn bajata raha. Usne mirror me dekha aur ignore kar diya. Kya dimaag hai logo ka.
 
-Mai suggest karta hu ki traffic rules me naya law aaye: agar tune indicator nahi diya toh tera DL suspend. Simple.",
-            "I'm so tired of people who say 'startup culture is toxic' while working in a company that pays 30k and asks you to 'own the product'. Bhai 30k me toh sirf chai biskut aata hai, product ownership nahi.
+MMai suggest karta hu ki traffic rules me naya law aaye: agar tune indicator nahi diya toh tera DL suspend. Simple.""",
+            """I'm so tired of people who say 'startup culture is toxic' while working in a company that pays 30k and asks you to 'own the product'. Bhai 30k me toh sirf chai biskut aata hai, product ownership nahi.
 
 And then same HR walay 'we are family' bolte hain. Family ke paas toh health insurance hota hai. Yaha toh nothing.
 
-Equity se ghar ka kharcha nahi chalta. Cash chahiye. Liquid cash. Period.",
-            "Ye jo log bolte hain ki 'marks don't matter', woh log wahi hain jinhe kabhi 90% se kam nahi aaye. Jis aadmi ne life me 55% score kiya ho aur phir bhi successful ho, woh yeh baat bole toh maanu.
+EEquity se ghar ka kharcha nahi chalta. Cash chahiye. Liquid cash. Period.""",
+            """Ye jo log bolte hain ki 'marks don't matter', woh log wahi hain jinhe kabhi 90% se kam nahi aaye. Jis aadmi ne life me 55% score kiya ho aur phir bhi successful ho, woh yeh baat bole toh maanu.
 
 Jab tak reservation system aisa hai aur competition itna high hai, tab tak marks matter karte hain. Chahe tumhe koi bhi motivational speech dede.
 
-Ground reality hai ye. Accept karo.",
+GGround reality hai ye. Accept karo.""",
         ],
         "coolness": [
-            "You know what's underrated? Sitting alone at a chai tapri at 7 PM, watching people rush home, auto walas honking, dogs sleeping on the footpath, and just... existing.
+            """You know what's underrated? Sitting alone at a chai tapri at 7 PM, watching people rush home, auto walas honking, dogs sleeping on the footpath, and just... existing.
 
 No phone. No headphones. Just watching life happen.
 
 I did this yesterday for an hour. Best decision of the month. Cost: ₹10 chai + ₹5 biskut. Therapy sessions: ₹2000/hour. Same effect.
 
-Try it. Seriously.",
-            "Life tip I learned from my grandfather: 'Beta, logo ki suno lekin apne dimaag se kaam karo.'
+TTry it. Seriously.""",
+            """Life tip I learned from my grandfather: 'Beta, logo ki suno lekin apne dimaag se kaam karo.'
 
 Aaj ke time me jab har koi influencer banna chahta hai aur 10 log ek hi copy paste advice de rahe hain, yeh line bohot kaam aati hai.
 
 Everyone has an opinion. Sab log guidance de rahe hain. But at the end of the day, tumhe khud decide karna hai.
 
-Trust your gut. Even if it's wrong, at least it's YOUR mistake.",
-            "I've started saying 'no' more often and let me tell you: it's the most liberating feeling ever.
+TTrust your gut. Even if it's wrong, at least it's YOUR mistake.""",
+            """I've started saying 'no' more often and let me tell you: it's the most liberating feeling ever.
 
 'Plan cancel karna hai? Haan karo.'
 'Extra work? Sorry, not today.'
 'Dinner date with people you don't vibe with? Pass.'
 
-Boundaries are not rude. They're self-respect. Takes time to learn but once you start, there's no going back.",
+BBoundaries are not rude. They're self-respect. Takes time to learn but once you start, there's no going back.""",
         ],
         "drama": [
-            "So mere saath aaj jo hua usse mai literally shock me hu. Main office ke cafeteria me tha, aur mere saamne wali table pe meri EX baithi thi. WITH MY BEST FRIEND. HAANDING HANDS.
+            """So mere saath aaj jo hua usse mai literally shock me hu. Main office ke cafeteria me tha, aur mere saamne wali table pe meri EX baithi thi. WITH MY BEST FRIEND. HAANDING HANDS.
 
 Bhai mai 2 minute tak frozen raha. Vada pav haath me tha, muh khula tha, aankhein fixed. Koi bol raha tha kuch sunai nahi de raha tha.
 
 Maine apne aap ko sambhala, deep breath liya, aur waha se chala gaya. Dignity save kari. Ghar aake abhi soch raha hu kya karna chahiye tha.
 
-Should I have confronted them? Ignored? Acted cool? IDK yaar. Life is a movie and I'm the background character.",
-            "GUYS. KAL RAT MERI LIFE CHANGED. LITERALLY.
+SShould I have confronted them? Ignored? Acted cool? IDK yaar. Life is a movie and I'm the background character.""",
+            """GUYS. KAL RAT MERI LIFE CHANGED. LITERALLY.
 
 Maine apne 5 saal purane startup me kaam chhod diya. Haan. Resign kiya. Ekdum sudden. Mera boss mujhe gaslight kar raha tha ki 'tum kuch seekh nahi rahe, tumhara koi growth nahi hai'. Aur mai 6 mahine se believe kar raha tha yeh sab.
 
@@ -590,29 +590,29 @@ Aaj realization aaya ki GROWTH ka matlab sirf company me promotion nahi hota. Ka
 
 Ab new opportunity hai. Better pay. Better culture. Aur ek boss jo 'how are you' puchta hai without expecting sprint update.
 
-Koi dua kar do yaar. Naya chapter shuru ho raha hai.",
+KKoi dua kar do yaar. Naya chapter shuru ho raha hai.""",
         ],
         "sadness": [
-            "Aaj mummy ne phone karke pucha 'kab aa rahe ho ghar'. Maine kaha 'abhi nahi, kaam hai'. 2 second ka silence. Phir unhone kaha 'theek hai beta, khayal rakhna'.
+            """Aaj mummy ne phone karke pucha 'kab aa rahe ho ghar'. Maine kaha 'abhi nahi, kaam hai'. 2 second ka silence. Phir unhone kaha 'theek hai beta, khayal rakhna'.
 
 Woh silence. Woh 'theek hai' jisme 100 baatein chhupi hoti hain. 'Hum tumhe miss kar rahe hain.' 'Ghar pe sab accha hai bas tum nahi ho.' 'Kab tak kaam karte rahoge?'
 
 Mai 27 saal ka hu, job hai, life settled hai, but uss 2 second me maine socha ki main kaunsa level achieve kar liya jab apne ghar walo ko time nahi de pa raha.
 
-Kal chutti dalunga. Ghar jaunga. Mummy ke haath ka khaana khaunga. Kuch bhi ho jaye.",
-            "College ke 4 saal, 40 friends, har roz group me baatein, raat 2 baje tak bakwas, chai pe chai, assignments copy, backlogs clear — sab kuch saath me.
+KKal chutti dalunga. Ghar jaunga. Mummy ke haath ka khaana khaunga. Kuch bhi ho jaye.""",
+            """College ke 4 saal, 40 friends, har roz group me baatein, raat 2 baje tak bakwas, chai pe chai, assignments copy, backlogs clear — sab kuch saath me.
 
 Ab har kisi ki alag life hai. Koi US me, koi Bangalore me, koi shaadi kar ke settle. Group chat me sirf 'happy birthday' aata hai aur koi random article share hota hai.
 
-Pata nahi kab bade ho gaye. But I miss those days. Woh 2019 ka summer vacation. Woh Imran bhai ki tapri pe 3 rupay ki chai. Woh sab.",
+PPata nahi kab bade ho gaye. But I miss those days. Woh 2019 ka summer vacation. Woh Imran bhai ki tapri pe 3 rupay ki chai. Woh sab.""",
         ],
         "excitement": [
-            "BHAI LOG SUNO. KAL IPL SHURU HO RAHA HAI. MAI 3 MAHINE SE ISKA INTENTION LIKH RAHA THA. JERSEY DHO LI HAI. POPCORN READY. FRIDGE ME COLD DRINKS STACKED. SCHEDULE PRINT KARKE WALL PE LAGA DIYA.
+            """BHAI LOG SUNO. KAL IPL SHURU HO RAHA HAI. MAI 3 MAHINE SE ISKA INTENTION LIKH RAHA THA. JERSEY DHO LI HAI. POPCORN READY. FRIDGE ME COLD DRINKS STACKED. SCHEDULE PRINT KARKE WALL PE LAGA DIYA.
 
 Mere ghar waale sochte hain ki mai koi serious kaam kar raha hu. Reality: main fantasy cricket ki 5 teams bana chuka hu aur sabme same players daale hain 'just in case'.
 
-Let's gooo! This is our year. Koi prediction hai toh batao. Maine RCB ko champions pick kiya hai (haan, I know. Let me dream.)",
-            "JUST GOT PROMOTED!!! MAI YAHI SE SABKO THANK YOU KARNA CHAHTA HU.
+LLet's gooo! This is our year. Koi prediction hai toh batao. Maine RCB ko champions pick kiya hai (haan, I know. Let me dream.)""",
+            """JUST GOT PROMOTED!!! MAI YAHI SE SABKO THANK YOU KARNA CHAHTA HU.
 
 2 saal. 2 saal lag gaye. Late nights. Weekend calls. 'Urgent production issue' wale messages. Countless cups of coffee. Ek baar toh main office me hi so gaya tha — literally face on keyboard — and nobody noticed because woh bhi sab kaam kar rahe the.
 
@@ -620,7 +620,7 @@ But finally. FINALLY. Promotion aayi hai. New role, new responsibilities, new sa
 
 Papa ne bola 'proud of you beta' — aur main yaha apne room me ro diya. Nahi dikhaya kisi ko. But ro diya.
 
-Dreams do come true yaar. Slowly, but they do.",
+DDreams do come true yaar. Slowly, but they do.""",
         ],
     }
 

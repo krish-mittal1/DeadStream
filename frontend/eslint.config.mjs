@@ -1,6 +1,6 @@
 export default [
   {
-    ignores: [".next/**", "node_modules/**"]
+    ignores: [".next/**", "node_modules/**"],
   },
   {
     files: ["**/*.{js,jsx,mjs}"],
@@ -9,8 +9,8 @@ export default [
       sourceType: "module",
       parserOptions: {
         ecmaFeatures: {
-          jsx: true
-        }
+          jsx: true,
+        },
       },
       globals: {
         React: "readonly",
@@ -18,11 +18,8 @@ export default [
         process: "readonly",
         fetch: "readonly",
         window: "readonly",
-        document: "readonly"
-      }
+        document: "readonly",
+      },
     },
-    rules: {
-      "react/no-unescaped-entities": "off"
-    }
-  }
+  },
 ];

@@ -121,7 +121,7 @@ export default function LoginPage() {
           </button>
 
           <div className="mt-6 text-center text-xs text-[var(--color-text-muted)]">
-            Don&apos;t have an account?{" "}
+            Don't have an account?{" "}
             <Link
               href="/register"
               className="text-[var(--color-accent)] transition-colors duration-200 hover:text-[var(--color-accent-hover)] font-medium"
