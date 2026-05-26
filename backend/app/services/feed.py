@@ -53,6 +53,7 @@ def _avatar_color(user_id: uuid.UUID) -> str:
 class FeedService:
     async def create_post(self, session: AsyncSession, author: User, request: CreatePostRequest) -> PostResponse:
         decision = await moderation_service.score(str(author.id), request.body)
+        controversy = min(1.0, decision.toxicity + (0.2 if "?" in request.body and "!" in request.body else 0.0))
         if not decision.allowed:
             await event_store.append(
                 session,
@@ -62,7 +63,8 @@ class FeedService:
                 {"action": decision.action, "reasons": decision.reasons},
             )
             await session.commit()
-            raise ValueError("moderation_blocked")            controversy = min(1.0, decision.toxicity + (0.2 if "?" in request.body and "!" in request.body else 0.0))
+            raise ValueError("moderation_blocked")
+
         post = Post(
             author_id=author.id,
             title=request.title,

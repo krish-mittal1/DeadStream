@@ -33,6 +33,11 @@ async def init_models() -> None:
             await conn.execute(text("ALTER TABLE posts ADD COLUMN image_url VARCHAR(1024)"))
         except Exception:
             pass  # column already exists
+        # ─── Migration: add title column to posts if not exists ──
+        try:
+            await conn.execute(text("ALTER TABLE posts ADD COLUMN title VARCHAR(500)"))
+        except Exception:
+            pass  # column already exists
 
 
 async def close_engine() -> None:
