@@ -10,9 +10,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { UserHoverCard } from "../../components/UserHoverCard";
+import { PostCard } from "../../components/feed/PostCard";
+import { Lightbox } from "../../components/Lightbox";
+import { copyToClipboard } from "../../components/feed/helpers";
 
 const container = {
   hidden: { opacity: 0 },
@@ -39,6 +42,28 @@ export default function CommunitiesPage() {
   const selectedCommunity = useSimulationStore((s) => s.selectedCommunity);
   const user = useSimulationStore((s) => s.user);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const like = useSimulationStore((s) => s.like);
+  const toggleBookmark = useSimulationStore((s) => s.toggleBookmark);
+  const bookmarkedIds = useSimulationStore((s) => s.bookmarkedIds);
+
+  const [copiedId, setCopiedId] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
+
+  const handleShare = useCallback((post) => {
+    const url = `${window.location.origin}/post/${post.id}`;
+    copyToClipboard(url);
+    setCopiedId(post.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }, []);
+
+  const handleLike = useCallback((postId) => {
+    like(postId).catch(() => {});
+  }, [like]);
+
+  const handleBookmark = useCallback((postId) => {
+    toggleBookmark(postId).catch(() => {});
+  }, [toggleBookmark]);
 
   const filtered = communities.filter(
     (c) =>
@@ -223,60 +248,18 @@ export default function CommunitiesPage() {
                   className="space-y-4"
                 >
                   {communityPosts.map((post, index) => (
-                    <motion.div
+                    <PostCard
                       key={post.id}
-                      variants={itemAnim}
-                      className="card p-5 cursor-pointer"
-                      onClick={() => window.open(`/post/${post.id}`, "_self")}
-                    >
-                      <div className="flex items-center gap-2.5 mb-3">
-                        <UserHoverCard
-                          userId={post.author_id}
-                          username={post.author_username}
-                          isAgent={post.author_username?.includes("_")}
-                        >
-                          <div className="avatar avatar-md bg-gradient-to-br from-violet-400 to-purple-500 shadow-sm">
-                            {post.author_username?.charAt(0).toUpperCase()}
-                          </div>
-                        </UserHoverCard>
-                        <UserHoverCard
-                          userId={post.author_id}
-                          username={post.author_username}
-                          isAgent={post.author_username?.includes("_")}
-                        >
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              window.open(`/profile/${post.author_id}`, "_self");
-                            }}
-                            className="text-sm font-semibold text-[var(--color-text)] transition-colors duration-200 hover:text-[var(--color-accent)] cursor-pointer"
-                          >
-                            @{post.author_username}
-                          </span>
-                        </UserHoverCard>
-                      </div>
-                      {post.title && (
-                        <h3 className="text-base font-semibold text-[var(--color-text)] mb-1.5 leading-snug transition-colors duration-200 group-hover:text-[var(--color-accent)]">
-                          {post.title}
-                        </h3>
-                      )}
-                      {post.image_url && (
-                        <div className="-mx-5 mb-3 overflow-hidden bg-[var(--color-bg)] rounded-lg">
-                          <img
-                            src={post.image_url}
-                            alt="Post image"
-                            className="w-full max-h-48 object-contain"
-                            loading="lazy"
-                            onError={(e) => {
-                              e.target.style.display = "none";
-                            }}
-                          />
-                        </div>
-                      )}
-                      <p className="text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                        {post.body}
-                      </p>
-                    </motion.div>
+                      post={post}
+                      index={index}
+                      user={user}
+                      onLike={handleLike}
+                      onBookmark={handleBookmark}
+                      onShare={handleShare}
+                      copiedId={copiedId}
+                      bookmarkedIds={bookmarkedIds}
+                      onImageExpand={setLightboxImage}
+                    />
                   ))}
                 </motion.div>
               </motion.div>
@@ -284,6 +267,12 @@ export default function CommunitiesPage() {
           )}
         </div>
       </div>
+      {lightboxImage && (
+        <Lightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </motion.div>
   );
 }

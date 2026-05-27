@@ -9,10 +9,13 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { api } from "../../lib/api";
 import { UserHoverCard } from "../../components/UserHoverCard";
+import { PostCard } from "../../components/feed/PostCard";
+import { Lightbox } from "../../components/Lightbox";
+import { copyToClipboard } from "../../components/feed/helpers";
 
 export default function BookmarksPage() {
   const user = useSimulationStore((s) => s.user);
@@ -22,6 +25,36 @@ export default function BookmarksPage() {
   const like = useSimulationStore((s) => s.like);
   const [bookmarkedPosts, setBookmarkedPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [copiedId, setCopiedId] = useState(null);
+  const [lightboxImage, setLightboxImage] = useState(null);
+
+  const handleShare = useCallback((post) => {
+    const url = `${window.location.origin}/post/${post.id}`;
+    copyToClipboard(url);
+    setCopiedId(post.id);
+    setTimeout(() => setCopiedId(null), 2000);
+  }, []);
+
+  const handleLike = useCallback((postId) => {
+    setBookmarkedPosts((current) =>
+      current.map((p) =>
+        p.id === postId
+          ? {
+              ...p,
+              score: p.liked_by_user ? p.score - 1 : p.score + 1,
+              like_count: p.liked_by_user ? p.like_count - 1 : p.like_count + 1,
+              liked_by_user: !p.liked_by_user,
+            }
+          : p
+      )
+    );
+    like(postId).catch(() => {});
+  }, [like]);
+
+  const handleBookmark = useCallback((postId) => {
+    toggleBookmark(postId).catch(() => {});
+  }, [toggleBookmark]);
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
@@ -160,57 +193,29 @@ export default function BookmarksPage() {
               </p>
             </motion.div>
           </motion.div>
-        ) : bookmarkedPosts.map((post, i) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: Math.min(i * 0.03, 0.3) }}
-            className="group flex gap-3 px-4 md:px-6 py-4 bg-[var(--color-bg-secondary)] transition-all duration-200 hover:bg-[var(--color-panel)]/30"
-          >
-            <div className="flex flex-col items-center gap-0.5 w-8 shrink-0 pt-0.5">
-              <button onClick={() => like(post.id).catch(() => {})} disabled={!user}
-                className="flex items-center justify-center h-5 w-5 rounded transition-all hover:text-[var(--color-upvote)] disabled:opacity-30 text-[var(--color-text-muted)]"
-              >
-                <ArrowUp size={12} />
-              </button>
-              <span className={`text-[10px] font-bold tabular-nums ${post.score > 0 ? "text-[var(--color-upvote)]" : "text-[var(--color-text-muted)]"}`}>
-                {post.score?.toFixed(0) ?? 0}
-              </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 mb-1 flex-wrap text-[11px] text-[var(--color-text-muted)]">
-                <UserHoverCard
-                  userId={post.author_id}
-                  username={post.author_username}
-                  isAgent={post.author_username?.includes("_")}
-                >
-                  <Link href={`/profile/${post.author_id}`} className="font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] hover:underline">
-                    @{post.author_username}
-                  </Link>
-                </UserHoverCard>
-                <span className="text-[var(--color-text-dim)]">·</span>
-                <span className="text-[var(--color-text-dim)]">{new Date(post.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-              </div>
-              <Link href={`/post/${post.id}`} className="block">
-                {post.title ? (
-                  <h2 className="text-sm font-semibold text-[var(--color-text)] leading-snug transition-colors group-hover:text-[var(--color-accent)]">{post.title}</h2>
-                ) : (
-                  <p className="text-sm text-[var(--color-text)] line-clamp-2">{post.body}</p>
-                )}
-              </Link>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="flex items-center gap-1 text-[11px] text-[var(--color-text-muted)]">
-                  <MessageCircle size={12} /> {post.reply_count}
-                </span>
-                <button onClick={() => toggleBookmark(post.id)} className="flex items-center gap-1 text-[11px] text-[var(--color-gold)] transition-colors hover:text-[var(--color-gold)]/80">
-                  <Bookmark size={12} className="fill-[var(--color-gold)]" /> Saved
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        ))}
+        ) : (
+          bookmarkedPosts.map((post, i) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              index={i}
+              user={user}
+              onLike={handleLike}
+              onBookmark={handleBookmark}
+              onShare={handleShare}
+              copiedId={copiedId}
+              bookmarkedIds={bookmarkedIds}
+              onImageExpand={setLightboxImage}
+            />
+          ))
+        )}
       </div>
+      {lightboxImage && (
+        <Lightbox
+          imageUrl={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </motion.div>
   );
 }

@@ -1,39 +1,107 @@
 "use client";
 
 import {
-  Bell,
-  Bookmark,
-  Bot,
-  Flame,
-  Home,
-  LayoutDashboard,
-  LogIn,
-  LogOut,
-  Moon,
-  Sun,
-  UserPlus,
-  Users,
+  Bell, Bookmark, Bot, Flame, Home, LayoutDashboard,
+  LogIn, LogOut, Moon, Search, Sun, UserPlus, Users, X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
 const avatarGradients = [
-  "from-orange-500 to-red-500",
-  "from-blue-500 to-purple-500",
-  "from-emerald-500 to-teal-500",
-  "from-pink-500 to-rose-500",
-  "from-violet-500 to-indigo-500",
-  "from-amber-500 to-yellow-500",
-  "from-cyan-500 to-sky-500",
-  "from-lime-500 to-green-500",
+  "linear-gradient(135deg,#ff4500,#ff6534)",
+  "linear-gradient(135deg,#4f8cff,#9b6cff)",
+  "linear-gradient(135deg,#10d48e,#14b8a6)",
+  "linear-gradient(135deg,#fb4785,#f5a623)",
+  "linear-gradient(135deg,#9b6cff,#4f8cff)",
+  "linear-gradient(135deg,#f5a623,#ff4500)",
+  "linear-gradient(135deg,#22d3ee,#4f8cff)",
+  "linear-gradient(135deg,#2ecc71,#10d48e)",
 ];
 
-function getAvatarColor(username) {
+function getAvatarBg(username) {
   const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
   return avatarGradients[i % avatarGradients.length];
+}
+
+function NavLink({ href, label, icon: Icon, isActive }) {
+  return (
+    <Link
+      href={href}
+      className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+        isActive
+          ? "text-white bg-white/8"
+          : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-panel)]"
+      }`}
+    >
+      <Icon size={15} strokeWidth={isActive ? 2.5 : 2} />
+      <span>{label}</span>
+      {isActive && (
+        <motion.div
+          layoutId="nav-pill"
+          className="absolute inset-0 rounded-full bg-white/5 border border-white/8"
+          style={{ zIndex: -1 }}
+          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+        />
+      )}
+    </Link>
+  );
+}
+
+function SearchBar() {
+  const [focused, setFocused] = useState(false);
+  const [value, setValue] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  return (
+    <div
+      className={`search-bar flex-1 max-w-xs transition-all duration-300 ${
+        focused ? "max-w-md" : ""
+      }`}
+    >
+      <Search size={14} className="text-[var(--color-text-muted)] shrink-0" />
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Search DeadStream"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className="text-sm"
+      />
+      <AnimatePresence>
+        {value && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            onClick={() => setValue("")}
+            className="text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors shrink-0"
+          >
+            <X size={13} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+      {!focused && !value && (
+        <span className="text-[10px] text-[var(--color-text-dim)] font-medium border border-[var(--color-line)] rounded px-1 py-0.5 shrink-0 hidden lg:block">
+          ⌘K
+        </span>
+      )}
+    </div>
+  );
 }
 
 export function Navbar() {
@@ -48,14 +116,13 @@ export function Navbar() {
   const fetchNotifications = useSimulationStore((s) => s.fetchNotifications);
   const logout = useSimulationStore((s) => s.logout);
   const [scrolled, setScrolled] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  useEffect(() => { initTheme(); bootstrap().catch(() => {}); }, [bootstrap, initTheme]);
 
   useEffect(() => {
-    initTheme();
-    bootstrap().catch(() => {});
-  }, [bootstrap, initTheme]);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
+    const onScroll = () => setScrolled(window.scrollY > 4);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -63,129 +130,146 @@ export function Navbar() {
   useEffect(() => {
     if (!user) return;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const iv = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(iv);
   }, [user, fetchNotifications]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const isLanding = pathname === "/";
   const isAuthPage = pathname === "/login" || pathname === "/register";
 
   const navLinks = [
-    { href: "/feed", label: "Feed", icon: Home },
-    { href: "/trending", label: "Trending", icon: Flame },
-    { href: "/communities", label: "Communities", icon: Users },
-    { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/feed",        label: "Feed",       icon: Home },
+    { href: "/trending",    label: "Trending",   icon: Flame },
+    { href: "/communities", label: "Communities",icon: Users },
+    { href: "/admin",       label: "Dashboard",  icon: LayoutDashboard },
   ];
 
   const mobileNavItems = [
-    { href: "/feed", label: "Feed", icon: Home },
-    { href: "/trending", label: "Trending", icon: Flame },
-    { href: "/notifications", label: "Alerts", icon: Bell, badge: unreadCount },
+    { href: "/feed",        label: "Feed",    icon: Home },
+    { href: "/trending",    label: "Hot",     icon: Flame },
+    { href: "/notifications",label: "Alerts", icon: Bell, badge: unreadCount },
     { href: user ? `/profile/${user.id}` : "/login", label: "Profile", icon: Bot },
   ];
 
   return (
     <>
       {/* ─── Top navbar ─── */}
-      <header
-        className={`fixed top-0 left-0 right-0 z-50 h-12 transition-all duration-300 ${
+      <motion.header
+        initial={{ y: -60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        style={{ height: "var(--nav-height)" }}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled || !isLanding
-            ? "bg-[var(--color-bg-secondary)]/85 backdrop-blur-2xl shadow-[0_1px_0_var(--color-line)]"
+            ? "glass-strong shadow-[0_1px_0_var(--color-line)]"
             : "bg-transparent"
         }`}
       >
-        <div className="mx-auto flex h-full max-w-7xl items-center gap-3 px-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
+        <div className="mx-auto flex h-full max-w-[1400px] items-center gap-3 px-4 lg:px-6">
+
+          {/* ── Logo ── */}
+          <Link href="/" className="flex items-center gap-2.5 shrink-0 group mr-2">
             <motion.div
-              whileHover={{ scale: 1.08, rotate: -5 }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-hover)] text-white shadow-[0_0_16px_rgba(255,69,0,0.15)]"
+              whileHover={{ scale: 1.1, rotate: -8 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 500, damping: 28 }}
+              className="flex h-8 w-8 items-center justify-center rounded-xl shadow-[var(--shadow-accent)]"
+              style={{ background: "linear-gradient(135deg, #ff4500, #ff6534)" }}
             >
-              <Bot size={16} />
+              <Bot size={17} className="text-white" />
             </motion.div>
-            <span className="text-sm font-bold tracking-tight hidden sm:inline text-white">
+            <motion.span
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.15 }}
+              className="text-[15px] font-extrabold tracking-tight hidden sm:inline font-display"
+              style={{
+                background: "linear-gradient(135deg, #fff 60%, rgba(255,255,255,0.5))",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
               DeadStream
-            </span>
+            </motion.span>
           </Link>
 
-          {/* Nav links */}
+          {/* ── Nav links (desktop) ── */}
           {!isLanding && !isAuthPage && (
-            <nav className="hidden md:flex items-center gap-1 ml-4" role="tablist">
-              {navLinks.map(({ href, label, icon: Icon }) => {
-                const isActive = pathname.startsWith(href);
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`relative flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${
-                      isActive
-                        ? "text-white bg-white/5"
-                        : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-panel)]/60"
-                    }`}
-                  >
-                    <Icon size={14} />
-                    <span>{label}</span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="nav-indicator"
-                        className="absolute -bottom-0.5 left-2 right-2 h-[2px] bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)] rounded-full"
-                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                      />
-                    )}
-                  </Link>
-                );
-              })}
+            <nav className="hidden md:flex items-center gap-0.5 mr-2">
+              {navLinks.map(({ href, label, icon }) => (
+                <NavLink
+                  key={href}
+                  href={href}
+                  label={label}
+                  icon={icon}
+                  isActive={pathname.startsWith(href)}
+                />
+              ))}
             </nav>
           )}
 
-          {/* Spacer */}
+          {/* ── Search bar ── */}
+          {!isLanding && !isAuthPage && (
+            <div className="hidden md:flex flex-1 max-w-xs lg:max-w-sm">
+              <SearchBar />
+            </div>
+          )}
+
           <div className="flex-1" />
 
-          {/* Right actions */}
+          {/* ── Right side ── */}
           {!isLanding && !isAuthPage && (
             <div className="flex items-center gap-1">
+              {/* Connection status */}
+              <div className={`hidden md:flex items-center gap-1.5 mr-1 px-2.5 py-1 rounded-full border ${
+                connected
+                  ? "border-[rgba(46,204,113,0.2)] bg-[rgba(46,204,113,0.06)]"
+                  : "border-[var(--color-line)] bg-transparent"
+              }`}>
+                <span className="relative flex h-1.5 w-1.5">
+                  {connected && (
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-50 animate-ping" />
+                  )}
+                  <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
+                    connected ? "bg-[var(--color-green)]" : "bg-[var(--color-text-dim)]"
+                  }`} />
+                </span>
+                <span className={`text-[10px] font-bold tracking-wide uppercase ${
+                  connected ? "text-[var(--color-green)]" : "text-[var(--color-text-dim)]"
+                }`}>
+                  {connected ? "Live" : "Off"}
+                </span>
+              </div>
+
               {/* Bookmarks */}
               {user && (
-                <Link
-                  href="/bookmarks"
-                  className="btn-icon"
-                  title="Saved posts"
-                >
-                  <Bookmark size={14} />
+                <Link href="/bookmarks" className="btn-icon" title="Saved">
+                  <Bookmark size={16} />
                 </Link>
               )}
 
-              {/* Theme toggle */}
-              <button
-                onClick={toggleTheme}
-                className="btn-icon"
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                <motion.div
-                  key={theme}
-                  initial={{ rotate: -90, opacity: 0 }}
-                  animate={{ rotate: 0, opacity: 1 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                >
-                  {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-                </motion.div>
-              </button>
-
               {/* Notifications */}
               {user && (
-                <Link
-                  href="/notifications"
-                  className="btn-icon relative"
-                  title="Notifications"
-                >
-                  <Bell size={14} />
+                <Link href="/notifications" className="btn-icon relative" title="Notifications">
+                  <Bell size={16} />
                   <AnimatePresence>
                     {unreadCount > 0 && (
                       <motion.span
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         exit={{ scale: 0 }}
-                        className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[14px] items-center justify-center rounded-full bg-[var(--color-accent)] px-1 text-[9px] font-bold text-white"
+                        className="badge absolute -top-0.5 -right-0.5"
                       >
                         {unreadCount > 9 ? "9+" : unreadCount}
                       </motion.span>
@@ -194,95 +278,150 @@ export function Navbar() {
                 </Link>
               )}
 
-              {/* Live status */}
-              <span
-                className={`hidden md:flex items-center gap-1.5 ml-2 text-[11px] font-semibold tracking-wider ${
-                  connected ? "live-dot online" : "live-dot offline"
-                }`}
-              >
-                {connected ? "LIVE" : "OFF"}
-              </span>
+              {/* Theme toggle */}
+              <button onClick={toggleTheme} className="btn-icon" title="Toggle theme">
+                <motion.div
+                  key={theme}
+                  initial={{ rotate: -90, opacity: 0, scale: 0.7 }}
+                  animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                >
+                  {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                </motion.div>
+              </button>
             </div>
           )}
 
-          {/* Auth area */}
+          {/* ── Auth area ── */}
           {user ? (
-            <>
-              <Link
-                href={`/profile/${user.id}`}
+            <div className="relative" ref={userMenuRef}>
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setUserMenuOpen((o) => !o)}
                 className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--color-line)] group"
               >
-                <motion.div
-                  whileHover={{ scale: 1.1 }}
-                  className={`flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br ${getAvatarColor(user.username)} text-[10px] font-bold text-white shadow-sm transition-shadow duration-200 group-hover:shadow-[0_0_12px_rgba(255,69,0,0.25)]`}
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm"
+                  style={{ background: getAvatarBg(user.username) }}
                 >
-                  {user.username[0].toUpperCase()}
-                </motion.div>
-                <span className="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-white transition-colors">
-                  @{user.username}
+                  {user.username?.[0]?.toUpperCase()}
+                </div>
+                <span className="text-sm font-semibold text-[var(--color-text-secondary)] group-hover:text-[var(--color-text)] transition-colors">
+                  {user.username}
                 </span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => { logout(); }}
-                className="btn-icon hover:text-red-400"
-                title="Logout"
-              >
-                <LogOut size={14} />
-              </button>
-            </>
+              </motion.button>
+
+              {/* User dropdown */}
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="absolute right-0 top-full mt-2 w-52 rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] shadow-[var(--shadow-xl)] overflow-hidden z-50"
+                  >
+                    <div className="p-3 border-b border-[var(--color-line)]">
+                      <p className="text-sm font-bold text-[var(--color-text)]">{user.username}</p>
+                      <p className="text-xs text-[var(--color-text-muted)] mt-0.5">DeadStream member</p>
+                    </div>
+                    <div className="p-2">
+                      <Link
+                        href={`/profile/${user.id}`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="sidebar-nav-item text-sm"
+                      >
+                        <Bot size={15} /> Profile
+                      </Link>
+                      <Link
+                        href="/bookmarks"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="sidebar-nav-item text-sm"
+                      >
+                        <Bookmark size={15} /> Saved
+                      </Link>
+                    </div>
+                    <div className="p-2 border-t border-[var(--color-line)]">
+                      <button
+                        onClick={() => { logout(); setUserMenuOpen(false); }}
+                        className="sidebar-nav-item text-sm text-[var(--color-red)] hover:bg-red-500/8 hover:text-[var(--color-red)] w-full"
+                      >
+                        <LogOut size={15} /> Log Out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           ) : !isAuthPage ? (
             <div className="hidden md:flex items-center gap-2">
-              <Link
-                href="/login"
-                className="btn-secondary h-8 text-xs px-3"
-              >
-                <LogIn size={13} />
-                <span>Login</span>
+              <Link href="/login" className="btn-secondary h-8 text-sm px-4">
+                <LogIn size={14} /> Log In
               </Link>
-              <Link
-                href="/register"
-                className="btn-primary h-8 text-xs px-3"
-              >
-                <UserPlus size={13} />
-                <span>Sign Up</span>
+              <Link href="/register" className="btn-primary h-8 text-sm px-4">
+                <UserPlus size={14} /> Sign Up
               </Link>
             </div>
           ) : null}
         </div>
-      </header>
+      </motion.header>
 
-      {/* ─── Mobile bottom navigation ─── */}
+      {/* ─── Mobile bottom nav ─── */}
       {!isLanding && !isAuthPage && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-[var(--color-line)] bg-[var(--color-bg-secondary)]/90 backdrop-blur-xl md:hidden pb-[max(env(safe-area-inset-bottom),8px)]">
+        <nav
+          className="fixed bottom-0 left-0 right-0 z-50 flex items-center md:hidden"
+          style={{
+            background: "rgba(7,7,9,0.92)",
+            backdropFilter: "blur(20px)",
+            borderTop: "1px solid var(--color-line)",
+            paddingBottom: "max(env(safe-area-inset-bottom), 8px)",
+          }}
+        >
           {mobileNavItems.map(({ href, label, icon: Icon, badge }) => {
             const isActive = pathname.startsWith(href.replace(/\/\d+$/, ""));
             return (
               <Link
                 key={href}
                 href={href}
-                className={`relative flex flex-col items-center gap-0.5 px-4 py-2 text-[10px] font-medium transition-colors duration-200 ${
-                  isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"
-                }`}
+                className="relative flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-all duration-200"
               >
-                <span className="relative">
-                  <Icon size={18} />
+                <motion.div
+                  whileTap={{ scale: 0.85 }}
+                  className={`relative flex items-center justify-center w-10 h-8 rounded-full transition-all duration-200 ${
+                    isActive
+                      ? "bg-[rgba(255,69,0,0.12)]"
+                      : "bg-transparent"
+                  }`}
+                >
+                  <Icon
+                    size={19}
+                    strokeWidth={isActive ? 2.5 : 1.8}
+                    className={isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"}
+                  />
                   {badge > 0 && (
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="absolute -top-1 -right-1.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[var(--color-accent)] px-1 text-[7px] font-bold text-white"
+                      className="badge absolute -top-1 -right-1 text-[8px]"
                     >
                       {badge > 9 ? "9+" : badge}
                     </motion.span>
                   )}
+                </motion.div>
+                <span
+                  className={`text-[9px] font-bold tracking-wide ${
+                    isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"
+                  }`}
+                >
+                  {label}
                 </span>
-                <span>{label}</span>
                 {isActive && (
                   <motion.div
                     layoutId="mobile-indicator"
-                    className="absolute -top-[1px] left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)] rounded-full"
-                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    className="absolute -top-px left-1/4 right-1/4 h-0.5 rounded-full bg-[var(--color-accent)]"
+                    transition={{ type: "spring", stiffness: 500, damping: 38 }}
                   />
                 )}
               </Link>

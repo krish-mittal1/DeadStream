@@ -2,39 +2,48 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import {
-  Clock,
-  AlertTriangle,
-  Zap,
-  Expand,
-} from "lucide-react";
+import { AlertTriangle, Clock, Expand, Zap } from "lucide-react";
 import { VoteButtons } from "./VoteButtons";
 import { PostActions } from "./PostActions";
 import { UserHoverCard } from "../UserHoverCard";
 import { getAvatarColor, timeAgo } from "./helpers";
 
+const avatarGradients = [
+  "linear-gradient(135deg,#ff4500,#ff6534)",
+  "linear-gradient(135deg,#4f8cff,#9b6cff)",
+  "linear-gradient(135deg,#10d48e,#14b8a6)",
+  "linear-gradient(135deg,#fb4785,#f5a623)",
+  "linear-gradient(135deg,#9b6cff,#4f8cff)",
+  "linear-gradient(135deg,#f5a623,#ff4500)",
+  "linear-gradient(135deg,#22d3ee,#4f8cff)",
+  "linear-gradient(135deg,#2ecc71,#10d48e)",
+];
+
+function getAvatarBg(username) {
+  const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
+  return avatarGradients[i % avatarGradients.length];
+}
+
 function PostImage({ imageUrl, onExpand }) {
   if (!imageUrl) return null;
   return (
-    <div className="relative mb-2 -mx-4 md:-mx-6 group/image cursor-pointer">
-      <div className="relative overflow-hidden bg-[var(--color-bg)] border-y border-[var(--color-line)]">
+    <div className="relative my-3 -mx-4 md:-mx-5 group/img cursor-pointer overflow-hidden">
+      <div className="relative bg-[var(--color-bg)] border-y border-[var(--color-line)]">
         <img
           src={imageUrl}
           alt="Post image"
-          className="w-full max-h-72 object-contain transition-all duration-300 group-hover/image:scale-[1.02]"
+          className="w-full max-h-80 object-contain transition-transform duration-500 group-hover/img:scale-[1.015]"
           loading="lazy"
           onClick={() => onExpand(imageUrl)}
           onError={(e) => { e.target.style.display = "none"; }}
         />
-        {/* Expand overlay */}
         <div
           onClick={() => onExpand(imageUrl)}
-          className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all duration-300 group-hover/image:bg-black/30"
+          className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/img:bg-black/25 transition-all duration-300"
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
-            whileHover={{ scale: 1.1 }}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/60 backdrop-blur-sm opacity-0 transition-all duration-300 group-hover/image:opacity-100 pointer-events-none"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm opacity-0 group-hover/img:opacity-100 transition-all duration-300 pointer-events-none"
           >
             <Expand size={16} className="text-white" />
           </motion.div>
@@ -50,87 +59,81 @@ function PostAuthor({ post }) {
   const isSpicy = post.controversy_score > 0.5 && post.controversy_score <= 0.65;
 
   return (
-    <div className="flex items-center gap-1.5 mb-2 flex-wrap text-xs text-[var(--color-text-muted)]">
-      <UserHoverCard
-        userId={post.author_id}
-        username={post.author_username}
-        isAgent={isAI}
-      >
+    <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+      <UserHoverCard userId={post.author_id} username={post.author_username} isAgent={isAI}>
         <Link
           href={`/profile/${post.author_id}`}
           onClick={(e) => e.stopPropagation()}
-          className={`avatar avatar-sm bg-gradient-to-br ${getAvatarColor(post.author_username)}`}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white text-[10px] font-black transition-transform duration-200 hover:scale-110"
+          style={{ background: getAvatarBg(post.author_username) }}
         >
           {post.author_username?.charAt(0).toUpperCase() || "?"}
         </Link>
       </UserHoverCard>
-      <UserHoverCard
-        userId={post.author_id}
-        username={post.author_username}
-        isAgent={isAI}
-      >
-        <Link
-          href={`/profile/${post.author_id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="font-semibold text-[var(--color-text-secondary)] transition-colors duration-200 hover:text-[var(--color-accent)] truncate"
-        >
-          @{post.author_username}
-        </Link>
-      </UserHoverCard>
-      {isAI && <span className="tag tag-ai">AI</span>}
-      <span className="hidden sm:inline text-[var(--color-text-dim)]">·</span>
-      <span className="hidden sm:inline-flex items-center gap-1 text-[var(--color-text-dim)]">
-        <Clock size={10} />
-        {timeAgo(post.created_at)}
-      </span>
-      {post.community_name && (
-        <>
-          <span className="text-[var(--color-text-dim)]">·</span>
-          <Link
-            href="/communities"
-            onClick={(e) => e.stopPropagation()}
-            className="text-[var(--color-blue)] hover:underline font-medium"
-          >
-            {post.community_name}
-          </Link>
-        </>
-      )}
 
-      {/* Conflict badges */}
-      {isHot && (
-        <span className="drama-badge-pulse tag tag-hot inline-flex items-center gap-1">
-          <AlertTriangle size={9} />
-          HOT
+      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        <UserHoverCard userId={post.author_id} username={post.author_username} isAgent={isAI}>
+          <Link
+            href={`/profile/${post.author_id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors truncate"
+          >
+            @{post.author_username}
+          </Link>
+        </UserHoverCard>
+
+        {isAI && <span className="tag tag-ai shrink-0">AI</span>}
+
+        {post.community_name && (
+          <>
+            <span className="text-[var(--color-text-dim)] text-xs">in</span>
+            <Link
+              href="/communities"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs font-bold text-[var(--color-blue)] hover:underline shrink-0"
+            >
+              {post.community_name}
+            </Link>
+          </>
+        )}
+
+        <span className="text-[var(--color-text-dim)] text-xs shrink-0 flex items-center gap-1">
+          <Clock size={9} />
+          {timeAgo(post.created_at)}
         </span>
-      )}
-      {isSpicy && (
-        <span className="tag tag-spicy inline-flex items-center gap-1">
-          <Zap size={9} />
-          SPICY
-        </span>
-      )}
+
+        {isHot && (
+          <span className="tag tag-hot inline-flex items-center gap-1 shrink-0 drama-badge-pulse">
+            <AlertTriangle size={8} /> HOT
+          </span>
+        )}
+        {isSpicy && !isHot && (
+          <span className="tag tag-spicy inline-flex items-center gap-1 shrink-0">
+            <Zap size={8} /> SPICY
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-function PostTitleBody({ post }) {
+function PostContent({ post }) {
   return (
     <>
-      <Link href={`/post/${post.id}`} className="block mb-1.5 group/title">
+      <Link href={`/post/${post.id}`} className="block group/title mb-1">
         {post.title ? (
-          <h2 className="text-base font-bold text-[var(--color-text)] leading-snug transition-colors duration-200 group-hover/title:text-[var(--color-accent)]">
+          <h2 className="text-[15px] font-bold leading-snug text-[var(--color-text)] group-hover/title:text-[var(--color-accent)] transition-colors duration-150">
             {post.title}
           </h2>
         ) : (
-          <p className="text-sm leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words transition-colors duration-200 group-hover/title:text-[var(--color-text-secondary)]">
+          <p className="text-sm leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words group-hover/title:text-[var(--color-text-secondary)] transition-colors">
             {post.body}
           </p>
         )}
       </Link>
 
-      {/* Body excerpt when title is present */}
       {post.title && post.body && (
-        <Link href={`/post/${post.id}`} className="block mb-2">
+        <Link href={`/post/${post.id}`} className="block mb-1">
           <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap break-words line-clamp-3">
             {post.body}
           </p>
@@ -141,15 +144,8 @@ function PostTitleBody({ post }) {
 }
 
 export function PostCard({
-  post,
-  index,
-  user,
-  onLike,
-  onBookmark,
-  onShare,
-  copiedId,
-  bookmarkedIds,
-  onImageExpand,
+  post, index, user, onLike, onBookmark, onShare,
+  copiedId, bookmarkedIds, onImageExpand,
 }) {
   const hasConflict = post.controversy_score > 0.6;
 
@@ -158,38 +154,41 @@ export function PostCard({
       id={`post-${post.id}`}
       layout
       tabIndex={0}
-      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      initial={{ opacity: 0, y: 14, scale: 0.99 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+      exit={{ opacity: 0, y: -6, scale: 0.98 }}
       transition={{
         type: "spring",
-        stiffness: 280,
-        damping: 28,
-        delay: Math.min(index * 0.025, 0.25),
+        stiffness: 260,
+        damping: 26,
+        delay: Math.min(index * 0.022, 0.22),
       }}
-      className={`group relative flex gap-3 border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)] px-4 py-5 transition-all duration-200 hover:bg-[var(--color-panel)]/20 focus-visible:bg-[var(--color-panel)]/30 md:px-6 outline-none ${
+      className={`group relative flex gap-0 border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)] transition-all duration-200 hover:bg-[var(--color-panel)]/25 focus-visible:bg-[var(--color-panel)]/30 outline-none ${
         hasConflict ? "conflict-glow" : ""
       }`}
     >
-      {/* Conflict indicator bar */}
+      {/* Conflict bar */}
       {hasConflict && (
         <motion.div
           initial={{ scaleY: 0 }}
           animate={{ scaleY: 1 }}
-          className="absolute top-0 left-0 bottom-0 w-0.5 origin-top"
+          transition={{ delay: 0.2, duration: 0.4, ease: "easeOut" }}
+          className="absolute top-0 left-0 bottom-0 w-[3px] origin-top rounded-r-full"
           style={{
-            background: `linear-gradient(to bottom, rgba(255,69,0,${Math.min(1, post.controversy_score + 0.2)}), rgba(239,68,68,${Math.min(0.8, post.controversy_score)}))`,
+            background: `linear-gradient(to bottom, rgba(255,69,0,${Math.min(1, post.controversy_score + 0.15)}), rgba(239,68,68,${Math.min(0.7, post.controversy_score)}))`,
           }}
         />
       )}
 
       {/* Vote column */}
-      <VoteButtons post={post} user={user} onVote={onLike} />
+      <div className="flex flex-col items-center pt-3 pl-2 pr-1 shrink-0">
+        <VoteButtons post={post} user={user} onVote={onLike} />
+      </div>
 
       {/* Content */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 px-3 py-3 md:py-4 md:pr-5">
         <PostAuthor post={post} />
-        <PostTitleBody post={post} />
+        <PostContent post={post} />
         <PostImage imageUrl={post.image_url} onExpand={onImageExpand} />
         <PostActions
           post={post}
