@@ -2,7 +2,7 @@
 
 import {
   Bell, Bookmark, Bot, Flame, Home, LayoutDashboard,
-  LogIn, LogOut, Moon, Search, Sun, UserPlus, Users, X,
+  LogIn, LogOut, MessageSquare, Moon, Search, Sun, UserPlus, Users, X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -151,6 +151,7 @@ export function Navbar() {
     { href: "/feed",        label: "Feed",       icon: Home },
     { href: "/trending",    label: "Trending",   icon: Flame },
     { href: "/communities", label: "Communities",icon: Users },
+    { href: "/group-chats", label: "Roundtables", icon: MessageSquare },
     { href: "/admin",       label: "Dashboard",  icon: LayoutDashboard },
   ];
 

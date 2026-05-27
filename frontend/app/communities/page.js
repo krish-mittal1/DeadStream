@@ -7,12 +7,13 @@ import {
   MessageSquare,
   Search,
   Users,
+  Vote,
+  Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
-import { UserHoverCard } from "../../components/UserHoverCard";
 import { PostCard } from "../../components/feed/PostCard";
 import { Lightbox } from "../../components/Lightbox";
 import { copyToClipboard } from "../../components/feed/helpers";
@@ -34,6 +35,83 @@ const itemAnim = {
   },
 };
 
+function ElectionCard({ community, user, token }) {
+  const [election, setElection] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const fetchActiveElection = useSimulationStore((s) => s.fetchActiveElection);
+  const startElection = useSimulationStore((s) => s.startElection);
+  const castVote = useSimulationStore((s) => s.castVote);
+
+  useEffect(() => {
+    if (community?.id) {
+      fetchActiveElection(community.id).then(setElection);
+    }
+  }, [community?.id, fetchActiveElection]);
+
+  const handleStart = useCallback(async () => {
+    setLoading(true);
+    await startElection(community.id);
+    const e = await fetchActiveElection(community.id);
+    setElection(e);
+    setLoading(false);
+  }, [community?.id, startElection, fetchActiveElection]);
+
+  const handleVote = useCallback(async (candidateId) => {
+    await castVote(community.id, candidateId);
+    const e = await fetchActiveElection(community.id);
+    setElection(e);
+  }, [community?.id, castVote, fetchActiveElection]);
+
+  if (!election) return null;
+
+  return (
+    <div className="rounded-xl border border-[var(--color-gold)]/30 bg-[var(--color-gold)]/5 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Vote size={14} className="text-[var(--color-gold)]" />
+        <span className="text-xs font-bold text-[var(--color-gold)]">Active Election</span>
+        {election.ends_at && (
+          <span className="text-[10px] text-[var(--color-text-dim)] ml-auto">
+            Ends {new Date(election.ends_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {(election.candidates || []).map((candidate) => (
+          <div key={candidate.user_id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-line)] bg-[var(--color-panel)] p-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-gold)] to-[var(--color-accent)] text-[10px] font-bold text-white">
+                {candidate.username?.charAt(0)?.toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[var(--color-text)] truncate">{candidate.username}</p>
+                <p className="text-[10px] text-[var(--color-text-dim)]">{candidate.votes || 0} votes</p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleVote(candidate.user_id)}
+              disabled={!token}
+              className="btn-ghost h-7 text-[10px]"
+            >
+              Vote
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {!election.started && (
+        <button
+          onClick={handleStart}
+          disabled={loading || !token}
+          className="btn-primary h-8 text-xs w-full"
+        >
+          <Shield size={13} /> {loading ? "Starting..." : "Start Election"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function CommunitiesPage() {
   const communities = useSimulationStore((s) => s.communities);
   const communityPosts = useSimulationStore((s) => s.communityPosts);
@@ -41,6 +119,7 @@ export default function CommunitiesPage() {
   const joinCommunity = useSimulationStore((s) => s.joinCommunity);
   const selectedCommunity = useSimulationStore((s) => s.selectedCommunity);
   const user = useSimulationStore((s) => s.user);
+  const token = useSimulationStore((s) => s.token);
   const [searchQuery, setSearchQuery] = useState("");
 
   const like = useSimulationStore((s) => s.like);
@@ -81,31 +160,22 @@ export default function CommunitiesPage() {
       {/* Header */}
       <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 md:px-6 h-11 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link
-            href="/feed"
-            className="btn-icon"
-          >
+          <Link href="/feed" className="btn-icon">
             <ArrowLeft size={14} />
           </Link>
-          <h1 className="text-sm font-bold text-[var(--color-text)]">
-            Communities
-          </h1>
+          <h1 className="text-sm font-bold text-[var(--color-text)]">Communities</h1>
         </div>
         <div className="relative">
-          <Search
-            size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
-          />
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search communities..."
-            className="input-premium w-40 pl-7 pr-2 py-1.5 text-xs"
+            placeholder="Search..."
+            className="input-premium w-36 pl-7 pr-2 py-1.5 text-xs"
           />
         </div>
       </div>
 
-      {/* Content */}
       <div className="grid min-h-[calc(100vh-3rem-44px)] md:grid-cols-[340px_1fr]">
         {/* Community list */}
         <div className="scrollbar-thin overflow-auto border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] p-3 space-y-2">
@@ -114,15 +184,9 @@ export default function CommunitiesPage() {
               No communities found
             </div>
           )}
-          <motion.div
-            variants={container}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-40px" }}
-            className="space-y-2"
-          >
+          <motion.div variants={container} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-40px" }} className="space-y-2">
             <AnimatePresence mode="popLayout">
-              {filtered.map((community, index) => (
+              {filtered.map((community) => (
                 <motion.button
                   key={community.id}
                   variants={itemAnim}
@@ -135,25 +199,22 @@ export default function CommunitiesPage() {
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-sm font-bold text-[var(--color-text)] truncate">
-                      {community.name}
-                    </span>
+                    <span className="text-sm font-bold text-[var(--color-text)] truncate">{community.name}</span>
                     <span className="shrink-0 flex items-center gap-1 text-xs font-semibold text-[var(--color-accent)]">
                       <Flame size={12} className="fill-[var(--color-accent)]" />
                       {Number(community.conflict_score).toFixed(1)}
                     </span>
                   </div>
-                  <p className="line-clamp-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-                    {community.description}
-                  </p>
+                  <p className="line-clamp-2 text-[11px] leading-relaxed text-[var(--color-text-muted)]">{community.description}</p>
                   <div className="mt-3 flex gap-4 text-[10px] text-[var(--color-text-dim)]">
-                    <span className="flex items-center gap-1">
-                      <Users size={11} /> {community.member_count} members
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MessageSquare size={11} /> {community.post_count} posts
-                    </span>
+                    <span className="flex items-center gap-1"><Users size={11} /> {community.member_count} members</span>
+                    <span className="flex items-center gap-1"><MessageSquare size={11} /> {community.post_count} posts</span>
                   </div>
+                  {community.mod_election && (
+                    <div className="mt-2 flex items-center gap-1 text-[9px] text-[var(--color-gold)]">
+                      <Vote size={9} /> Election active
+                    </div>
+                  )}
                 </motion.button>
               ))}
             </AnimatePresence>
@@ -173,9 +234,7 @@ export default function CommunitiesPage() {
                 >
                   <Users size={32} className="text-[var(--color-text-muted)]" />
                 </motion.div>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  Select a community to explore
-                </p>
+                <p className="text-sm text-[var(--color-text-muted)]">Select a community</p>
               </div>
             </div>
           )}
@@ -189,18 +248,12 @@ export default function CommunitiesPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="text-xl font-bold text-[var(--color-text)]">
-                      {selectedCommunity.name}
-                    </h2>
-                    <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                      {selectedCommunity.description}
-                    </p>
+                    <h2 className="text-xl font-bold text-[var(--color-text)]">{selectedCommunity.name}</h2>
+                    <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--color-text-secondary)]">{selectedCommunity.description}</p>
                   </div>
                   <motion.button
                     whileTap={{ scale: 0.97 }}
-                    onClick={() =>
-                      joinCommunity(selectedCommunity.id).catch(() => {})
-                    }
+                    onClick={() => joinCommunity(selectedCommunity.id).catch(() => {})}
                     disabled={!user}
                     className="btn-primary h-10 shrink-0"
                   >
@@ -208,18 +261,19 @@ export default function CommunitiesPage() {
                   </motion.button>
                 </div>
                 <div className="mt-5 flex gap-6 text-sm">
-                  <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
-                    <Users size={15} /> {selectedCommunity.member_count}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]">
-                    <MessageSquare size={15} /> {selectedCommunity.post_count}
-                  </span>
+                  <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]"><Users size={15} /> {selectedCommunity.member_count}</span>
+                  <span className="flex items-center gap-1.5 text-[var(--color-text-muted)]"><MessageSquare size={15} /> {selectedCommunity.post_count}</span>
                   <span className="flex items-center gap-1.5 text-[var(--color-accent)] font-semibold">
-                    <Flame size={15} className="fill-[var(--color-accent)]" />{" "}
-                    {Number(selectedCommunity.conflict_score).toFixed(1)}
+                    <Flame size={15} className="fill-[var(--color-accent)]" /> {Number(selectedCommunity.conflict_score).toFixed(1)}
                   </span>
                 </div>
               </motion.div>
+
+              {/* Elections */}
+              <div className="px-6 py-4 border-b border-[var(--color-line)]">
+                <ElectionCard community={selectedCommunity} user={user} token={token} />
+              </div>
+
               <motion.div
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
@@ -230,23 +284,12 @@ export default function CommunitiesPage() {
                 {communityPosts.length === 0 && (
                   <div className="flex items-center justify-center py-16">
                     <div className="text-center">
-                      <MessageSquare
-                        size={24}
-                        className="mx-auto mb-3 text-[var(--color-text-muted)]"
-                      />
-                      <p className="text-sm text-[var(--color-text-muted)]">
-                        No local posts yet
-                      </p>
+                      <MessageSquare size={24} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
+                      <p className="text-sm text-[var(--color-text-muted)]">No local posts yet</p>
                     </div>
                   </div>
                 )}
-                <motion.div
-                  variants={container}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true, margin: "-60px" }}
-                  className="space-y-4"
-                >
+                <motion.div variants={container} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} className="space-y-4">
                   {communityPosts.map((post, index) => (
                     <PostCard
                       key={post.id}
@@ -267,12 +310,7 @@ export default function CommunitiesPage() {
           )}
         </div>
       </div>
-      {lightboxImage && (
-        <Lightbox
-          imageUrl={lightboxImage}
-          onClose={() => setLightboxImage(null)}
-        />
-      )}
+      {lightboxImage && <Lightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />}
     </motion.div>
   );
 }

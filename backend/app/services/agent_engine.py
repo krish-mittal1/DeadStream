@@ -21,6 +21,7 @@ from app.services.feed import feed_service
 from app.services.memory import memory_service
 from app.services.opinion_service import opinion_service
 from app.services.relationship_service import relationship_service
+from app.services.cognitive_drift_service import cognitive_drift_service
 
 
 # ─── Desi / Indian trending topic bank ───────────────────────────────
@@ -63,7 +64,32 @@ class AgentEngine:
         if user is None:
             return
 
-        await event_store.append(session, "agent_woke", user.id, agent.id, {"template": agent.template})
+        dominant_emotion = self._get_dominant_emotion(agent)
+        agitation = float(agent.emotional_state.get("agitation", 0.3))
+        confidence = float(agent.emotional_state.get("confidence", 0.5))
+
+        # Detect if the agent is having a mood swing (agitation spike)
+        old_agitation = float(agent.emotional_state.get("_prev_agitation", agitation))
+        mood_shift = agitation > 0.65 and old_agitation < 0.5
+        agent.emotional_state["_prev_agitation"] = round(agitation, 3)
+
+        await event_store.append(session, "agent_woke", user.id, agent.id, {
+            "template": agent.template,
+            "thought_log": {
+                "dominant_emotion": dominant_emotion,
+                "agitation": round(agitation, 2),
+                "confidence": round(confidence, 2),
+                "mood": "fired up" if agitation > 0.65 else "chill" if agitation < 0.25 else "normal",
+            }
+        })
+
+        if mood_shift:
+            await event_store.append(session, "agent_mood_shift", user.id, agent.id, {
+                "from": round(old_agitation, 2),
+                "to": round(agitation, 2),
+                "template": agent.template,
+                "note": f"{user.username} is getting heated!",
+            })
 
         recent_posts = (await session.execute(select(Post).order_by(desc(Post.created_at)).limit(25))).scalars().all()
         topic = self._choose_topic(agent, recent_posts)
@@ -111,9 +137,28 @@ class AgentEngine:
                     session, agent.id, rival_rel.target_user_id, "argue_reply", intensity=0.6
                 )
                 await memory_service.remember(session, agent.id, f"Publicly roasted @{rival_user.username}: {body[:100]}", "beef", 0.8)
-                await event_store.append(session, "agent_beef", user.id, rival_rel.target_user_id, {
-                    "roast": body[:200], "rivalry": rival_rel.rivalry
-                })
+                beef_payload = {
+                    "roast": body[:200],
+                    "rivalry": rival_rel.rivalry,
+                    "thought_log": {
+                        "reason": f"Rivalry score {rival_rel.rivalry:.2f} exceeded threshold",
+                        "target": rival_user.username,
+                        "agitation": round(float(agent.emotional_state.get("agitation", 0.3)), 2),
+                    },
+                }
+                await event_store.append(session, "agent_beef", user.id, rival_rel.target_user_id, beef_payload)
+                # Notify rival user if they are human
+                if not rival_user.is_agent:
+                    from app.services.notification_service import notification_service as ns
+                    from app.models.notification import Notification
+                    notif = Notification(
+                        user_id=rival_user.id,
+                        actor_id=user.id,
+                        type="beef",
+                        entity_id=None,
+                        read=False,
+                    )
+                    session.add(notif)
                 AGENT_ACTIONS.labels(action="roast").inc()
                 action = "roast"
 
@@ -216,6 +261,11 @@ class AgentEngine:
                 agent.emotional_state["agitation"] = new_ag
                 await memory_service.remember(session, agent.id, f"Noticed a rival replied to my post: {reply.body[:80]}", "beef", 0.5)
 
+        # Track cognitive drift: save ideology snapshots periodically
+        await cognitive_drift_service.drift_personality(session, agent, recent_posts)
+        if random.random() < 0.05:  # ~5% chance to save a snapshot each wake
+            await cognitive_drift_service.take_snapshot(session, agent)
+
         await memory_service.decay(session, agent.id)
         await memory_service.maybe_summarize(session, agent.id, get_provider())
 
@@ -226,6 +276,12 @@ class AgentEngine:
         await event_store.append(session, "agent_slept", user.id, agent.id, {
             "next_wake_at": agent.next_wake_at.isoformat(),
             "action": action,
+            "thought_log": {
+                "action_taken": action,
+                "dominant_emotion": self._get_dominant_emotion(agent),
+                "agitation_after": round(float(agent.emotional_state.get("agitation", 0.3)), 2),
+                "topic": topic[:80] if isinstance(topic, str) else "",
+            },
         })
         await session.commit()
 

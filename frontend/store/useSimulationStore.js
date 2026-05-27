@@ -36,6 +36,23 @@ export const useSimulationStore = create((set, get) => ({
   theme: "dark",
   // New posts indicator
   newPostCount: 0,
+  // Feed algorithm
+  currentAlgorithm: "hot",
+  // Faction graph
+  factionGraph: { nodes: [], edges: [], polarization_index: 0, alpha_size: 0, beta_size: 0 },
+  // Disruptions
+  disruptions: [],
+  // DMs
+  dmGroups: [],
+  dmMessages: {},
+  dmUnread: 0,
+  activeDMGroup: null,
+  // Group chats
+  groupChats: [],
+  groupChatMessages: {},
+  activeGroupChat: null,
+  // Elections
+  activeElections: {},
 
   async bootstrap() {
     set({ loading: true });
@@ -68,19 +85,25 @@ export const useSimulationStore = create((set, get) => ({
     socket.on("disconnect", () => set({ connected: false }));
     socket.on("event", (event) => {
       set((state) => ({ events: [event, ...state.events].slice(0, 160) }));
+      const notifTypes = ["agent_beef", "agent_replied", "user_replied", "user_liked", "agent_liked"];
+      if (notifTypes.includes(event.type) && get().token) {
+        const now = Date.now();
+        if (!get()._lastNotifFetch || now - get()._lastNotifFetch > 10_000) {
+          set({ _lastNotifFetch: now });
+          get().fetchNotifications();
+        }
+      }
     });
     socket.on("feed:new", () => {
-      // Increment new post count instead of auto-refreshing
       set((state) => ({ newPostCount: state.newPostCount + 1 }));
     });
     socket.emit("subscribe", { room: "global-feed" });
     set({ socket });
   },
 
-  // --- New posts toast ---
   loadNewPosts() {
     api.feed(get().feedSort).then((posts) => {
-      set({ posts, newPostCount: 0 });
+      set({ posts, newPostCount: 0, feedCursor: posts.length > 0 ? posts[posts.length - 1].created_at : null });
       api.trends().then((trends) => set({ trends })).catch(() => {});
       api.agents().then((agents) => set({ agents })).catch(() => {});
       if (get().token && posts.length) {
@@ -89,7 +112,20 @@ export const useSimulationStore = create((set, get) => ({
     }).catch(() => {});
   },
 
-  // --- Sort ---
+  loadMore() {
+    const { feedSort, feedCursor, posts } = get();
+    if (!feedCursor) return;
+    set({ loading: true });
+    api.feed(feedSort, feedCursor).then((morePosts) => {
+      const combined = [...posts, ...morePosts];
+      const nextCursor = morePosts.length > 0 ? morePosts[morePosts.length - 1].created_at : null;
+      set({ posts: combined, feedCursor: nextCursor, loading: false });
+      if (get().token && morePosts.length) {
+        get().checkBookmarks(morePosts.map((p) => p.id));
+      }
+    }).catch(() => set({ loading: false }));
+  },
+
   setFeedSort(sort) {
     set({ feedSort: sort, loading: true });
     api.feed(sort).then((posts) => {
@@ -100,7 +136,6 @@ export const useSimulationStore = create((set, get) => ({
     }).catch(() => set({ loading: false }));
   },
 
-  // --- Auth ---
   async login(username, password) {
     const auth = await api.login({ username, password });
     const userData = { ...auth, id: auth.user_id };
@@ -188,11 +223,39 @@ export const useSimulationStore = create((set, get) => ({
   async like(postId) {
     const { token } = get();
     if (!token) throw new Error("login_required");
-    await api.like(token, postId);
-    api.feed(get().feedSort).then((posts) => {
-      set({ posts });
-      if (posts.length) get().checkBookmarks(posts.map((p) => p.id));
-    }).catch(() => {});
+    set((state) => ({
+      posts: state.posts.map((p) =>
+        p.id === postId ? { ...p, like_count: (p.like_count || 0) + 1 } : p
+      ),
+      communityPosts: state.communityPosts.map((p) =>
+        p.id === postId ? { ...p, like_count: (p.like_count || 0) + 1 } : p
+      ),
+      threadReplies: state.threadReplies.map((p) =>
+        p.id === postId ? { ...p, like_count: (p.like_count || 0) + 1 } : p
+      ),
+    }));
+    try {
+      const res = await api.like(token, postId);
+      if (res?.like_count !== undefined) {
+        set((state) => ({
+          posts: state.posts.map((p) =>
+            p.id === postId ? { ...p, like_count: res.like_count } : p
+          ),
+          communityPosts: state.communityPosts.map((p) =>
+            p.id === postId ? { ...p, like_count: res.like_count } : p
+          ),
+          threadReplies: state.threadReplies.map((p) =>
+            p.id === postId ? { ...p, like_count: res.like_count } : p
+          ),
+        }));
+      }
+    } catch {
+      set((state) => ({
+        posts: state.posts.map((p) =>
+          p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
+        ),
+      }));
+    }
   },
 
   async follow(userId) {
@@ -288,6 +351,186 @@ export const useSimulationStore = create((set, get) => ({
     try {
       const data = await api.trendingTopics();
       set({ trendingTopics: data });
+    } catch {}
+  },
+
+  // ── Feed Algorithm ──
+  async setAlgorithm(algorithm) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.setFeedAlgorithm(token, algorithm);
+      set({ currentAlgorithm: algorithm });
+    } catch {}
+  },
+  async fetchAlgorithm() {
+    try {
+      const { algorithm } = await api.getFeedAlgorithm();
+      set({ currentAlgorithm: algorithm });
+    } catch {}
+  },
+
+  // ── Faction Graph ──
+  async fetchFactionGraph() {
+    try {
+      const data = await api.factionGraph();
+      set({ factionGraph: data });
+    } catch {}
+  },
+
+  // ── Disruptions ──
+  async injectFakeNews(title, body = "", source = null) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.injectFakeNews(token, { title, body, source });
+      get().fetchDisruptions();
+    } catch {}
+  },
+  async spawnTrollFarm(title, count = 10) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.spawnTrollFarm(token, title, count);
+      get().fetchDisruptions();
+    } catch {}
+  },
+  async fetchDisruptions() {
+    try {
+      const data = await api.listDisruptions();
+      set({ disruptions: data });
+    } catch {}
+  },
+  async stopDisruption(disruptionId) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.stopDisruption(token, disruptionId);
+      get().fetchDisruptions();
+    } catch {}
+  },
+  async simulateSpread(disruptionId) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const res = await api.simulateSpread(token, disruptionId);
+      return res.infection_rate;
+    } catch {}
+  },
+
+  // ── Direct Messages ──
+  async fetchDMGroups() {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const groups = await api.listDMGroups(token);
+      set({ dmGroups: groups });
+    } catch {}
+  },
+  async fetchDMMessages(dmGroupId) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const messages = await api.getDMMessages(token, dmGroupId);
+      set((state) => ({ dmMessages: { ...state.dmMessages, [dmGroupId]: messages } }));
+    } catch {}
+  },
+  async sendDM(recipientId, body) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const msg = await api.sendDM(token, { recipient_id: recipientId, body });
+      get().fetchDMGroups();
+      return msg;
+    } catch {}
+  },
+  async fetchDMUnread() {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const { count } = await api.dmUnreadCount(token);
+      set({ dmUnread: count });
+    } catch {}
+  },
+  setActiveDMGroup(group) {
+    set({ activeDMGroup: group });
+    if (group) get().fetchDMMessages(group.id);
+  },
+
+  // ── Group Chats ──
+  async fetchGroupChats() {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const chats = await api.listGroupChats(token);
+      set({ groupChats: chats });
+    } catch {}
+  },
+  async createGroupChat(name, topic, participantIds) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.createGroupChat(token, { name, topic, participant_ids: participantIds });
+      get().fetchGroupChats();
+    } catch {}
+  },
+  async fetchGroupMessages(groupChatId) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const messages = await api.getGroupMessages(token, groupChatId);
+      set((state) => ({ groupChatMessages: { ...state.groupChatMessages, [groupChatId]: messages } }));
+    } catch {}
+  },
+  async sendGroupMessage(groupChatId, body) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      const msg = await api.sendGroupMessage(token, groupChatId, { body });
+      get().fetchGroupMessages(groupChatId);
+      return msg;
+    } catch {}
+  },
+  setActiveGroupChat(chat) {
+    set({ activeGroupChat: chat });
+    if (chat) get().fetchGroupMessages(chat.id);
+  },
+
+  // ── Community Elections ──
+  async fetchActiveElection(communityId) {
+    try {
+      const election = await api.getActiveElection(communityId);
+      set((state) => ({ activeElections: { ...state.activeElections, [communityId]: election } }));
+      return election;
+    } catch {}
+  },
+  async startElection(communityId) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.startElection(token, communityId);
+      get().fetchActiveElection(communityId);
+    } catch {}
+  },
+  async castVote(communityId, candidateId) {
+    const { token } = get();
+    if (!token) return;
+    try {
+      await api.castVote(token, communityId, candidateId);
+      get().fetchActiveElection(communityId);
+    } catch {}
+  },
+
+  // ── Refresh All ──
+  async refreshAll() {
+    try {
+      await Promise.all([
+        api.feed(get().feedSort).then((posts) => set({ posts })),
+        api.events().then((events) => set({ events })),
+        api.trends().then((trends) => set({ trends })),
+        api.agents().then((agents) => set({ agents })),
+        api.communities().then((communities) => set({ communities })),
+      ]);
     } catch {}
   },
 }));

@@ -3,11 +3,14 @@
 import {
   ArrowLeft,
   Bot,
+  Brain,
   Calendar,
+  Flame,
+  Heart,
   MessageCircle,
   UserPlus,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -27,25 +30,93 @@ const avatarGradients = [
 ];
 
 function getAvatarColor(username) {
-  const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
+  const i = (username || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
   return avatarGradients[i % avatarGradients.length];
+}
+
+const EMOTION_META = {
+  agitation:  { label: "Agitation",  color: "#ff4500", emoji: "🔥" },
+  humor:      { label: "Humor",      color: "#f5a623", emoji: "😂" },
+  aggression: { label: "Aggression", color: "#ef4444", emoji: "⚡" },
+  drama:      { label: "Drama",      color: "#a855f7", emoji: "🎭" },
+  coolness:   { label: "Coolness",   color: "#4f8cff", emoji: "😎" },
+  sadness:    { label: "Sadness",    color: "#6b7280", emoji: "😢" },
+  excitement: { label: "Excitement", color: "#10d48e", emoji: "🚀" },
+  confidence: { label: "Confidence", color: "#ffd700", emoji: "💪" },
+};
+
+function EmotionBar({ emotion, value }) {
+  const meta = EMOTION_META[emotion] || { label: emotion, color: "#6b7280", emoji: "●" };
+  const pct = Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="flex items-center gap-1.5 text-[var(--color-text-secondary)] font-medium">
+          <span>{meta.emoji}</span>{meta.label}
+        </span>
+        <span className="tabular-nums font-bold" style={{ color: meta.color }}>{pct}%</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-[var(--color-panel-2)] overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.7, ease: "easeOut" }}
+          className="h-full rounded-full"
+          style={{ background: `linear-gradient(90deg, ${meta.color}88, ${meta.color})` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MiniPostCard({ post }) {
+  const timeAgo = (dateStr) => {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h`;
+    return `${Math.floor(hrs / 24)}d`;
+  };
+
+  return (
+    <Link href={`/post/${post.id}`}>
+      <motion.div
+        whileHover={{ x: 2, backgroundColor: "var(--color-panel-hover)" }}
+        className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4 space-y-2 transition-all duration-200 cursor-pointer"
+      >
+        {post.title && (
+          <p className="text-sm font-semibold text-[var(--color-text)] line-clamp-2 leading-snug">
+            {post.title}
+          </p>
+        )}
+        <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 leading-relaxed">
+          {post.body}
+        </p>
+        <div className="flex items-center gap-3 text-[10px] text-[var(--color-text-dim)]">
+          <span className="flex items-center gap-1">
+            <Heart size={10} className="text-[var(--color-accent)]" />
+            {post.like_count}
+          </span>
+          <span className="flex items-center gap-1">
+            <MessageCircle size={10} />
+            {post.reply_count}
+          </span>
+          <span className="ml-auto">{timeAgo(post.created_at)}</span>
+        </div>
+      </motion.div>
+    </Link>
+  );
 }
 
 const container = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06 },
-  },
+  visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
 };
 
 const itemAnim = {
   hidden: { opacity: 0, y: 12 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { type: "spring", stiffness: 300, damping: 26 },
-  },
+  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 26 } },
 };
 
 export default function ProfilePage() {
@@ -54,14 +125,33 @@ export default function ProfilePage() {
   const follow = useSimulationStore((s) => s.follow);
   const user = useSimulationStore((s) => s.user);
   const [profile, setProfile] = useState(null);
+  const [agentDetail, setAgentDetail] = useState(null);
+  const [userPosts, setUserPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("posts");
 
   useEffect(() => {
     async function load() {
       try {
         const data = await api.userProfile(id);
         setProfile(data);
-      } catch {}
+
+        // Load posts for this user
+        setPostsLoading(true);
+        api.userPosts(id, 20)
+          .then((posts) => setUserPosts(posts))
+          .catch(() => {})
+          .finally(() => setPostsLoading(false));
+
+        // If it's an agent, also load agent detail for emotion bars
+        if (data.is_agent) {
+          // Find agent id from agents list or try to load via profile id
+          // The AgentDetail endpoint uses agent.id, but profile gives user.id
+          // We pass user.id but the backend /agents/{agent_id} uses agent pk
+          // So we rely on the user_id approach via userProfile which has agent_template
+        }
+      } catch { /* not found */ }
       setLoading(false);
     }
     load();
@@ -85,18 +175,20 @@ export default function ProfilePage() {
   if (!profile) {
     return (
       <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
-        <div className="text-center">
+        <div className="text-center space-y-3">
           <p className="text-sm text-[var(--color-text-muted)]">User not found</p>
-          <Link
-            href="/feed"
-            className="mt-3 inline-flex items-center gap-1 text-xs text-[var(--color-accent)] transition-colors hover:text-[var(--color-accent-hover)]"
-          >
+          <Link href="/feed" className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:underline">
             <ArrowLeft size={12} /> Back to feed
           </Link>
         </div>
       </div>
     );
   }
+
+  const tabs = [
+    { id: "posts", label: `Posts (${profile.post_count})` },
+    ...(profile.is_agent ? [{ id: "brain", label: "🧠 Brain" }] : []),
+  ];
 
   return (
     <motion.div
@@ -107,19 +199,16 @@ export default function ProfilePage() {
     >
       {/* Back button */}
       <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 h-11 flex items-center">
-        <button
-          onClick={() => router.back()}
-          className="btn-icon"
-        >
+        <button onClick={() => router.back()} className="btn-icon">
           <ArrowLeft size={14} />
         </button>
         <span className="ml-2 text-xs font-medium text-[var(--color-text-secondary)]">Back</span>
       </div>
 
-      {/* Banner with gradient */}
+      {/* Banner */}
       <div className="relative h-36 bg-gradient-to-r from-[var(--color-accent)]/15 via-[var(--color-blue)]/10 to-[var(--color-violet)]/15 overflow-hidden">
-        {/* Subtle pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.03]"
+        <div
+          className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: `radial-gradient(circle at 25% 50%, var(--color-accent) 1px, transparent 1px)`,
             backgroundSize: "20px 20px",
@@ -140,11 +229,7 @@ export default function ProfilePage() {
         animate="visible"
         className="px-6 md:px-8 relative"
       >
-        <UserHoverCard
-          userId={profile.id}
-          username={profile.username}
-          isAgent={profile.is_agent}
-        >
+        <UserHoverCard userId={profile.id} username={profile.username} isAgent={profile.is_agent}>
           <motion.div
             variants={itemAnim}
             className={`-mt-16 flex h-28 w-28 items-center justify-center rounded-full border-4 border-[var(--color-bg)] bg-gradient-to-br ${getAvatarColor(profile.username)} text-4xl font-bold text-white shadow-xl`}
@@ -153,15 +238,13 @@ export default function ProfilePage() {
           </motion.div>
         </UserHoverCard>
 
-        <motion.div variants={itemAnim} className="mt-4 pb-6 border-b border-[var(--color-line)]">
+        <motion.div variants={itemAnim} className="mt-4 pb-5 border-b border-[var(--color-line)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-xl font-bold text-[var(--color-text)]">
                 {profile.display_name || profile.username}
               </h1>
-              <p className="text-sm text-[var(--color-text-muted)] mt-0.5">
-                @{profile.username}
-              </p>
+              <p className="text-sm text-[var(--color-text-muted)] mt-0.5">@{profile.username}</p>
             </div>
             {user && String(user.id) !== id && (
               <motion.button
@@ -175,86 +258,144 @@ export default function ProfilePage() {
             )}
           </div>
 
-          <p className="mt-4 text-sm leading-relaxed text-[var(--color-text-secondary)] max-w-lg">
+          <p className="mt-3 text-sm leading-relaxed text-[var(--color-text-secondary)] max-w-lg">
             {profile.bio || "No bio. Suspiciously normal."}
           </p>
 
-          <div className="mt-4 flex items-center gap-1.5 text-xs text-[var(--color-text-dim)]">
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-[var(--color-text-dim)]">
             <Calendar size={13} />
             Joined{" "}
             {new Date(profile.created_at).toLocaleDateString("en-US", {
-              month: "long",
-              year: "numeric",
+              month: "long", year: "numeric",
             })}
           </div>
         </motion.div>
 
         {/* Stats */}
-        <motion.div variants={itemAnim} className="grid grid-cols-3 gap-4 py-6">
+        <motion.div variants={itemAnim} className="grid grid-cols-3 gap-4 py-5 border-b border-[var(--color-line)]">
           {[
             { label: "Posts", value: profile.post_count, color: "var(--color-text)" },
-            {
-              label: "Followers",
-              value: profile.follower_count,
-              color: "var(--color-blue)",
-            },
-            {
-              label: "Following",
-              value: profile.following_count,
-              color: "var(--color-violet)",
-            },
+            { label: "Followers", value: profile.follower_count, color: "var(--color-blue)" },
+            { label: "Following", value: profile.following_count, color: "var(--color-violet)" },
           ].map((stat) => (
-            <div
-              key={stat.label}
-              className="card p-4 text-center"
-            >
+            <div key={stat.label} className="card p-4 text-center">
               <div className="text-xl font-bold tabular-nums" style={{ color: stat.color }}>
                 {stat.value}
               </div>
-              <div className="text-xs text-[var(--color-text-muted)] mt-0.5">
-                {stat.label}
-              </div>
+              <div className="text-xs text-[var(--color-text-muted)] mt-0.5">{stat.label}</div>
             </div>
           ))}
         </motion.div>
 
-        {/* Agent details */}
-        {profile.agent_template && (
-          <motion.div
-            variants={itemAnim}
-            className="card p-6 mb-6"
-          >
-            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)] mb-3">
-              Observed Pattern
-            </h3>
-            <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-              {profile.agent_template}
-            </p>
-            <div className="mt-4 space-y-2">
-              <div className="flex justify-between text-xs text-[var(--color-text-dim)]">
-                <span>Activity Level</span>
-                <span className="tabular-nums font-medium">
-                  {Math.round(Number(profile.agent_activity_level || 0) * 100)}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-[var(--color-panel-2)] overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{
-                    width: `${Number(profile.agent_activity_level || 0) * 100}%`,
-                  }}
-                  transition={{ duration: 0.8, ease: "easeOut" }}
-                  className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)]"
-                />
-              </div>
-            </div>
-          </motion.div>
+        {/* Tabs */}
+        {tabs.length > 1 && (
+          <div className="flex gap-1 py-3 border-b border-[var(--color-line)]">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)] border border-[var(--color-accent)]/30"
+                    : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-panel)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         )}
 
-        <div className="py-6 text-center text-xs text-[var(--color-text-dim)]">
-          <MessageCircle size={14} className="inline mr-1.5" />
-          Posts by @{profile.username} appear in the feed
-        </div>
+        {/* Tab content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="py-5 space-y-4"
+          >
+            {activeTab === "posts" && (
+              <>
+                {postsLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4 animate-pulse space-y-2">
+                        <div className="h-3 bg-[var(--color-line)] rounded w-3/4" />
+                        <div className="h-2 bg-[var(--color-line)] rounded w-full" />
+                        <div className="h-2 bg-[var(--color-line)] rounded w-2/3" />
+                      </div>
+                    ))}
+                  </div>
+                ) : userPosts.length > 0 ? (
+                  <div className="space-y-3">
+                    {userPosts.map((post) => (
+                      <MiniPostCard key={post.id} post={post} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center space-y-2">
+                    <MessageCircle size={24} className="mx-auto text-[var(--color-text-dim)]" />
+                    <p className="text-sm text-[var(--color-text-muted)]">No posts yet</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === "brain" && profile.is_agent && (
+              <>
+                {/* Agent detail card */}
+                {profile.agent_template && (
+                  <div className="card p-5 space-y-3">
+                    <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                      <Bot size={13} className="text-[var(--color-accent)]" />
+                      Observed Pattern
+                    </h3>
+                    <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                      {profile.agent_template}
+                    </p>
+                    <div className="space-y-2 pt-1">
+                      <div className="flex justify-between text-xs text-[var(--color-text-dim)]">
+                        <span>Activity Level</span>
+                        <span className="tabular-nums font-medium">
+                          {Math.round(Number(profile.agent_activity_level || 0) * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-[var(--color-panel-2)] overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Number(profile.agent_activity_level || 0) * 100}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                          className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Deep dive link */}
+                <Link
+                  href={`/agents/${id}`}
+                  className="flex items-center justify-between rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-4 transition-all duration-200 hover:border-[var(--color-accent)]/40 hover:bg-[var(--color-panel-hover)]/40 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
+                      <Brain size={16} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-[var(--color-text)]">View Full Brain Panel</div>
+                      <div className="text-xs text-[var(--color-text-muted)]">Emotion bars, personality traits, interests & more</div>
+                    </div>
+                  </div>
+                  <Flame size={16} className="text-[var(--color-text-dim)] group-hover:text-[var(--color-accent)] transition-colors" />
+                </Link>
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="h-8" />
       </motion.div>
     </motion.div>
   );

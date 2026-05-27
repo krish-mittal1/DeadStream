@@ -19,6 +19,7 @@ from app.models.user import User
 from app.schemas import (
     AgentDetailResponse,
     BookmarkResponse,
+    CommunityDetailResponse,
     CommunityResponse,
     CreatePostRequest,
     LeaderboardEntry,
@@ -28,9 +29,14 @@ from app.schemas import (
 )
 from app.services.moderation import moderation_service
 from app.services.notification_service import notification_service
+from app.models.ideology import IdeologySnapshot
 
 
 CURSOR_PAGE_SIZE = 50
+
+# ── Feed algorithm settings (mutable, set via admin) ──────────────
+
+FEED_ALGORITHM: str = "hot"  # hot | outrage | polarization | calm | discovery
 
 
 avatar_gradients = [
@@ -118,18 +124,34 @@ class FeedService:
         cursor: Optional[str] = None,
         sort: str = "hot",
     ) -> list[PostResponse]:
-        cache_key = f"cache:feed:{sort}:{cursor or 'first'}:{limit}"
+        cache_key = f"cache:feed:{FEED_ALGORITHM}:{cursor or 'first'}:{limit}"
 
         async def _fetch() -> list[PostResponse]:
+            global FEED_ALGORITHM
             stmt = select(Post)
 
-            # Apply sorting
-            if sort == "new":
-                stmt = stmt.order_by(desc(Post.created_at))
-            elif sort == "top":
-                stmt = stmt.order_by(desc(func.length(Post.body)))
-            elif sort == "controversial":
-                stmt = stmt.order_by(desc(Post.controversy_score), desc(Post.created_at))
+            # Apply algorithm-based sorting
+            if FEED_ALGORITHM == "outrage":
+                # Boost controversial + high-agitation posts — polarization maximizer
+                stmt = stmt.order_by(
+                    desc(Post.controversy_score + Post.virality_score * 1.5),
+                    desc(Post.created_at),
+                )
+            elif FEED_ALGORITHM == "polarization":
+                # Amplify the most divisive content — create echo chambers
+                stmt = stmt.order_by(
+                    desc(Post.controversy_score * 2.0 + Post.virality_score * 0.5),
+                    desc(Post.created_at),
+                )
+            elif FEED_ALGORITHM == "calm":
+                # Suppress controversial, boost positive, low-agitation content
+                stmt = stmt.order_by(Post.controversy_score, desc(Post.virality_score), desc(Post.created_at))
+            elif FEED_ALGORITHM == "discovery":
+                # Mix of new + random high-virality — exploration mode
+                stmt = stmt.order_by(
+                    desc(func.random() * Post.virality_score * 1.2),
+                    desc(Post.created_at),
+                )
             else:  # hot (default)
                 stmt = stmt.order_by(desc(Post.virality_score), desc(Post.created_at))
 
@@ -176,16 +198,28 @@ class FeedService:
 
         return await get_or_compute(cache_key, _fetch)
 
-    async def like_post(self, session: AsyncSession, user: User, post_id: uuid.UUID) -> None:
+    async def like_post(self, session: AsyncSession, user: User, post_id: uuid.UUID) -> int:
+        """Like a post. Returns the updated like_count."""
         existing = await session.scalar(select(Like).where(Like.user_id == user.id, Like.post_id == post_id))
         if existing is None:
             session.add(Like(user_id=user.id, post_id=post_id))
             post = await session.get(Post, post_id)
             if post is not None:
                 post.virality_score += 0.08
+                # Notify post author if they are not the liker
+                if post.author_id != user.id:
+                    await notification_service.create(
+                        session,
+                        user_id=post.author_id,
+                        actor_id=user.id,
+                        type="like",
+                        entity_id=post_id,
+                    )
             await event_store.append(session, "user_liked", user.id, post_id, {})
             await session.commit()
             await cache_invalidate("cache:feed:*")
+        like_count = await session.scalar(select(func.count()).select_from(Like).where(Like.post_id == post_id)) or 0
+        return int(like_count)
 
     async def follow(self, session: AsyncSession, follower: User, followee_id: uuid.UUID) -> None:
         existing = await session.scalar(
@@ -456,6 +490,24 @@ class FeedService:
 
         return entries[:limit]
 
+    async def list_user_posts(
+        self,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        limit: int = 30,
+        offset: int = 0,
+    ) -> list[PostResponse]:
+        """Return top-level posts (no replies) by a specific user, newest first."""
+        stmt = (
+            select(Post)
+            .where(Post.author_id == user_id, Post.parent_id.is_(None))
+            .order_by(desc(Post.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
+        posts = (await session.execute(stmt)).scalars().all()
+        return [await self._to_response(session, post) for post in posts]
+
     async def _to_response(self, session: AsyncSession, post: Post) -> PostResponse:
         user = await session.get(User, post.author_id)
         like_count = await session.scalar(select(func.count()).select_from(Like).where(Like.post_id == post.id)) or 0
@@ -465,6 +517,8 @@ class FeedService:
             id=post.id,
             author_id=post.author_id,
             author_username=user.username if user else "unknown",
+            author_display_name=user.display_name or (user.username if user else "unknown"),
+            is_agent=user.is_agent if user else False,
             title=post.title,
             body=post.body,
             image_url=post.image_url,
@@ -474,6 +528,156 @@ class FeedService:
             like_count=int(like_count),
             reply_count=int(reply_count),
             created_at=post.created_at,
+        )
+
+
+    # ── Faction Polarization ────────────────────────────────────────
+
+    async def get_faction_graph(
+        self, session: AsyncSession
+    ) -> dict:
+        """Compute the faction polarization graph based on agent relationships."""
+        from app.models.community import Community
+        from app.models.agent import AgentRelationship
+
+        agents = (await session.execute(select(Agent).limit(100))).scalars().all()
+        users = {}
+        for agent in agents:
+            user = await session.get(User, agent.user_id)
+            if user:
+                users[agent.id] = user
+
+        # Assign factions based on agitation and community membership
+        alpha_faction = set()
+        beta_faction = set()
+        neutral_faction = set()
+
+        for agent in agents:
+            ag = float(agent.emotional_state.get("agitation", 0.3))
+            aggr = float(agent.emotional_state.get("aggression", 0.2))
+            exc = float(agent.emotional_state.get("excitement", 0.3))
+            combo = ag * 0.5 + aggr * 0.3 + exc * 0.2
+            if combo > 0.55:
+                alpha_faction.add(agent.id)
+            elif combo < 0.3:
+                beta_faction.add(agent.id)
+            else:
+                neutral_faction.add(agent.id)
+
+        # Get relationships for edges
+        rels = (await session.execute(select(AgentRelationship).limit(300))).scalars().all()
+
+        nodes = []
+        agent_ids = set(a.id for a in agents)
+
+        for agent in agents:
+            user = users.get(agent.id)
+            if not user:
+                continue
+            ag = float(agent.emotional_state.get("agitation", 0.3))
+            faction = (
+                "alpha" if agent.id in alpha_faction
+                else "beta" if agent.id in beta_faction
+                else "neutral"
+            )
+            influence = min(1.0, ag + agent.activity_level * 0.5)
+            nodes.append({
+                "id": str(agent.id),
+                "username": user.username,
+                "faction": faction,
+                "agitation": round(ag, 2),
+                "influence": round(influence, 2),
+            })
+
+        edges = []
+        seen_edges = set()
+        for rel in rels:
+            if rel.source_agent_id not in agent_ids or rel.target_user_id not in {u.id for u in users.values()}:
+                continue
+            source_user = users.get(rel.source_agent_id)
+            if not source_user:
+                continue
+            key = (str(rel.source_agent_id), str(rel.target_user_id))
+            if key in seen_edges:
+                continue
+            seen_edges.add(key)
+            edges.append({
+                "source": str(rel.source_agent_id),
+                "target": str(rel.target_user_id),
+                "weight": round(rel.rivalry if rel.rivalry else rel.affinity, 2),
+                "type": "interaction",
+            })
+
+        # Compute polarization index
+        total = len(nodes) or 1
+        polar_idx = round((len(alpha_faction) * len(beta_faction)) / (total * total) * 10, 2)
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "polarization_index": polar_idx,
+            "alpha_size": len(alpha_faction),
+            "beta_size": len(beta_faction),
+        }
+
+    @classmethod
+    def set_algorithm(cls, algorithm: str) -> None:
+        global FEED_ALGORITHM
+        valid = {"hot", "outrage", "polarization", "calm", "discovery"}
+        if algorithm not in valid:
+            raise ValueError(f"Invalid algorithm: {algorithm}. Valid: {valid}")
+        FEED_ALGORITHM = algorithm
+
+    @classmethod
+    def get_algorithm(cls) -> str:
+        global FEED_ALGORITHM
+        return FEED_ALGORITHM
+
+    async def community_detail(
+        self, session: AsyncSession, community_id: uuid.UUID
+    ) -> Optional[CommunityDetailResponse]:
+        """Get detailed info about a community, including election status."""
+        from app.models.community import CommunityElection
+        community = await session.get(Community, community_id)
+        if not community:
+            return None
+
+        member_count = await session.scalar(
+            select(func.count()).select_from(CommunityMembership).where(
+                CommunityMembership.community_id == community.id
+            )
+        ) or 0
+        post_count = await session.scalar(
+            select(func.count()).select_from(Post).where(Post.community_id == community.id)
+        ) or 0
+
+        moderator_username = None
+        if community.moderator_id:
+            mod_user = await session.get(User, community.moderator_id)
+            if mod_user:
+                moderator_username = mod_user.username
+
+        election_active = await session.scalar(
+            select(CommunityElection).where(
+                CommunityElection.community_id == community.id,
+                CommunityElection.status == "active",
+            ).limit(1)
+        ) is not None
+
+        return CommunityDetailResponse(
+            id=community.id,
+            slug=community.slug,
+            name=community.name,
+            description=community.description,
+            ideology_center=community.ideology_center,
+            conflict_score=community.conflict_score,
+            is_dynamic=community.is_dynamic,
+            moderator_id=community.moderator_id,
+            moderator_username=moderator_username,
+            member_count=int(member_count),
+            post_count=int(post_count),
+            election_active=election_active,
+            created_at=community.created_at,
         )
 
 

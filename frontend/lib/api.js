@@ -57,6 +57,8 @@ export const api = {
     }),
   postReplies: (postId) => request(`/posts/${postId}/replies`),
   userProfile: (userId) => request(`/users/${userId}/profile`),
+  userPosts: (userId, limit = 30, offset = 0) =>
+    request(`/users/${userId}/posts?limit=${limit}&offset=${offset}`),
 
   // Notifications
   notifications: (token, limit = 50, offset = 0) =>
@@ -102,4 +104,115 @@ export const api = {
   trendingTopics: () => request("/trending"),
   leaderboard: (sort = "activity", limit = 20) =>
     request(`/leaderboard?sort=${sort}&limit=${limit}`),
+
+  // ── NEW: Faction Polarization ──
+  factionGraph: () => request("/admin/faction-graph"),
+  setFeedAlgorithm: (token, algorithm) =>
+    request("/admin/algorithm", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ algorithm })
+    }),
+  getFeedAlgorithm: () => request("/admin/algorithm"),
+
+  // ── NEW: God Mode Disruptions ──
+  injectFakeNews: (token, payload) =>
+    request("/admin/disruptions/fake-news", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }),
+  spawnTrollFarm: (token, title, count = 10) =>
+    request(`/admin/disruptions/troll-farm?title=${encodeURIComponent(title)}&count=${count}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  listDisruptions: (activeOnly = false) =>
+    request(`/admin/disruptions?active_only=${activeOnly}`),
+  stopDisruption: (token, disruptionId) =>
+    request(`/admin/disruptions/${disruptionId}/stop`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  simulateSpread: (token, disruptionId) =>
+    request(`/admin/disruptions/${disruptionId}/spread`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // ── NEW: Cognitive Drift ──
+  agentBrainEvolution: (agentId, days = 7) =>
+    request(`/agents/${agentId}/brain-evolution?days=${days}`),
+
+  // ── NEW: Direct Messages ──
+  sendDM: (token, payload) =>
+    request("/dm/send", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }),
+  listDMGroups: (token) =>
+    request("/dm/groups", {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  getDMMessages: (token, dmGroupId, limit = 50, beforeId = null) =>
+    request(`/dm/groups/${dmGroupId}/messages?limit=${limit}${beforeId ? `&before_id=${beforeId}` : ""}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  dmUnreadCount: (token) =>
+    request("/dm/unread-count", {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // ── NEW: Group Chats ──
+  createGroupChat: (token, payload) =>
+    request("/group-chats", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }),
+  listGroupChats: (token) =>
+    request("/group-chats", {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  getGroupChat: (token, groupChatId) =>
+    request(`/group-chats/${groupChatId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  sendGroupMessage: (token, groupChatId, payload) =>
+    request(`/group-chats/${groupChatId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }),
+  getGroupMessages: (token, groupChatId, limit = 100, beforeId = null) =>
+    request(`/group-chats/${groupChatId}/messages?limit=${limit}${beforeId ? `&before_id=${beforeId}` : ""}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  getGroupParticipants: (token, groupChatId) =>
+    request(`/group-chats/${groupChatId}/participants`, {
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+
+  // ── NEW: Community Elections ──
+  communityDetail: (communityId) =>
+    request(`/communities/${communityId}`),
+  startElection: (token, communityId) =>
+    request(`/communities/${communityId}/elections/start`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+  castVote: (token, communityId, candidateId) =>
+    request(`/communities/${communityId}/elections/vote`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ candidate_id: candidateId })
+    }),
+  getActiveElection: (communityId) =>
+    request(`/communities/${communityId}/elections/active`),
+  endElection: (token, electionId) =>
+    request(`/elections/${electionId}/end`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }
+    }),
 };
