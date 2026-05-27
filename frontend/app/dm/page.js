@@ -34,18 +34,60 @@ function getOtherParticipant(group, userId) {
   return { id: group.participant_a_id, username: group.participant_a_username };
 }
 
+/* ─── Typing Indicator ──────────────────────────────────── */
+function TypingIndicator({ visible = false }) {
+  if (!visible) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0 }}
+      className="flex items-center gap-2 px-2 py-1.5"
+    >
+      <div className="flex items-center gap-1 px-3 py-2 rounded-2xl bg-[var(--color-panel)] border border-[var(--color-line)] rounded-bl-md">
+        {[0, 1, 2].map((i) => (
+          <motion.span
+            key={i}
+            className="w-[6px] h-[6px] rounded-full bg-[var(--color-text-dim)]"
+            animate={{
+              y: [0, -4, 0],
+              opacity: [0.3, 0.8, 0.3],
+            }}
+            transition={{
+              duration: 1.2,
+              repeat: Infinity,
+              delay: i * 0.2,
+              ease: "easeInOut",
+            }}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] text-[var(--color-text-dim)]">typing...</span>
+    </motion.div>
+  );
+}
+
 function DMMessage({ msg, isOwn }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8, scale: 0.96 }}
+      initial={{ opacity: 0, y: 10, scale: 0.94 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
       className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
     >
+      {/* Avatar for incoming messages */}
+      {!isOwn && (
+        <div
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white mt-1"
+          style={{ background: getAvatarGradient(msg.sender_username) }}
+        >
+          {msg.sender_username?.charAt(0)?.toUpperCase() || "?"}
+        </div>
+      )}
       <div
-        className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+        className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm ${
           isOwn
-            ? "bg-[var(--color-accent)] text-white rounded-br-md"
+            ? "bg-[var(--color-accent)] text-white rounded-br-md shadow-[0_2px_8px_rgba(255,69,0,0.2)]"
             : "bg-[var(--color-panel)] border border-[var(--color-line)] text-[var(--color-text)] rounded-bl-md"
         }`}
       >
@@ -321,6 +363,11 @@ export default function DMPage() {
                     </div>
                   </div>
                 )}
+                {/* Typing indicator */}
+                <AnimatePresence>
+                  <TypingIndicator visible={true} />
+                </AnimatePresence>
+
                 <AnimatePresence>
                   {(dmMessages[activeDMGroup.id] || []).map((msg) => (
                     <DMMessage key={msg.id} msg={msg} isOwn={msg.sender_id === user?.id} />

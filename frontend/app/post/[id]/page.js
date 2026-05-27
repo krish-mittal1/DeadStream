@@ -406,23 +406,30 @@ function CommentNode({ comments, depth, collapsedThreads, onToggle, getAvatarCol
                 paddingBottom: "14px",
               }}
             >
-              {/* Thread line connector */}
+              {/* Thread line connector — lights up on hover via CSS */}
               {depth > 0 && (
                 <div
-                  className="absolute left-0 top-0 bottom-0 w-px"
+                  className="absolute top-0 bottom-0 w-px transition-all duration-300"
                   style={{
                     left: `${Math.min(depth, maxDepth) * 16 + 12}px`,
-                    background: "var(--color-line)",
+                    background: 'var(--color-line)',
                     opacity: depth <= 3 ? 0.5 : 0.2,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = String(depth <= 3 ? 0.5 : 0.2);
                   }}
                 />
               )}
 
               {/* Thread collapse toggle */}
               {hasChildren && (
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.85 }}
                   onClick={() => onToggle(comment.id)}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-[var(--color-panel)] transition-all"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-[var(--color-text-dim)] hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 transition-all"
                   style={{ left: `${Math.min(depth, maxDepth) * 16 + 6}px` }}
                 >
                   {isCollapsed ? (
@@ -430,7 +437,7 @@ function CommentNode({ comments, depth, collapsedThreads, onToggle, getAvatarCol
                   ) : (
                     <ChevronDown size={10} />
                   )}
-                </button>
+                </motion.button>
               )}
 
               {/* Author + timestamp */}
@@ -482,13 +489,13 @@ function CommentNode({ comments, depth, collapsedThreads, onToggle, getAvatarCol
             </motion.div>
 
             {/* Recursive children */}
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
               {hasChildren && !isCollapsed && depth < maxDepth && (
                 <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  initial={{ opacity: 0, height: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, height: "auto", scale: 1 }}
+                  exit={{ opacity: 0, height: 0, scale: 0.98 }}
+                  transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
                 >
                   <CommentNode
                     comments={comment.children}

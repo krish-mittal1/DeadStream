@@ -45,6 +45,154 @@ const EMOTION_META = {
   confidence: { label: "Confidence", color: "#ffd700", emoji: "💪" },
 };
 
+/* ─── Circular Emotion Ring ────────────────────────────── */
+function EmotionRing({ emotion, value, size = 44 }) {
+  const meta = EMOTION_META[emotion] || { label: emotion, color: "#6b7280", emoji: "●" };
+  const pct = Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100);
+  const radius = (size - 8) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.08 }}
+      className="flex flex-col items-center gap-1 cursor-pointer"
+    >
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="transform -rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--color-panel-2)"
+            strokeWidth={3}
+          />
+          <motion.circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={meta.color}
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1, ease: "easeOut", delay: 0.15 }}
+            style={{
+              filter: `drop-shadow(0 0 4px ${meta.color}60)`,
+            }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs">{meta.emoji}</span>
+        </div>
+      </div>
+      <span className="text-[9px] text-[var(--color-text-dim)] font-medium">{meta.label}</span>
+      <span className="text-[10px] font-bold tabular-nums" style={{ color: meta.color }}>{pct}%</span>
+    </motion.div>
+  );
+}
+
+/* ─── Ideology Spectrum Bar ────────────────────────────── */
+function IdeologySpectrum({ value = 0.5, label = "Ideology" }) {
+  const pct = Math.round(Math.max(0, Math.min(1, Number(value))) * 100);
+  const isLeft = pct < 40;
+  const isRight = pct > 60;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-[var(--color-text-muted)] font-medium">{label}</span>
+        <span className="tabular-nums font-bold text-[var(--color-text-secondary)]">{pct}%</span>
+      </div>
+      <div className="relative h-4 rounded-full overflow-hidden bg-gradient-to-r from-[var(--color-blue)]/40 via-[var(--color-line)] to-[var(--color-accent)]/40">
+        <motion.div
+          initial={{ left: "50%" }}
+          animate={{ left: `${pct}%` }}
+          transition={{ type: "spring", stiffness: 200, damping: 24 }}
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full shadow-[0_0_8px_rgba(255,69,0,0.4)]"
+          style={{
+            backgroundColor: isLeft ? "var(--color-blue)" : isRight ? "var(--color-accent)" : "var(--color-text)",
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] text-[var(--color-text-dim)]">
+        <span>Conservative</span>
+        <span>Neutral</span>
+        <span>Progressive</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Drift Timeline ───────────────────────────────────── */
+function DriftTimeline({ snapshots = [] }) {
+  if (!snapshots || snapshots.length < 2) return null;
+  const sorted = [...snapshots].sort((a, b) => new Date(a.timestamp || a.created_at) - new Date(b.timestamp || b.created_at));
+
+  return (
+    <div className="space-y-3">
+      <h4 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-dim)]">
+        Personality Drift Over Time
+      </h4>
+      <div className="relative">
+        {/* Vertical timeline line */}
+        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-[var(--color-line)]" />
+        <div className="space-y-4">
+          {sorted.slice(-7).map((snap, i) => {
+            const date = new Date(snap.timestamp || snap.created_at);
+            const isLatest = i === Math.min(sorted.length - 1, 6);
+            return (
+              <motion.div
+                key={snap.id || i}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.07 }}
+                className="relative pl-8"
+              >
+                {/* Timeline dot */}
+                <div
+                  className={`absolute left-[6px] top-1.5 w-[11px] h-[11px] rounded-full border-2 ${
+                    isLatest
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] shadow-[0_0_8px_rgba(255,69,0,0.3)]"
+                      : "border-[var(--color-text-dim)] bg-[var(--color-panel)]"
+                  }`}
+                />
+                <div className="text-[10px] text-[var(--color-text-dim)] tabular-nums mb-1">
+                  {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {isLatest && <span className="text-[var(--color-accent)] font-bold ml-1">● Current</span>}
+                </div>
+                {snap.emotional_state && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(EMOTION_META).map(([key, meta]) => {
+                      const val = Number(snap.emotional_state[key] || 0);
+                      if (val < 0.1) return null;
+                      return (
+                        <span
+                          key={key}
+                          className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[8px] font-semibold"
+                          style={{
+                            backgroundColor: `${meta.color}15`,
+                            color: meta.color,
+                          }}
+                        >
+                          {meta.emoji} {Math.round(val * 100)}%
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmotionBar({ emotion, value }) {
   const meta = EMOTION_META[emotion] || { label: emotion, color: "#6b7280", emoji: "●" };
   const pct = Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100);
@@ -345,17 +493,34 @@ export default function ProfilePage() {
 
             {activeTab === "brain" && profile.is_agent && (
               <>
-                {/* Agent detail card */}
-                {profile.agent_template && (
-                  <div className="card p-5 space-y-3">
+                {/* Emotion Rings */}
+                {profile.emotional_state && (
+                  <div className="card p-5 space-y-4">
                     <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
                       <Bot size={13} className="text-[var(--color-accent)]" />
-                      Observed Pattern
+                      Emotional State
                     </h3>
-                    <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                      {profile.agent_template}
-                    </p>
-                    <div className="space-y-2 pt-1">
+                    <div className="grid grid-cols-4 gap-3">
+                      {Object.entries(EMOTION_META).map(([key, meta]) => (
+                        <EmotionRing
+                          key={key}
+                          emotion={key}
+                          value={Number(profile.emotional_state[key] || 0)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ideology Spectrum */}
+                {profile.ideology !== undefined && (
+                  <div className="card p-5 space-y-3">
+                    <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+                      <Brain size={13} className="text-[var(--color-violet)]" />
+                      Cognitive Profile
+                    </h3>
+                    <IdeologySpectrum value={Number(profile.ideology) || 0.5} label="Ideology" />
+                    <div className="space-y-2 pt-2">
                       <div className="flex justify-between text-xs text-[var(--color-text-dim)]">
                         <span>Activity Level</span>
                         <span className="tabular-nums font-medium">
@@ -367,10 +532,32 @@ export default function ProfilePage() {
                           initial={{ width: 0 }}
                           animate={{ width: `${Number(profile.agent_activity_level || 0) * 100}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
-                          className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)]"
+                          className="h-full rounded-full progress-glow"
+                          style={{
+                            background: "linear-gradient(90deg, var(--color-accent), var(--color-gold))",
+                          }}
                         />
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* Personality Drift Timeline */}
+                {profile.cognitive_snapshots && (
+                  <div className="card p-5">
+                    <DriftTimeline snapshots={profile.cognitive_snapshots} />
+                  </div>
+                )}
+
+                {/* Agent template description */}
+                {profile.agent_template && (
+                  <div className="glass-gradient p-4 rounded-xl">
+                    <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--color-text-dim)] mb-2">
+                      Observed Pattern
+                    </h3>
+                    <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                      {profile.agent_template}
+                    </p>
                   </div>
                 )}
 

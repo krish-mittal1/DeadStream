@@ -405,6 +405,156 @@
     box-shadow: 0 0 0 3px rgba(255,69,0,0.10);
   }
 
+  /* ─── Scanline overlay ────────────────────────────── */
+  .scanlines::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.04) 2px,
+      rgba(0, 0, 0, 0.04) 4px
+    );
+  }
+
+  /* ─── CRT tube curvature ──────────────────────────── */
+  .crt-curve::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9997;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 60%,
+      rgba(0, 0, 0, 0.25) 100%
+    );
+  }
+
+  /* ─── Terminal font utility ────────────────────────── */
+  .font-terminal {
+    font-family: "Courier New", "JetBrains Mono", "Fira Code", monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ─── Border glow (retro-futuristic) ─────────────── */
+  .border-glow {
+    position: relative;
+  }
+  .border-glow::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-amber), transparent, var(--color-accent));
+    background-size: 300% 300%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: gradient-shift 4s ease infinite;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .border-glow:hover::before {
+    opacity: 1;
+  }
+
+  /* ─── Amber retro glow ───────────────────────────── */
+  .amber-glow {
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.08), 0 0 60px rgba(251, 191, 36, 0.03);
+  }
+  .amber-glow:hover {
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.18), 0 0 80px rgba(251, 191, 36, 0.06);
+  }
+
+  /* ─── Neon pulse (for radiation/infection bars) ─── */
+  .neon-pulse {
+    animation: neon-pulse 2s ease-in-out infinite;
+  }
+  @keyframes neon-pulse {
+    0%, 100% { filter: brightness(1) drop-shadow(0 0 4px currentColor); }
+    50% { filter: brightness(1.3) drop-shadow(0 0 12px currentColor); }
+  }
+
+  /* ─── Terminal cursor blink ───────────────────────── */
+  .terminal-cursor::after {
+    content: "▌";
+    animation: blink-cursor 1s step-end infinite;
+    color: var(--color-accent);
+    margin-left: 2px;
+  }
+  @keyframes blink-cursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ─── Hardware toggle knob ────────────────────────── */
+  .hardware-toggle {
+    position: relative;
+    cursor: pointer;
+    border-radius: 10px;
+    border: 1px solid var(--color-line);
+    background: var(--color-panel);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+  .hardware-toggle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  }
+  .hardware-toggle:hover {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 20px var(--color-accent-glow);
+  }
+  .hardware-toggle.active {
+    border-color: var(--color-accent);
+    background: rgba(255, 69, 0, 0.08);
+    box-shadow: 0 0 15px var(--color-accent-glow), inset 0 0 20px rgba(255, 69, 0, 0.04);
+  }
+
+  /* ─── Progress bar glow ────────────────────────────── */
+  .progress-glow {
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-glow::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    animation: progress-sweep 2.5s ease-in-out infinite;
+  }
+  @keyframes progress-sweep {
+    0% { left: -100%; }
+    100% { left: 200%; }
+  }
+
+  /* ─── Glass gradient card (premium) ───────────────── */
+  .glass-gradient {
+    background: linear-gradient(135deg, rgba(255,69,0,0.03), rgba(251,191,36,0.02), transparent);
+    border: 1px solid var(--color-line);
+    backdrop-filter: blur(12px);
+    transition: all 0.3s ease;
+  }
+  .glass-gradient:hover {
+    background: linear-gradient(135deg, rgba(255,69,0,0.06), rgba(251,191,36,0.04), rgba(79,140,255,0.02));
+    border-color: var(--color-accent);
+  }
+
   /* ─── Search bar ────────────────────────────────────── */
   .search-bar {
     display: flex;

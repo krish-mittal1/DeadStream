@@ -12,7 +12,7 @@ import {
   Swords,
   Zap,
 } from "lucide-react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
@@ -296,6 +296,82 @@ function FactionGraph({ factionGraph }) {
   );
 }
 
+/* ─── Terminal-style hardware toggle ───────────────────── */
+function HardwareToggle({ active, onClick, label, color = "var(--color-accent)" }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={`hardware-toggle w-full flex items-center justify-between px-4 py-3 ${
+        active ? "active" : ""
+      }`}
+    >
+      <span className="text-xs font-semibold" style={{ color: active ? color : "var(--color-text-secondary)" }}>
+        {label}
+      </span>
+      <div
+        className={`w-9 h-5 rounded-full transition-all duration-300 relative ${
+          active ? "bg-opacity-30" : "bg-[var(--color-panel-2)]"
+        }`}
+        style={{
+          backgroundColor: active ? `${color}40` : undefined,
+          boxShadow: active ? `0 0 12px ${color}30, inset 0 0 8px ${color}20` : undefined,
+        }}
+      >
+        <motion.div
+          animate={{ x: active ? 18 : 2 }}
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          className={`absolute top-1 w-[12px] h-[12px] rounded-full shadow-sm ${
+            active ? "shadow-[0_0_10px_rgba(255,69,0,0.3)]" : ""
+          }`}
+          style={{ backgroundColor: active ? color : "var(--color-text-dim)" }}
+        />
+      </div>
+    </motion.button>
+  );
+}
+
+/* ─── Terminal log line ─────────────────────────────────── */
+function TerminalLog({ events }) {
+  const endRef = useRef(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [events.length]);
+
+  return (
+    <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)] p-3 font-terminal text-[10px] leading-relaxed max-h-52 overflow-auto">
+      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--color-line)]">
+        <span className="text-[var(--color-accent)] font-bold">$</span>
+        <span className="text-[var(--color-text-dim)]">tail -f /var/log/deadstream/events.log</span>
+        <span className="terminal-cursor text-[var(--color-accent)] ml-auto" />
+      </div>
+      {events.slice(0, 20).map((event, i) => (
+        <div
+          key={event.id || i}
+          className="flex items-start gap-2 py-0.5 opacity-80 hover:opacity-100 transition-opacity"
+        >
+          <span className="shrink-0" style={{ color: eventColors[event.type] || "#6b7280" }}>
+            {eventTypeIcons[event.type] || "▸"}
+          </span>
+          <span className="text-[var(--color-text-dim)] tabular-nums shrink-0">
+            [{event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "--:--:--"}]
+          </span>
+          <span className="text-[var(--color-text-muted)] font-medium" style={{ color: eventColors[event.type] || undefined }}>
+            {event.type.replace(/_/g, " ")}
+          </span>
+          {event.payload?.body && (
+            <span className="text-[var(--color-text-dim)] truncate max-w-[200px]">
+              {String(event.payload.body).slice(0, 60)}
+            </span>
+          )}
+        </div>
+      ))}
+      <div ref={endRef} />
+    </div>
+  );
+}
+
 function GodModePanel() {
   const token = useSimulationStore((s) => s.token);
   const disruptions = useSimulationStore((s) => s.disruptions);
@@ -558,48 +634,8 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              {/* Event Stream */}
-              <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)]">
-                <div className="px-4 py-3 border-b border-[var(--color-line)]">
-                  <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
-                    <Zap size={16} className="text-[var(--color-gold)]" />
-                    Event Stream
-                  </h2>
-                </div>
-                <div className="max-h-80 overflow-auto p-3 space-y-1.5">
-                  {events.slice(0, 40).map((event, index) => (
-                    <motion.div
-                      key={event.id}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: Math.min(index * 0.015, 0.4) }}
-                      className="group rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)] p-3"
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold"
-                            style={{ backgroundColor: `${eventColors[event.type] || "#6b7280"}15`, color: eventColors[event.type] || "#6b7280" }}
-                          >
-                            {eventTypeIcons[event.type] || "?"}
-                          </span>
-                          <span className="text-[11px] font-semibold" style={{ color: eventColors[event.type] || "#6b7280" }}>
-                            {event.type.replace(/_/g, " ")}
-                          </span>
-                        </div>
-                        <span className="shrink-0 text-[10px] text-[var(--color-text-dim)] tabular-nums">
-                          {event.occurred_at ? new Date(event.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : ""}
-                        </span>
-                      </div>
-                      {event.payload?.body && (
-                        <div className="truncate text-[11px] text-[var(--color-text-muted)] pl-7 leading-relaxed">
-                          {String(event.payload.body).slice(0, 100)}
-                        </div>
-                      )}
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
+              {/* Terminal-style event log */}
+              <TerminalLog events={events} />
 
               {/* Event Breakdown */}
               <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-5">
@@ -663,32 +699,27 @@ export default function AdminPage() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                {ALGORITHMS.map((algo) => (
-                  <motion.button
-                    key={algo.id}
-                    whileHover={{ x: 2 }}
-                    whileTap={{ scale: 0.995 }}
-                    onClick={() => setAlgorithm(algo.id)}
-                    className={`w-full rounded-xl p-4 text-left transition-all duration-200 border ${
-                      currentAlgorithm === algo.id
-                        ? "bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 shadow-[0_0_0_1px_var(--color-accent)]"
-                        : "card hover:border-[var(--color-line-light)]"
-                    }`}
+              {/* Algorithm hardware toggles */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-dim)]">
+                    Select Algorithm
+                  </span>
+                  <span
+                    className="tag tag-live text-[9px]"
+                    style={{ opacity: currentAlgorithm ? 1 : 0.4 }}
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{algo.icon}</span>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold" style={{ color: algo.color }}>{algo.label}</span>
-                          {currentAlgorithm === algo.id && (
-                            <span className="text-[9px] font-bold text-[var(--color-accent)] uppercase">Active</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-[var(--color-text-dim)] mt-0.5">{algo.desc}</p>
-                      </div>
-                    </div>
-                  </motion.button>
+                    {currentAlgorithm.toUpperCase()}
+                  </span>
+                </div>
+                {ALGORITHMS.map((algo) => (
+                  <HardwareToggle
+                    key={algo.id}
+                    active={currentAlgorithm === algo.id}
+                    onClick={() => setAlgorithm(algo.id)}
+                    label={`${algo.icon} ${algo.label}`}
+                    color={algo.color}
+                  />
                 ))}
               </div>
 

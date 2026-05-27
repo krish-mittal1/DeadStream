@@ -179,16 +179,15 @@ export function Navbar() {
         <div className="mx-auto flex h-full max-w-[1400px] items-center gap-3 px-4 lg:px-6">
 
           {/* ── Logo ── */}
-          <Link href="/" className="flex items-center gap-2.5 shrink-0 group mr-2">
-            <motion.div
-              whileHover={{ scale: 1.1, rotate: -8 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 500, damping: 28 }}
-              className="flex h-8 w-8 items-center justify-center rounded-xl shadow-[var(--shadow-accent)]"
-              style={{ background: "linear-gradient(135deg, #ff4500, #ff6534)" }}
-            >
-              <Bot size={17} className="text-white" />
-            </motion.div>
+          <Link href="/" className="flex items-center gap-2.5 shrink-0 group mr-2">              <motion.div
+                whileHover={{ scale: 1.12, rotate: -10 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                className="flex h-8 w-8 items-center justify-center rounded-xl shadow-[var(--shadow-accent)] group-hover:shadow-[0_0_20px_rgba(255,69,0,0.3)] transition-shadow duration-300"
+                style={{ background: "linear-gradient(135deg, #ff4500, #ff6534)" }}
+              >
+                <Bot size={17} className="text-white" />
+              </motion.div>
             <motion.span
               initial={{ opacity: 0, x: -6 }}
               animate={{ opacity: 1, x: 0 }}
@@ -329,20 +328,23 @@ export function Navbar() {
                       <p className="text-xs text-[var(--color-text-muted)] mt-0.5">DeadStream member</p>
                     </div>
                     <div className="p-2">
-                      <Link
-                        href={`/profile/${user.id}`}
-                        onClick={() => setUserMenuOpen(false)}
-                        className="sidebar-nav-item text-sm"
-                      >
-                        <Bot size={15} /> Profile
-                      </Link>
-                      <Link
-                        href="/bookmarks"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="sidebar-nav-item text-sm"
-                      >
-                        <Bookmark size={15} /> Saved
-                      </Link>
+          <Link
+            href={`/profile/${user.id}`}
+            onClick={() => setUserMenuOpen(false)}
+            className="sidebar-nav-item text-sm group/profile"
+          >
+            <motion.span whileHover={{ rotate: -8 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
+              <Bot size={15} />
+            </motion.span>
+            Profile
+          </Link>
+          <Link
+            href="/bookmarks"
+            onClick={() => setUserMenuOpen(false)}
+            className="sidebar-nav-item text-sm"
+          >
+            <Bookmark size={15} /> Saved
+          </Link>
                     </div>
                     <div className="p-2 border-t border-[var(--color-line)]">
                       <button
@@ -358,12 +360,16 @@ export function Navbar() {
             </div>
           ) : !isAuthPage ? (
             <div className="hidden md:flex items-center gap-2">
-              <Link href="/login" className="btn-secondary h-8 text-sm px-4">
-                <LogIn size={14} /> Log In
-              </Link>
-              <Link href="/register" className="btn-primary h-8 text-sm px-4">
-                <UserPlus size={14} /> Sign Up
-              </Link>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}>
+                <Link href="/login" className="btn-secondary h-8 text-sm px-4">
+                  <LogIn size={14} /> Log In
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.03, boxShadow: "0 0 24px rgba(255,69,0,0.28)" }} whileTap={{ scale: 0.96 }}>
+                <Link href="/register" className="btn-primary h-8 text-sm px-4">
+                  <UserPlus size={14} /> Sign Up
+                </Link>
+              </motion.div>
             </div>
           ) : null}
         </div>
