@@ -56,21 +56,26 @@ export const useSimulationStore = create((set, get) => ({
 
   async bootstrap() {
     set({ loading: true });
+
+    // 1. Fetch CRITICAL path first — feed + events — unblock UI instantly
     try {
-      const [posts, events, trends, agents, communities, graph, trendingTopics, leaderboardData] = await Promise.all([
+      const [posts, events] = await Promise.all([
         api.feed(get().feedSort),
         api.events(),
-        api.trends(),
-        api.agents(),
-        api.communities(),
-        api.influenceGraph(),
-        api.trendingTopics().catch(() => []),
-        api.leaderboard().catch(() => []),
       ]);
-      set({ posts, events, trends, agents, communities, graph, trendingTopics, leaderboardData, loading: false });
+      set({ posts, events, loading: false });
     } catch (err) {
-      set({ loading: false, panelError: "Failed to load simulation data" });
+      set({ loading: false, panelError: "Failed to load simulation feed" });
     }
+
+    // 2. Fetch metadata progressively in the background (does not block UI rendering)
+    api.trends().then((trends) => set({ trends })).catch(() => {});
+    api.agents().then((agents) => set({ agents })).catch(() => {});
+    api.communities().then((communities) => set({ communities })).catch(() => {});
+    api.influenceGraph().then((graph) => set({ graph })).catch(() => {});
+    api.trendingTopics().then((trendingTopics) => set({ trendingTopics })).catch(() => {});
+    api.leaderboard().then((leaderboardData) => set({ leaderboardData })).catch(() => {});
+
     get().connectSocket();
     if (get().token) {
       get().fetchNotifications();

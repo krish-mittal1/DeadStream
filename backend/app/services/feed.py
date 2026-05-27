@@ -165,7 +165,51 @@ class FeedService:
                     pass
 
             posts = (await session.execute(stmt)).scalars().all()
-            return [await self._to_response(session, post) for post in posts]
+            if not posts:
+                return []
+
+            # Batch-fetch users, like counts, and reply counts in 3 queries total
+            author_ids = list(set(p.author_id for p in posts))
+            post_ids = [p.id for p in posts]
+
+            user_rows = await session.execute(
+                select(User).where(User.id.in_(author_ids))
+            )
+            user_map = {u.id: u for u in user_rows.scalars().all()}
+
+            like_rows = await session.execute(
+                select(Like.post_id, func.count())
+                .where(Like.post_id.in_(post_ids))
+                .group_by(Like.post_id)
+            )
+            like_map = dict(like_rows.all())
+
+            reply_rows = await session.execute(
+                select(Post.parent_id, func.count())
+                .where(Post.parent_id.in_(post_ids))
+                .group_by(Post.parent_id)
+            )
+            reply_map = dict(reply_rows.all())
+
+            return [
+                PostResponse(
+                    id=post.id,
+                    author_id=post.author_id,
+                    author_username=user_map.get(post.author_id).username if user_map.get(post.author_id) else "unknown",
+                    author_display_name=user_map.get(post.author_id).display_name or (user_map.get(post.author_id).username if user_map.get(post.author_id) else "unknown"),
+                    is_agent=user_map.get(post.author_id).is_agent if user_map.get(post.author_id) else False,
+                    title=post.title,
+                    body=post.body,
+                    image_url=post.image_url,
+                    parent_id=post.parent_id,
+                    community_id=post.community_id,
+                    score=post.virality_score + float(like_map.get(post.id, 0)) * 0.05 + post.controversy_score * 0.4,
+                    like_count=int(like_map.get(post.id, 0)),
+                    reply_count=int(reply_map.get(post.id, 0)),
+                    created_at=post.created_at,
+                )
+                for post in posts
+            ]
 
         return await get_or_compute(cache_key, _fetch)
 
@@ -194,7 +238,7 @@ class FeedService:
                     pass
 
             posts = (await session.execute(stmt)).scalars().all()
-            return [await self._to_response(session, post) for post in posts]
+            return await self._batch_to_response(session, posts)
 
         return await get_or_compute(cache_key, _fetch)
 
@@ -269,7 +313,7 @@ class FeedService:
             .limit(50)
         )
         posts = (await session.execute(stmt)).scalars().all()
-        return [await self._to_response(session, post) for post in posts]
+        return await self._batch_to_response(session, posts)
 
     async def list_communities(self, session: AsyncSession) -> list[CommunityResponse]:
         cache_key = "cache:communities"
@@ -399,7 +443,7 @@ class FeedService:
             .limit(limit)
         )
         posts = (await session.execute(stmt)).scalars().all()
-        return [await self._to_response(session, post) for post in posts]
+        return await self._batch_to_response(session, posts)
 
     async def bookmark_post(
         self, session: AsyncSession, user_id: uuid.UUID, post_id: uuid.UUID
@@ -539,7 +583,62 @@ class FeedService:
             .limit(limit)
         )
         posts = (await session.execute(stmt)).scalars().all()
-        return [await self._to_response(session, post) for post in posts]
+        return await self._batch_to_response(session, posts)
+
+    async def _batch_to_response(
+        self, session: AsyncSession, posts: list[Post]
+    ) -> list[PostResponse]:
+        """Batch-fetch users, like counts, and reply counts for a list of posts.
+        Replaces N*3 queries (per-post _to_response) with 3 queries total."""
+        if not posts:
+            return []
+
+        author_ids = list(set(p.author_id for p in posts))
+        post_ids = [p.id for p in posts]
+
+        user_rows = await session.execute(
+            select(User).where(User.id.in_(author_ids))
+        )
+        user_map = {u.id: u for u in user_rows.scalars().all()}
+
+        like_rows = await session.execute(
+            select(Like.post_id, func.count())
+            .where(Like.post_id.in_(post_ids))
+            .group_by(Like.post_id)
+        )
+        like_map = dict(like_rows.all())
+
+        reply_rows = await session.execute(
+            select(Post.parent_id, func.count())
+            .where(Post.parent_id.in_(post_ids))
+            .group_by(Post.parent_id)
+        )
+        reply_map = dict(reply_rows.all())
+
+        results = []
+        for post in posts:
+            user = user_map.get(post.author_id)
+            like_count = int(like_map.get(post.id, 0))
+            reply_count = int(reply_map.get(post.id, 0))
+            results.append(
+                PostResponse(
+                    id=post.id,
+                    author_id=post.author_id,
+                    author_username=user.username if user else "unknown",
+                    author_display_name=user.display_name or (user.username if user else "unknown"),
+                    is_agent=user.is_agent if user else False,
+                    title=post.title,
+                    body=post.body,
+                    image_url=post.image_url,
+                    parent_id=post.parent_id,
+                    community_id=post.community_id,
+                    score=post.virality_score + float(like_count) * 0.05 + post.controversy_score * 0.4,
+                    like_count=int(like_count),
+                    reply_count=int(reply_count),
+                    created_at=post.created_at,
+                )
+            )
+        return results
 
     async def _to_response(self, session: AsyncSession, post: Post) -> PostResponse:
         user = await session.get(User, post.author_id)
