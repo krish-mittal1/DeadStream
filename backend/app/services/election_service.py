@@ -175,14 +175,21 @@ class ElectionService:
         ).all()
 
         candidates = []
-        for candidate_id, vote_count in vote_rows:
-            user = await session.get(User, candidate_id)
-            candidates.append({
-                "user_id": str(candidate_id),
-                "username": user.username if user else "unknown",
-                "display_name": user.display_name if user and user.display_name else (user.username if user else "unknown"),
-                "votes": vote_count,
-            })
+        if vote_rows:
+            # Batch-fetch all candidate users in one query instead of N
+            candidate_ids = [candidate_id for candidate_id, _ in vote_rows]
+            user_rows = await session.execute(
+                select(User).where(User.id.in_(candidate_ids))
+            )
+            user_map = {u.id: u for u in user_rows.scalars().all()}
+            for candidate_id, vote_count in vote_rows:
+                user = user_map.get(candidate_id)
+                candidates.append({
+                    "user_id": str(candidate_id),
+                    "username": user.username if user else "unknown",
+                    "display_name": user.display_name if user and user.display_name else (user.username if user else "unknown"),
+                    "votes": vote_count,
+                })
 
         winner_username = None
         if election.winner_id:

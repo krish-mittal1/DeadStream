@@ -278,16 +278,27 @@ class FeedService:
             communities = (
                 await session.execute(select(Community).order_by(desc(Community.conflict_score), Community.name).limit(50))
             ).scalars().all()
+
+            if not communities:
+                return []
+
+            # Batch-fetch counts in 2 queries instead of N*2
+            community_ids = [c.id for c in communities]
+            member_rows = await session.execute(
+                select(CommunityMembership.community_id, func.count())
+                .where(CommunityMembership.community_id.in_(community_ids))
+                .group_by(CommunityMembership.community_id)
+            )
+            member_count_map = dict(member_rows.all())
+            post_rows = await session.execute(
+                select(Post.community_id, func.count())
+                .where(Post.community_id.in_(community_ids))
+                .group_by(Post.community_id)
+            )
+            post_count_map = dict(post_rows.all())
+
             responses: list[CommunityResponse] = []
             for community in communities:
-                member_count = await session.scalar(
-                    select(func.count()).select_from(CommunityMembership).where(
-                        CommunityMembership.community_id == community.id
-                    )
-                ) or 0
-                post_count = await session.scalar(
-                    select(func.count()).select_from(Post).where(Post.community_id == community.id)
-                ) or 0
                 responses.append(
                     CommunityResponse(
                         id=community.id,
@@ -296,8 +307,8 @@ class FeedService:
                         description=community.description,
                         ideology_center=community.ideology_center,
                         conflict_score=community.conflict_score,
-                        member_count=int(member_count),
-                        post_count=int(post_count),
+                        member_count=int(member_count_map.get(community.id, 0)),
+                        post_count=int(post_count_map.get(community.id, 0)),
                     )
                 )
             return responses
@@ -462,16 +473,34 @@ class FeedService:
         rows = (await session.execute(stmt)).all()
 
         entries = []
+
+        if not rows:
+            return entries
+
+        # Batch-fetch post and like counts in 2 queries instead of N*2
+        user_ids = [user.id for _, user in rows]
+        post_count_rows = await session.execute(
+            select(Post.author_id, func.count())
+            .where(Post.author_id.in_(user_ids))
+            .group_by(Post.author_id)
+        )
+        post_count_map = dict(post_count_rows.all())
+        like_subq = select(Like.id).join(Post, Like.post_id == Post.id).where(Post.author_id.in_(user_ids)).subquery()
+        like_count_rows = await session.execute(
+            select(Post.author_id, func.count(Like.id))
+            .outerjoin(Like, Like.post_id == Post.id)
+            .where(Post.author_id.in_(user_ids))
+            .group_by(Post.author_id)
+        )
+        like_count_map = dict(like_count_rows.all())
+
         for agent, user in rows:
-            post_count = await session.scalar(
-                select(func.count()).select_from(Post).where(Post.author_id == user.id)
-            ) or 0
-            like_subq = select(Like.id).join(Post, Like.post_id == Post.id).where(Post.author_id == user.id).subquery()
-            like_count = await session.scalar(select(func.count()).select_from(like_subq)) or 0
+            post_count = int(post_count_map.get(user.id, 0))
+            like_count = int(like_count_map.get(user.id, 0))
             score = (
                 agent.activity_level * 100
-                + int(post_count) * 2
-                + int(like_count) * 5
+                + post_count * 2
+                + like_count * 5
             )
             entries.append(
                 LeaderboardEntry(
@@ -662,15 +691,38 @@ class FeedService:
                 )
             ).scalars().all()
 
+            if not children:
+                return []
+
+            # Batch-fetch users for all children at this depth level
+            author_ids = list(set(child.author_id for child in children))
+            user_rows = await session.execute(
+                select(User).where(User.id.in_(author_ids))
+            )
+            user_map = {u.id: u for u in user_rows.scalars().all()}
+
+            # Batch-fetch like counts
+            child_ids = [child.id for child in children]
+            like_rows = await session.execute(
+                select(Like.post_id, func.count())
+                .where(Like.post_id.in_(child_ids))
+                .group_by(Like.post_id)
+            )
+            like_map = dict(like_rows.all())
+
+            # Batch-fetch reply counts
+            reply_rows = await session.execute(
+                select(Post.parent_id, func.count())
+                .where(Post.parent_id.in_(child_ids))
+                .group_by(Post.parent_id)
+            )
+            reply_map = dict(reply_rows.all())
+
             result = []
             for child in children:
-                user = await session.get(User, child.author_id)
-                like_count = await session.scalar(
-                    select(func.count()).select_from(Like).where(Like.post_id == child.id)
-                ) or 0
-                reply_count = await session.scalar(
-                    select(func.count()).select_from(Post).where(Post.parent_id == child.id)
-                ) or 0
+                user = user_map.get(child.author_id)
+                like_count = int(like_map.get(child.id, 0))
+                reply_count = int(reply_map.get(child.id, 0))
                 grand_children = await _fetch_children(child.id, depth - 1)
                 result.append(
                     PostTreeResponse(
@@ -682,8 +734,8 @@ class FeedService:
                         body=child.body,
                         parent_id=child.parent_id,
                         score=child.virality_score + float(like_count) * 0.05 + child.controversy_score * 0.4,
-                        like_count=int(like_count),
-                        reply_count=int(reply_count),
+                        like_count=like_count,
+                        reply_count=reply_count,
                         created_at=child.created_at,
                         children=grand_children,
                     )
