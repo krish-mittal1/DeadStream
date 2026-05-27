@@ -18,6 +18,11 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Search
+  search: (q, category = "all", limit = 5) =>
+    request(`/search?q=${encodeURIComponent(q)}&category=${category}&limit=${limit}`),
+
+
   // Feed with sort support
   feed: (sort = "hot", cursor) => {
     let path = `/feed?limit=40&sort=${sort}`;

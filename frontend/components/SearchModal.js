@@ -6,14 +6,12 @@ import {
   Bot,
   MessageSquare,
   Users,
-  Flame,
-  X,
   ArrowRight,
   Loader2,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useSimulationStore } from "../store/useSimulationStore";
+import { api } from "../lib/api";
 
 const searchCategories = [
   { id: "all", label: "All", icon: Search },
@@ -24,14 +22,35 @@ const searchCategories = [
 
 export function SearchModal({ open, onClose }) {
   const router = useRouter();
-  const posts = useSimulationStore((s) => s.posts);
-  const agents = useSimulationStore((s) => s.agents);
-  const communities = useSimulationStore((s) => s.communities);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
-  const resultsRef = useRef(null);
+  const debounceRef = useRef(null);
+
+  // Debounced server-side search
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    setLoading(true);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const data = await api.search(query, category, 5);
+        setResults(data);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(debounceRef.current);
+  }, [query, category]);
 
   useEffect(() => {
     if (open) {
@@ -43,58 +62,9 @@ export function SearchModal({ open, onClose }) {
     };
   }, [open]);
 
-  const filteredResults = (() => {
-    if (!query.trim()) return [];
-    const q = query.toLowerCase();
-
-    const postResults =
-      category === "all" || category === "posts"
-        ? posts
-            .filter(
-              (p) =>
-                p.title?.toLowerCase().includes(q) ||
-                p.body?.toLowerCase().includes(q) ||
-                p.author_username?.toLowerCase().includes(q)
-            )
-            .slice(0, 5)
-            .map((p) => ({ type: "post", data: p }))
-        : [];
-
-    const agentResults =
-      category === "all" || category === "agents"
-        ? agents
-            .filter(
-              (a) =>
-                a.username?.toLowerCase().includes(q) ||
-                a.template?.toLowerCase().includes(q)
-            )
-            .slice(0, 5)
-            .map((a) => ({ type: "agent", data: a }))
-        : [];
-
-    const communityResults =
-      category === "all" || category === "communities"
-        ? communities
-            .filter(
-              (c) =>
-                c.name?.toLowerCase().includes(q) ||
-                c.description?.toLowerCase().includes(q)
-            )
-            .slice(0, 5)
-            .map((c) => ({ type: "community", data: c }))
-        : [];
-
-    const all = [
-      ...postResults,
-      ...agentResults,
-      ...communityResults,
-    ];
-    return all;
-  })();
-
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query, category]);
+  }, [results]);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -108,26 +78,26 @@ export function SearchModal({ open, onClose }) {
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((i) => Math.min(i + 1, filteredResults.length - 1));
+        setSelectedIndex((i) => Math.min(i + 1, results.length - 1));
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((i) => Math.max(i - 1, 0));
       }
-      if (e.key === "Enter" && filteredResults[selectedIndex]) {
+      if (e.key === "Enter" && results[selectedIndex]) {
         e.preventDefault();
-        const result = filteredResults[selectedIndex];
+        const result = results[selectedIndex];
         if (result.type === "post") {
-          router.push(`/post/${result.data.id}`);
+          router.push(`/post/${result.id}`);
         } else if (result.type === "agent") {
-          router.push(`/profile/${result.data.id}`);
+          router.push(`/profile/${result.id}`);
         } else if (result.type === "community") {
           router.push("/communities");
         }
         onClose?.();
       }
     },
-    [filteredResults, selectedIndex, query, onClose, router]
+    [results, selectedIndex, query, onClose, router]
   );
 
   const resultIcon = (type) => {
@@ -176,7 +146,6 @@ export function SearchModal({ open, onClose }) {
 
           {/* Modal */}
           <motion.div
-            ref={resultsRef}
             initial={{ opacity: 0, scale: 0.96, y: -8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -8 }}
@@ -198,6 +167,7 @@ export function SearchModal({ open, onClose }) {
                 placeholder="Search posts, agents, communities..."
                 className="flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
               />
+              {loading && <Loader2 size={14} className="animate-spin text-[var(--color-text-muted)]" />}
               <kbd className="hidden sm:inline-flex items-center justify-center h-5 px-1.5 rounded border border-[var(--color-line-light)] bg-[var(--color-panel-2)] text-[10px] font-semibold text-[var(--color-text-muted)] font-mono">
                 Esc
               </kbd>
@@ -226,11 +196,11 @@ export function SearchModal({ open, onClose }) {
 
             {/* Results */}
             <div className="scrollbar-thin max-h-[50vh] overflow-y-auto p-2">
-              {query && filteredResults.length === 0 && (
+              {query && !loading && results.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <Search size={24} className="text-[var(--color-text-muted)] mb-2" />
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    No results for "{query}"
+                    No results for &ldquo;{query}&rdquo;
                   </p>
                 </div>
               )}
@@ -241,27 +211,13 @@ export function SearchModal({ open, onClose }) {
                   <p className="text-xs text-[var(--color-text-dim)]">
                     Type to search across posts, agents, and communities
                   </p>
-                  <div className="mt-4 flex items-center gap-4 text-[10px] text-[var(--color-text-dim)]">
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-blue)]" />{" "}
-                      {posts.length} posts
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" />{" "}
-                      {agents.length} agents
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--color-violet)]" />{" "}
-                      {communities.length} communities
-                    </span>
-                  </div>
                 </div>
               )}
 
               <AnimatePresence mode="popLayout">
-                {filteredResults.map((result, i) => (
+                {results.map((result, i) => (
                   <motion.button
-                    key={`${result.type}-${result.data.id}`}
+                    key={`${result.type}-${result.id}`}
                     layout
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -269,9 +225,9 @@ export function SearchModal({ open, onClose }) {
                     transition={{ delay: i * 0.03, duration: 0.2 }}
                     onClick={() => {
                       if (result.type === "post") {
-                        router.push(`/post/${result.data.id}`);
+                        router.push(`/post/${result.id}`);
                       } else if (result.type === "agent") {
-                        router.push(`/profile/${result.data.id}`);
+                        router.push(`/profile/${result.id}`);
                       } else if (result.type === "community") {
                         router.push("/communities");
                       }
@@ -288,32 +244,32 @@ export function SearchModal({ open, onClose }) {
                       {result.type === "post" && (
                         <>
                           <p className="text-sm font-semibold text-[var(--color-text)] truncate">
-                            {result.data.title || result.data.body?.slice(0, 60)}
+                            {result.title || result.body?.slice(0, 60)}
                           </p>
                           <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5">
-                            @{result.data.author_username} ·{" "}
-                            {result.data.like_count} likes
+                            @{result.author_username} &middot;{" "}
+                            {result.like_count} likes
                           </p>
                         </>
                       )}
                       {result.type === "agent" && (
                         <>
                           <p className="text-sm font-semibold text-[var(--color-text)]">
-                            @{result.data.username}
+                            @{result.username}
                           </p>
                           <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5 truncate">
-                            {result.data.template || "AI Agent"}
+                            {result.template || "AI Agent"}
                           </p>
                         </>
                       )}
                       {result.type === "community" && (
                         <>
                           <p className="text-sm font-semibold text-[var(--color-text)]">
-                            {result.data.name}
+                            {result.name}
                           </p>
                           <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5 truncate">
-                            {result.data.member_count} members ·{" "}
-                            {result.data.post_count} posts
+                            {result.member_count} members &middot;{" "}
+                            {result.post_count} posts
                           </p>
                         </>
                       )}
@@ -331,20 +287,20 @@ export function SearchModal({ open, onClose }) {
               </AnimatePresence>
             </div>
 
-            {/* Footer */} 
+            {/* Footer */}
             <div className="flex items-center justify-between border-t border-[var(--color-line)] px-4 py-2.5 text-[10px] text-[var(--color-text-dim)]">
               <span className="flex items-center gap-2">
                 <kbd className="inline-flex items-center justify-center h-4 px-1 rounded border border-[var(--color-line-light)] text-[9px] font-mono font-semibold">
-                  ↑↓
+                  &uarr;&darr;
                 </kbd>
                 <span>navigate</span>
                 <kbd className="inline-flex items-center justify-center h-4 px-1 rounded border border-[var(--color-line-light)] text-[9px] font-mono font-semibold">
-                  ↵
+                  &crarr;
                 </kbd>
                 <span>open</span>
               </span>
               <span>
-                {filteredResults.length} result{filteredResults.length !== 1 ? "s" : ""}
+                {results.length} result{results.length !== 1 ? "s" : ""}
               </span>
             </div>
           </motion.div>

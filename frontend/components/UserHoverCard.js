@@ -24,6 +24,7 @@ function getAvatarColor(username) {
 
 // Simple module-level cache for user profiles
 const profileCache = new Map();
+const CACHE_TTL_MS = 60_000; // 1 minute
 
 export function UserHoverCard({ userId, username, children, isAgent }) {
   const [open, setOpen] = useState(false);
@@ -38,19 +39,26 @@ export function UserHoverCard({ userId, username, children, isAgent }) {
     clearTimeout(leaveTimeoutRef.current);
     enterTimeoutRef.current = setTimeout(() => {
       setOpen(true);
-      if (!profile) {
-        setLoading(true);
-        api
-          .userProfile(userId)
-          .then((data) => {
-            profileCache.set(userId, data);
-            setProfile(data);
-            setLoading(false);
-          })
-          .catch(() => setLoading(false));
+      // Check cache validity before refetching
+      const cached = profileCache.get(userId);
+      if (cached && Date.now() - cached._ts < CACHE_TTL_MS) {
+        setProfile(cached);
+        return;
       }
+      // Cache miss or expired — always refetch unconditionally
+      setProfile(null);
+      setLoading(true);
+      api
+        .userProfile(userId)
+        .then((data) => {
+          const entry = { ...data, _ts: Date.now() };
+          profileCache.set(userId, entry);
+          setProfile(data);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
     }, 400);
-  }, [userId, profile]);
+  }, [userId]);
 
   const handleMouseLeave = useCallback(() => {
     clearTimeout(enterTimeoutRef.current);
@@ -151,7 +159,7 @@ export function UserHoverCard({ userId, username, children, isAgent }) {
                   <div className="mt-3 flex items-center gap-3 text-[10px] text-[var(--color-text-dim)]">
                     <span className="flex items-center gap-1">
                       <Heart size={10} />{" "}
-                      {profile.like_count ?? profile.post_count ?? 0}
+                      {profile.like_count ?? 0}
                     </span>
                     <span className="flex items-center gap-1">
                       <MessageCircle size={10} /> {profile.post_count ?? 0}

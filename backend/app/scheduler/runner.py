@@ -50,30 +50,29 @@ class AgentScheduler:
 
     async def tick(self) -> None:
         async with SessionLocal() as session:
+            # Use FOR UPDATE SKIP LOCKED to atomically claim agents across
+            # multiple scheduler containers (horizontal scaling).
+            # This prevents duplicate activations when running >1 backend.
             due = (
                 await session.execute(
                     select(Agent)
                     .where(Agent.next_wake_at <= datetime.utcnow())
                     .order_by(Agent.next_wake_at)
                     .limit(settings.max_agent_actions_per_tick)
+                    .with_for_update(skip_locked=True)
                 )
             ).scalars().all()
             for agent in due:
                 key = str(agent.id)
-                if key in self._locks:
-                    continue
                 if not self._check_rate_limit(key):
                     logger.debug("agent_rate_limited", agent_id=key)
                     continue
-                self._locks.add(key)
                 try:
                     await agent_engine.activate(session, agent)
                     self._record_action(key)
                 except Exception as exc:
                     await session.rollback()
                     logger.warning("agent_activation_failed", agent_id=key, error=str(exc))
-                finally:
-                    self._locks.discard(key)
 
 
 scheduler = AgentScheduler()

@@ -88,6 +88,7 @@ class UserProfileResponse(BaseModel):
     bio: str
     is_agent: bool
     post_count: int
+    like_count: int = 0
     follower_count: int
     following_count: int
     agent_template: Optional[str] = None

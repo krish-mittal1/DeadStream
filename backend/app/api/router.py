@@ -5,7 +5,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import current_user
@@ -13,7 +13,9 @@ from app.db.session import get_session
 from app.events.store import event_store
 from app.models.agent import Agent
 from app.models.bookmark import Bookmark
+from app.models.community import Community, CommunityMembership
 from app.models.notification import Notification
+from app.models.social import Like, Post
 from app.models.user import User
 from app.schemas import (
     AgentDetailResponse,
@@ -87,6 +89,94 @@ async def health(session: AsyncSession = Depends(get_session)) -> dict:
         "redis": redis_ok,
         "version": "0.1.0",
     }
+
+
+# ── Search ───────────────────────────────────────────────────────────
+
+@api_router.get("/search")
+async def search(
+    q: str = Query("", min_length=1, max_length=200),
+    category: str = Query("all", description="all | posts | agents | communities"),
+    limit: int = Query(5, ge=1, le=20),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Server-side search across posts, agents, and communities."""
+    results: list[dict] = []
+    pattern = f"%{q}%"
+
+    if category in ("all", "posts"):
+        rows = await session.execute(
+            select(Post, User)
+            .join(User, Post.author_id == User.id)
+            .where(
+                Post.body.ilike(pattern)
+                | (Post.title.ilike(pattern))
+                | User.username.ilike(pattern)
+            )
+            .order_by(desc(Post.virality_score))
+            .limit(limit)
+        )
+        for post, user in rows:
+            like_count = await session.scalar(
+                select(func.count()).select_from(Like).where(Like.post_id == post.id)
+            ) or 0
+            results.append({
+                "type": "post",
+                "id": str(post.id),
+                "title": post.title or post.body[:60],
+                "body": post.body[:200],
+                "author_username": user.username,
+                "like_count": int(like_count),
+            })
+
+    if category in ("all", "agents"):
+        rows = await session.execute(
+            select(Agent, User)
+            .join(User, Agent.user_id == User.id)
+            .where(
+                User.username.ilike(pattern)
+                | Agent.template.ilike(pattern)
+                | Agent.interests.as_string().ilike(pattern)
+            )
+            .limit(limit)
+        )
+        for agent, user in rows:
+            results.append({
+                "type": "agent",
+                "id": str(agent.id),
+                "username": user.username,
+                "template": agent.template,
+            })
+
+    if category in ("all", "communities"):
+        rows = await session.execute(
+            select(Community)
+            .where(
+                Community.name.ilike(pattern)
+                | Community.description.ilike(pattern)
+            )
+            .order_by(desc(Community.conflict_score))
+            .limit(limit)
+        )
+        for c in rows.scalars():
+            member_count = await session.scalar(
+                select(func.count()).select_from(CommunityMembership).where(
+                    CommunityMembership.community_id == c.id
+                )
+            ) or 0
+            post_count = await session.scalar(
+                select(func.count()).select_from(Post).where(Post.community_id == c.id)
+            ) or 0
+            results.append({
+                "type": "community",
+                "id": str(c.id),
+                "name": c.name,
+                "slug": c.slug,
+                "member_count": int(member_count),
+                "post_count": int(post_count),
+            })
+
+    return results
 
 
 # ── Auth ─────────────────────────────────────────────────────────────

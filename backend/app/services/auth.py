@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -24,7 +25,7 @@ class AuthService:
         user = User(
             username=request.username,
             display_name=request.display_name,
-            password_hash=self._hash_password(request.password),
+            password_hash=await self._hash_password(request.password),
             is_agent=False,
         )
         session.add(user)
@@ -37,16 +38,22 @@ class AuthService:
         user = await session.scalar(select(User).where(User.username == request.username))
         if user is None or user.password_hash is None:
             raise UnauthorizedError("invalid_credentials")
-        if not self._verify_password(request.password, user.password_hash):
+        if not await self._verify_password(request.password, user.password_hash):
             raise UnauthorizedError("invalid_credentials")
         return self._response(user)
 
-    def _hash_password(self, password: str) -> str:
-        return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    async def _hash_password(self, password: str) -> str:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, lambda: bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        )
 
-    def _verify_password(self, password: str, password_hash: str) -> bool:
+    async def _verify_password(self, password: str, password_hash: str) -> bool:
         try:
-            return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(
+                None, lambda: bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+            )
         except ValueError:
             return False
 

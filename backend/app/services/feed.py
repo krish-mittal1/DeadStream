@@ -318,6 +318,9 @@ class FeedService:
         following_count = await session.scalar(
             select(func.count()).select_from(Follow).where(Follow.follower_id == user_id)
         ) or 0
+        like_subq = select(Like.id).join(Post, Like.post_id == Post.id).where(Post.author_id == user.id).subquery()
+        like_count = await session.scalar(select(func.count()).select_from(like_subq)) or 0
+
         return UserProfileResponse(
             id=user.id,
             username=user.username,
@@ -325,6 +328,7 @@ class FeedService:
             bio=user.bio,
             is_agent=user.is_agent,
             post_count=int(post_count),
+            like_count=int(like_count),
             follower_count=int(follower_count),
             following_count=int(following_count),
             agent_template=agent.template if agent else None,

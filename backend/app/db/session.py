@@ -28,16 +28,6 @@ async def init_models() -> None:
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
-        # ─── Migration: add image_url column to posts if not exists ──
-        try:
-            await conn.execute(text("ALTER TABLE posts ADD COLUMN image_url VARCHAR(1024)"))
-        except Exception:
-            pass
-        # ─── Migration: add title column to posts if not exists ──
-        try:
-            await conn.execute(text("ALTER TABLE posts ADD COLUMN title VARCHAR(500)"))
-        except Exception:
-            pass
 
 
 async def close_engine() -> None:

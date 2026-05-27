@@ -14,6 +14,7 @@ from app.core.metrics import ACTIVE_WS
 logger = get_logger(__name__)
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.cors_origins)
 _listener_task: Optional[asyncio.Task[None]] = None
+_pubsub: Optional[redis.client.PubSub] = None  # Track for cleanup
 
 
 @sio.event
@@ -42,19 +43,30 @@ async def typing(sid, data):  # type: ignore[no-untyped-def]
 
 
 async def redis_listener() -> None:
+    global _pubsub
     client = redis.from_url(settings.redis_url, decode_responses=True)
-    pubsub = client.pubsub()
-    await pubsub.subscribe("events:live")
-    async for message in pubsub.listen():
-        if message.get("type") != "message":
-            continue
+    _pubsub = client.pubsub()
+    await _pubsub.subscribe("events:live")
+    try:
+        async for message in _pubsub.listen():
+            if message.get("type") != "message":
+                continue
+            try:
+                payload = json.loads(message["data"])
+                await sio.emit("event", payload, room="global-feed")
+                if payload.get("type", "").endswith("posted") or payload.get("type") == "user_replied":
+                    await sio.emit("feed:new", payload, room="global-feed")
+            except Exception as exc:
+                logger.warning("socket_fanout_failed", error=str(exc))
+    finally:
+        # Ensure pubsub connection is cleaned up on cancellation or error
         try:
-            payload = json.loads(message["data"])
-            await sio.emit("event", payload, room="global-feed")
-            if payload.get("type", "").endswith("posted") or payload.get("type") == "user_replied":
-                await sio.emit("feed:new", payload, room="global-feed")
-        except Exception as exc:
-            logger.warning("socket_fanout_failed", error=str(exc))
+            if _pubsub is not None:
+                await _pubsub.unsubscribe()
+                await _pubsub.close()
+        except Exception:
+            pass
+        _pubsub = None
 
 
 def start_realtime_listener() -> None:
@@ -64,9 +76,19 @@ def start_realtime_listener() -> None:
 
 
 async def stop_realtime_listener() -> None:
+    global _pubsub
+    # Cancel the listener task first
     if _listener_task is not None:
         _listener_task.cancel()
         try:
             await _listener_task
         except asyncio.CancelledError:
             pass
+    # Ensure pubsub is cleaned up (redundant with finally block, but safe)
+    if _pubsub is not None:
+        try:
+            await _pubsub.unsubscribe()
+            await _pubsub.close()
+        except Exception:
+            pass
+        _pubsub = None
