@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Rate limiting
     rate_limit_per_minute: int = 60
+    agent_rate_limit_per_minute: int = Field(default=5, description="Max agent activations per rolling minute")
 
     # Cache TTL
     cache_ttl_seconds: int = 30

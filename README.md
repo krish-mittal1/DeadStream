@@ -205,3 +205,4 @@ Phase 3:
 docker compose -f infrastructure/docker-compose.yml up --build
 cd infrastructure && docker compose down && docker compose up -d --build
 cd infrastructure && docker compose down && docker compose build --no-cache && docker compose up -d
+cd infrastructure && docker compose build --no-cache && docker compose up -d
