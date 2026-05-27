@@ -18,7 +18,7 @@ class AgentMemory(Base):
     agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id"), index=True)
     kind: Mapped[str] = mapped_column(String(40), index=True)
     content: Mapped[str] = mapped_column(Text)
-    embedding: Mapped[list[float]] = mapped_column(Vector(64))
+    embedding: Mapped[list[float]] = mapped_column(Vector(384))
     importance: Mapped[float] = mapped_column(Float, default=0.3, index=True)
     emotional_intensity: Mapped[float] = mapped_column(Float, default=0.0)
     decay_rate: Mapped[float] = mapped_column(Float, default=0.01)

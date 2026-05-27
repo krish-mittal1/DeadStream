@@ -92,9 +92,39 @@ function getDominantEmotion(emotionalState) {
   return { name, emoji: EMOTION_EMOJIS[name] || "●", color: EMOTION_COLORS[name] || "#6b7280" };
 }
 
-function LiveAgentCard({ agent }) {
+function deriveAgentStatus(agent, events) {
+  // Derive current status from agent state and latest event
+  const agitation = Number(agent.emotional_state?.agitation || 0);
+  const aggression = Number(agent.emotional_state?.aggression || 0);
+  const excitement = Number(agent.emotional_state?.excitement || 0);
+  const drama = Number(agent.emotional_state?.drama || 0);
+  const activity = Number(agent.activity_level || 0);
+
+  const now = Date.now();
+  const wake = new Date(agent.next_wake_at).getTime();
+  const diffSec = Math.floor((wake - now) / 1000);
+
+  // Check latest event for this agent
+  const agentEvents = events
+    .filter(e => e.actor_id === agent.id || String(e.actor_id) === String(agent.id))
+    .slice(0, 3);
+
+  if (diffSec <= 0) {
+    if (aggression > 0.5 || agitation > 0.6) return { label: "ARGUING", emoji: "\u26A1", color: "#ef4444" };
+    if (excitement > 0.6) return { label: "WRITING", emoji: "\u270D\uFE0F", color: "#10d48e" };
+    if (drama > 0.5) return { label: "DRAMATIC", emoji: "\uD83C\uDFAD", color: "#a855f7" };
+    return { label: "THINKING", emoji: "\uD83E\uDDE0", color: "#4f8cff" };
+  }
+
+  if (diffSec > 30) return { label: "SLEEPING", emoji: "\uD83D\uDCA4", color: "#6b7280" };
+  if (activity > 0.7) return { label: "ACTIVE", emoji: "\uD83D\uDC41\uFE0F", color: "#22c55e" };
+  return { label: "IDLE", emoji: "\uD83D\uDCA4", color: "#6b7280" };
+}
+
+function LiveAgentCard({ agent, events }) {
   const [timeLeft, setTimeLeft] = useState("");
   const emotion = getDominantEmotion(agent.emotional_state);
+  const status = deriveAgentStatus(agent, events || []);
 
   useEffect(() => {
     const update = () => {
@@ -131,6 +161,22 @@ function LiveAgentCard({ agent }) {
           <div className="text-[10px] text-[var(--color-text-dim)] truncate capitalize">{emotion.name}</div>
         </div>
         <div className="shrink-0 text-right">
+          {/* Live status indicator */}
+          <div className="flex items-center gap-1 mb-1 justify-end">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full animate-pulse"
+              style={{
+                backgroundColor: status.color,
+                boxShadow: `0 0 6px ${status.color}`,
+              }}
+            />
+            <span
+              className="text-[9px] font-bold tracking-wide uppercase"
+              style={{ color: status.color }}
+            >
+              {status.emoji} {status.label}
+            </span>
+          </div>
           <div className="flex items-center gap-1 text-[10px] text-[var(--color-text-dim)] tabular-nums">
             <Clock size={9} />
             {timeLeft}
@@ -592,7 +638,7 @@ export default function AdminPage() {
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {sortedAgents.map((agent) => (
-                  <LiveAgentCard key={agent.id} agent={agent} />
+                  <LiveAgentCard key={agent.id} agent={agent} events={events} />
                 ))}
               </div>
             </motion.div>

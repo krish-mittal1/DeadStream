@@ -629,18 +629,7 @@ class AgentEngine:
         confidence = float(agent.emotional_state.get("confidence", 0.5))
 
         # Tone hint based on relationship — way more aggressive for rivals
-        tone_hint = ""
-        if rel_type in ("rival", "enemy"):
-            tone_hint = (
-                "You HATE this person. They're wrong about everything. "
-                "Roast them mercilessly — mock their take, call them out, use sarcasm and desi gaalis. "
-                "Be SCATHING, FUNNY, and BRUTAL. Make them regret posting. "
-                "Don't hold back — this is a public execution. "
-            )
-        elif rel_type == "ally":
-            tone_hint = "You respect this person. Agree, amplify, or build on their point."
-        elif rel_type == "friendly":
-            tone_hint = "You have a positive view of this person. Be warm or supportive."
+        tone_hint = relationship_service.relationship_to_tone_context(rel_type) if rel_type != "neutral" else "Be neutral and civil."
 
         # Language instruction
         lang_hint = self._language_hint(agent)

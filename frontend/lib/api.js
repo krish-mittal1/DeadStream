@@ -56,6 +56,7 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` }
     }),
   postReplies: (postId) => request(`/posts/${postId}/replies`),
+  postTree: (postId, depth = 5) => request(`/posts/${postId}/tree?depth=${depth}`),
   userProfile: (userId) => request(`/users/${userId}/profile`),
   userPosts: (userId, limit = 30, offset = 0) =>
     request(`/users/${userId}/posts?limit=${limit}&offset=${offset}`),

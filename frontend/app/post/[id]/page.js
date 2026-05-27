@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowLeft, ArrowUp, ArrowDown, Heart, MessageCircle, Send, Clock, Expand } from "lucide-react";
-import { motion } from "framer-motion";
+import { ArrowLeft, ArrowUp, ArrowDown, Heart, MessageCircle, Send, Clock, Expand, ChevronRight, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { api } from "../../../lib/api";
 import { Lightbox } from "../../../components/Lightbox";
@@ -62,20 +62,27 @@ export default function PostDetailPage() {
   const user = useSimulationStore((s) => s.user);
   const like = useSimulationStore((s) => s.like);
   const createPost = useSimulationStore((s) => s.post);
-  const [replies, setReplies] = useState([]);
+  const [commentTree, setCommentTree] = useState(null);
   const [replyBody, setReplyBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [collapsedThreads, setCollapsedThreads] = useState(new Set());
 
   const parentPost = posts.find((p) => String(p.id) === id);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await api.postReplies(id);
-        setReplies(data);
-      } catch {}
+        const tree = await api.postTree(id, 10);
+        setCommentTree(tree);
+      } catch {
+        // Fallback: try flat replies
+        try {
+          const data = await api.postReplies(id);
+          setCommentTree({ children: data });
+        } catch {}
+      }
       setLoading(false);
     }
     load();
@@ -88,11 +95,28 @@ export default function PostDetailPage() {
     try {
       await createPost(replyBody.trim());
       setReplyBody("");
-      const data = await api.postReplies(id);
-      setReplies(data);
-    } catch {}
+      const tree = await api.postTree(id, 10);
+      setCommentTree(tree);
+    } catch {
+      try {
+        const data = await api.postReplies(id);
+        setCommentTree({ children: data });
+      } catch {}
+    }
     setBusy(false);
   }
+
+  const toggleThread = useCallback((commentId) => {
+    setCollapsedThreads((prev) => {
+      const next = new Set(prev);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
+  }, []);
 
   const postData = parentPost;
   if (loading && !postData) {
@@ -276,7 +300,7 @@ export default function PostDetailPage() {
               <span className="flex items-center gap-1.5">
                 <MessageCircle size={16} />
                 <span className="tabular-nums font-medium">
-                  {replies.length + (postData.reply_count || 0)} replies
+                  {(commentTree?.children?.length || 0) + (postData.reply_count || 0)} replies
                 </span>
               </span>
             </div>
@@ -318,9 +342,9 @@ export default function PostDetailPage() {
         </form>
       )}
 
-      {/* Replies */}
+      {/* Comment Tree */}
       <div className="divide-y divide-[var(--color-line)]">
-        {replies.length === 0 && (
+        {(!commentTree || (commentTree.children && commentTree.children.length === 0)) && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <MessageCircle size={28} className="text-[var(--color-text-muted)] mb-3" />
             <p className="text-sm text-[var(--color-text-muted)]">No replies yet</p>
@@ -334,45 +358,15 @@ export default function PostDetailPage() {
             )}
           </div>
         )}
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="visible"
-        >
-          {replies.map((reply, index) => (
-            <motion.div
-              key={reply.id}
-              variants={itemAnim}
-              className="px-5 md:px-8 py-5 bg-[var(--color-bg-secondary)] transition-all duration-200 hover:bg-[var(--color-panel)]/20"
-            >
-              <div className="flex items-center gap-3 mb-2.5">
-                <Link
-                  href={`/profile/${reply.author_id}`}
-                  className={`avatar avatar-md bg-gradient-to-br ${getAvatarColor(reply.author_username)} shadow-sm`}
-                >
-                  {reply.author_username?.charAt(0).toUpperCase() || "?"}
-                </Link>
-                <Link
-                  href={`/profile/${reply.author_id}`}
-                  className="text-sm font-semibold text-[var(--color-text)] transition-colors duration-200 hover:text-[var(--color-accent)]"
-                >
-                  @{reply.author_username}
-                </Link>
-                <span className="text-[11px] text-[var(--color-text-dim)] ml-auto">
-                  {new Date(reply.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </span>
-              </div>
-              <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] pl-11">
-                {reply.body}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
+        {commentTree?.children && (
+          <CommentNode
+            comments={commentTree.children}
+            depth={0}
+            collapsedThreads={collapsedThreads}
+            onToggle={toggleThread}
+            getAvatarColor={getAvatarColor}
+          />
+        )}
       </div>
       {/* ─── Lightbox ─── */}
       {lightboxImage && (
@@ -381,6 +375,134 @@ export default function PostDetailPage() {
           onClose={() => setLightboxImage(null)}
         />
       )}
+    </motion.div>
+  );
+}
+
+/* ─── Recursive Comment Node Component ─────────────────────────── */
+function CommentNode({ comments, depth, collapsedThreads, onToggle, getAvatarColor }) {
+  const maxDepth = 8;
+  if (!comments || comments.length === 0) return null;
+
+  return (
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="visible"
+    >
+      {comments.map((comment) => {
+        const isCollapsed = collapsedThreads.has(comment.id);
+        const hasChildren = comment.children && comment.children.length > 0;
+
+        return (
+          <div key={comment.id}>
+            <motion.div
+              variants={itemAnim}
+              className="group relative transition-all duration-200 hover:bg-[var(--color-panel)]/20"
+              style={{
+                paddingLeft: `${Math.min(depth, maxDepth) * 16 + 20}px`,
+                paddingRight: "20px",
+                paddingTop: "14px",
+                paddingBottom: "14px",
+              }}
+            >
+              {/* Thread line connector */}
+              {depth > 0 && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-px"
+                  style={{
+                    left: `${Math.min(depth, maxDepth) * 16 + 12}px`,
+                    background: "var(--color-line)",
+                    opacity: depth <= 3 ? 0.5 : 0.2,
+                  }}
+                />
+              )}
+
+              {/* Thread collapse toggle */}
+              {hasChildren && (
+                <button
+                  onClick={() => onToggle(comment.id)}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center w-5 h-5 rounded text-[var(--color-text-dim)] hover:text-[var(--color-text-muted)] hover:bg-[var(--color-panel)] transition-all"
+                  style={{ left: `${Math.min(depth, maxDepth) * 16 + 6}px` }}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight size={10} />
+                  ) : (
+                    <ChevronDown size={10} />
+                  )}
+                </button>
+              )}
+
+              {/* Author + timestamp */}
+              <div className="flex items-center gap-2 mb-1.5">
+                <Link
+                  href={`/profile/${comment.author_id}`}
+                  className={`avatar avatar-xs bg-gradient-to-br ${getAvatarColor(comment.author_username)} shadow-sm`}
+                >
+                  {comment.author_username?.charAt(0).toUpperCase() || "?"}
+                </Link>
+                <Link
+                  href={`/profile/${comment.author_id}`}
+                  className="text-xs font-semibold text-[var(--color-text-secondary)] transition-colors duration-200 hover:text-[var(--color-accent)]"
+                >
+                  @{comment.author_username}
+                </Link>
+                {comment.is_agent && (
+                  <span className="tag tag-ai text-[8px] py-0 px-1.5">AI</span>
+                )}
+                <span className="text-[10px] text-[var(--color-text-dim)] ml-auto">
+                  {new Date(comment.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+              </div>
+
+              {/* Body */}
+              <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] pl-6">
+                {comment.body}
+              </p>
+
+              {/* Score + likes */}
+              <div className="flex items-center gap-3 mt-1.5 pl-6">
+                <span className="text-[10px] text-[var(--color-text-dim)] tabular-nums">
+                  {comment.like_count > 0 && (
+                    <>♥ {comment.like_count}
+                  </>
+                  )}
+                </span>
+                {hasChildren && !isCollapsed && (
+                  <span className="text-[10px] text-[var(--color-text-dim)]">
+                    {comment.children.length} {comment.children.length === 1 ? "reply" : "replies"}
+                  </span>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Recursive children */}
+            <AnimatePresence>
+              {hasChildren && !isCollapsed && depth < maxDepth && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                >
+                  <CommentNode
+                    comments={comment.children}
+                    depth={depth + 1}
+                    collapsedThreads={collapsedThreads}
+                    onToggle={onToggle}
+                    getAvatarColor={getAvatarColor}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
     </motion.div>
   );
 }

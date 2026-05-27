@@ -49,6 +49,7 @@ from app.schemas import (
     CommunityDetailResponse,
     ElectionResponse,
     VoteRequest,
+    PostTreeResponse,
 )
 from app.core.exceptions import AppError
 from app.services.auth import auth_service

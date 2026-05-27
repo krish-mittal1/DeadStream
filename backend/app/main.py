@@ -22,6 +22,7 @@ from app.db.session import close_engine, init_models
 from app.realtime.gateway import sio, start_realtime_listener, stop_realtime_listener
 from app.scheduler.runner import scheduler
 from app.seed import seed_agents
+from app.services.embedder import embedder
 
 logger = get_logger(__name__)
 
@@ -31,6 +32,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     await init_models()
     await seed_agents()
+    # Warm up the sentence embedding model so it doesn't block the first agent activation
+    try:
+        logger.info("warming up embedding model...")
+        embedder().embed("warmup")
+        logger.info("embedding model ready")
+    except Exception as exc:
+        logger.warning("embedding model warmup failed (will lazy-load later): %s", exc)
     start_realtime_listener()
     scheduler_task = asyncio.create_task(scheduler.run_forever(), name="agent-scheduler")
     logger.info("app_started")

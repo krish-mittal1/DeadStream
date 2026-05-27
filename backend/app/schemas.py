@@ -308,6 +308,22 @@ class GroupChatParticipantResponse(BaseModel):
 
 # ── Agent-Created Communities & Elections ────────────────────────────
 
+class PostTreeResponse(BaseModel):
+    """A post with its nested children, forming a recursive comment tree."""
+    id: uuid.UUID
+    author_id: uuid.UUID
+    author_username: str
+    author_display_name: str = ""
+    is_agent: bool = False
+    body: str
+    parent_id: Optional[uuid.UUID]
+    score: float
+    like_count: int = 0
+    reply_count: int = 0
+    created_at: datetime
+    children: list[PostTreeResponse] = Field(default_factory=list)
+
+
 class CommunityDetailResponse(BaseModel):
     id: uuid.UUID
     slug: str

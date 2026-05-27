@@ -633,6 +633,83 @@ class FeedService:
         global FEED_ALGORITHM
         return FEED_ALGORITHM
 
+    async def get_comment_tree(
+        self,
+        session: AsyncSession,
+        post_id: uuid.UUID,
+        max_depth: int = 5,
+    ) -> Optional[PostTreeResponse]:
+        """Return a post and its nested comment tree up to max_depth deep."""
+        from app.schemas import PostTreeResponse
+
+        post = await session.get(Post, post_id)
+        if not post:
+            return None
+
+        async def _fetch_children(parent_id: uuid.UUID, depth: int) -> list[PostTreeResponse]:
+            if depth <= 0:
+                return []
+            children = (
+                await session.execute(
+                    select(Post)
+                    .where(Post.parent_id == parent_id)
+                    .order_by(Post.created_at)
+                    .limit(50)
+                )
+            ).scalars().all()
+
+            result = []
+            for child in children:
+                user = await session.get(User, child.author_id)
+                like_count = await session.scalar(
+                    select(func.count()).select_from(Like).where(Like.post_id == child.id)
+                ) or 0
+                reply_count = await session.scalar(
+                    select(func.count()).select_from(Post).where(Post.parent_id == child.id)
+                ) or 0
+                grand_children = await _fetch_children(child.id, depth - 1)
+                result.append(
+                    PostTreeResponse(
+                        id=child.id,
+                        author_id=child.author_id,
+                        author_username=user.username if user else "unknown",
+                        author_display_name=user.display_name or (user.username if user else "unknown"),
+                        is_agent=user.is_agent if user else False,
+                        body=child.body,
+                        parent_id=child.parent_id,
+                        score=child.virality_score + float(like_count) * 0.05 + child.controversy_score * 0.4,
+                        like_count=int(like_count),
+                        reply_count=int(reply_count),
+                        created_at=child.created_at,
+                        children=grand_children,
+                    )
+                )
+            return result
+
+        user = await session.get(User, post.author_id)
+        like_count = await session.scalar(
+            select(func.count()).select_from(Like).where(Like.post_id == post.id)
+        ) or 0
+        reply_count = await session.scalar(
+            select(func.count()).select_from(Post).where(Post.parent_id == post.id)
+        ) or 0
+        children = await _fetch_children(post.id, max_depth)
+
+        return PostTreeResponse(
+            id=post.id,
+            author_id=post.author_id,
+            author_username=user.username if user else "unknown",
+            author_display_name=user.display_name or (user.username if user else "unknown"),
+            is_agent=user.is_agent if user else False,
+            body=post.body,
+            parent_id=post.parent_id,
+            score=post.virality_score + float(like_count) * 0.05 + post.controversy_score * 0.4,
+            like_count=int(like_count),
+            reply_count=int(reply_count),
+            created_at=post.created_at,
+            children=children,
+        )
+
     async def community_detail(
         self, session: AsyncSession, community_id: uuid.UUID
     ) -> Optional[CommunityDetailResponse]:
