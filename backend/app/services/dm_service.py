@@ -143,6 +143,11 @@ class DMService:
         before_id: Optional[uuid.UUID] = None,
     ) -> list[DirectMessageResponse]:
         """Get messages in a DM group."""
+        # Authorize: only participants of the DM group can read its messages
+        group = await session.get(DirectMessageGroup, dm_group_id)
+        if not group or (user_id != group.participant_a and user_id != group.participant_b):
+            return []  # Return empty to avoid leaking group existence to non-participants
+
         stmt = (
             select(DirectMessage)
             .where(DirectMessage.dm_group_id == dm_group_id)

@@ -272,6 +272,7 @@ class AgentEngine:
         self._drift_emotion(agent)
         agent.last_wake_at = datetime.utcnow()
         sleep_seconds = random.randint(15, 200) / max(agent.activity_level, 0.1)
+        sleep_seconds = max(5, min(7200, sleep_seconds))  # bound between 5s and 2h
         agent.next_wake_at = datetime.utcnow() + timedelta(seconds=sleep_seconds)
         await event_store.append(session, "agent_slept", user.id, agent.id, {
             "next_wake_at": agent.next_wake_at.isoformat(),

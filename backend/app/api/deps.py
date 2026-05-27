@@ -19,7 +19,13 @@ async def current_user(
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="missing_token")
     try:
-        return await auth_service.resolve_user(session, authorization.removeprefix("Bearer ").strip())
+        user = await auth_service.resolve_user(session, authorization.removeprefix("Bearer ").strip())
+        # Prevent agent accounts from authenticating as human users
+        if getattr(user, "is_agent", False):
+            raise HTTPException(status_code=403, detail="agent_account_not_allowed")
+        return user
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail="invalid_token") from exc
 

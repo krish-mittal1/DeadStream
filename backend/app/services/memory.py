@@ -88,86 +88,43 @@ class MemoryService:
             select(func.count()).select_from(AgentMemory).where(AgentMemory.agent_id == agent_id)
         ) or 0
 
-        if count > 100:
-            # Use pgvector ANN search via cosine distance
-            # pgvector's <=> operator computes 1 - cosine_similarity
-            vec_literal = "[" + ",".join(str(v) for v in query_vec) + "]"
-            stmt = text("""
-                SELECT id, agent_id, kind, content, embedding, importance,
-                       emotional_intensity, decay_rate, metadata, created_at, last_accessed_at,
-                       (embedding <=> :query_vec) AS dist
-                FROM agent_memories
-                WHERE agent_id = :agent_id
-                ORDER BY dist ASC
-                LIMIT :limit
-            """)
-            rows = (await session.execute(
-                stmt,
-                {"query_vec": vec_literal, "agent_id": agent_id, "limit": limit * 2},
-            )).fetchall()
+        # Use ORM-based similarity search for all memory sizes.
+        # For large sets, pre-filter by importance then compute cosine similarity in Python
+        # to avoid raw SQL text() injection risks.
+        fetch_limit = limit * 3 if count > 100 else 80
+        memories = (
+            await session.execute(
+                select(AgentMemory)
+                .where(AgentMemory.agent_id == agent_id)
+                .order_by(desc(AgentMemory.importance))
+                .limit(fetch_limit)
+            )
+        ).scalars().all()
 
-            # Wrap as AgentMemory objects for the scoring pass
-            ranked = []
-            for row in rows:
-                mem = AgentMemory(
-                    id=row[0],
-                    agent_id=row[1],
-                    kind=row[2],
-                    content=row[3],
-                    embedding=row[4],
-                    importance=row[5],
-                    emotional_intensity=row[6],
-                    decay_rate=row[7],
-                    metadata_=row[8],
-                    created_at=row[9],
-                    last_accessed_at=row[10],
-                )
-                keyword_bonus = self._keyword_overlap(query, mem.content) * 0.3
-                created_at = mem.created_at
-                if created_at.tzinfo is None:
-                    created_at = created_at.replace(tzinfo=timezone.utc)
-                age_hours = max(1.0, (now - created_at).total_seconds() / 3600)
-                recency = math.exp(-mem.decay_rate * age_hours)
-                total_score = (
-                    (1.0 - row[11]) * 0.45  # cosine similarity from distance
-                    + keyword_bonus
-                    + mem.importance * 0.25
-                    + recency * 0.15
-                    + mem.emotional_intensity * 0.05
-                )
-                ranked.append((total_score, mem))
+        query_vec_norm = math.sqrt(sum(v * v for v in query_vec)) or 1.0
 
-            ranked.sort(key=lambda x: x[0], reverse=True)
-            result = [r[1] for r in ranked[:limit]]
-        else:
-            # For small sets, fetch all and rank in Python
-            memories = (
-                await session.execute(
-                    select(AgentMemory)
-                    .where(AgentMemory.agent_id == agent_id)
-                    .order_by(desc(AgentMemory.importance))
-                    .limit(80)
-                )
-            ).scalars().all()
+        def score(memory: AgentMemory) -> float:
+            # Cosine similarity via dot product
+            dot = sum(a * b for a, b in zip(query_vec, memory.embedding, strict=False))
+            mem_norm = math.sqrt(sum(v * v for v in memory.embedding)) or 1.0
+            similarity = dot / (query_vec_norm * mem_norm)
 
-            def score(memory: AgentMemory) -> float:
-                similarity = sum(a * b for a, b in zip(query_vec, memory.embedding, strict=False))
-                keyword_bonus = self._keyword_overlap(query, memory.content) * 0.3
-                created_at = memory.created_at
-                if created_at.tzinfo is None:
-                    created_at = created_at.replace(tzinfo=timezone.utc)
-                age_hours = max(1.0, (now - created_at).total_seconds() / 3600)
-                recency = math.exp(-memory.decay_rate * age_hours)
-                return (
-                    similarity * 0.45
-                    + keyword_bonus
-                    + memory.importance * 0.25
-                    + recency * 0.15
-                    + memory.emotional_intensity * 0.05
-                )
+            keyword_bonus = self._keyword_overlap(query, memory.content) * 0.3
+            created_at = memory.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            age_hours = max(1.0, (now - created_at).total_seconds() / 3600)
+            recency = math.exp(-memory.decay_rate * age_hours)
+            return (
+                similarity * 0.45
+                + keyword_bonus
+                + memory.importance * 0.25
+                + recency * 0.15
+                + memory.emotional_intensity * 0.05
+            )
 
-            ranked = sorted(memories, key=score, reverse=True)[:limit]
-            result = ranked
+        ranked = sorted(memories, key=score, reverse=True)[:limit]
+        result = ranked
 
         for memory in result:
             memory.last_accessed_at = datetime.utcnow()
