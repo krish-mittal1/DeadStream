@@ -10,6 +10,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}-backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}-frontend
+
 jobs:
   lint-backend:
     name: Lint & Typecheck Backend
@@ -25,7 +30,11 @@ jobs:
           cache: "pip"
       - run: pip install -e ".[dev]"
       - run: pip install pyright
-      - run: pyright app || true  # advisory — strict mode needs gradual migration
+      - name: Pyright type check
+        run: pyright app
+        # If strict mode is too aggressive, temporarily add:
+        #   continue-on-error: true
+        # and file an issue to fix the type errors incrementally.
 
   test-backend:
     name: Test Backend
@@ -59,11 +68,11 @@ jobs:
           cache: "pip"
       - run: pip install -e ".[dev]"
       - run: pip install pytest pytest-asyncio httpx aiosqlite
-      - name: Run tests
-        run: pytest -v --tb=short -m "not integration"
+      - name: Run all tests (unit + integration)
+        run: pytest -v --tb=short
 
   test-frontend:
-    name: Lint Frontend
+    name: Test & Lint Frontend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -76,17 +85,61 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
-      - run: npm run lint
-      - run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
 
-  docker-build:
-    name: Docker Build
+  docker-publish:
+    name: Docker Build & Publish
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
     needs: [lint-backend, test-backend, test-frontend]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - name: Build backend image
-        run: docker build -t deadstream-backend:ci ./backend
-      - name: Build frontend image
-        run: docker build -t deadstream-frontend:ci ./frontend
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+
+      - name: Extract metadata for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
+          tags: |
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}

@@ -1,0 +1,15 @@
+# ── Grafana dashboard provisioning ──────────────────────────────
+# Dashboards are auto-provisioned from this directory.
+
+apiVersion: 1
+
+providers:
+  - name: "DeadStream"
+    orgId: 1
+    folder: "DeadStream"
+    type: file
+    disableDeletion: true
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
