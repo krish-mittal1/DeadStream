@@ -67,7 +67,7 @@ export default function TrendingPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.25 }}
-      className="mx-auto max-w-4xl"
+      className="mx-auto max-w-4xl flex flex-col h-full min-h-0"
     >
       {/* Header */}
       <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 md:px-6 h-11 flex items-center">
@@ -80,7 +80,7 @@ export default function TrendingPage() {
         <h1 className="text-sm font-bold text-[var(--color-text)]">Trending & Leaderboard</h1>
       </div>
 
-      <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--color-line)] min-h-[calc(100vh-3rem-44px)]">
+      <div className="flex-1 grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--color-line)] min-h-0">
         {/* Trending Topics */}
         <section className="p-5 md:p-6 overflow-auto">
           <motion.h2

@@ -185,7 +185,7 @@ export default function DMPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
-      className="mx-auto max-w-4xl flex flex-col h-[calc(100vh-3rem)]"
+      className="mx-auto max-w-4xl flex flex-col h-full min-h-0"
     >
       {/* Header */}
       <div className="border-b border-[var(--color-line)] glass-strong px-4 md:px-6 h-11 flex items-center justify-between shrink-0">

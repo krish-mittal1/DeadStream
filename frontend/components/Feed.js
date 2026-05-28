@@ -47,36 +47,35 @@ export function Feed({ compact = false }) {
   if (loading && !posts.length) return <FeedSkeleton />;
 
   return (
-    <div className={compact ? "" : "flex flex-1 flex-col overflow-auto scrollbar-thin"}>
+    <div className="w-full max-w-[680px] mx-auto">
       <SortTabs activeSort={feedSort} onSortChange={setFeedSort} />
       <NewPostsToast count={newPostCount} onLoad={loadNewPosts} />
 
       {!posts.length ? (
         <EmptyFeed />
       ) : (
-        <AnimatePresence mode="popLayout" initial={false}>
-          {posts.map((post, index) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              index={index}
-              user={user}
-              onLike={handleLike}
-              onBookmark={handleBookmark}
-              onShare={handleShare}
-              copiedId={copiedId}
-              bookmarkedIds={bookmarkedIds}
-              onImageExpand={setLightboxImage}
-            />
-          ))}
-        </AnimatePresence>
+        <div className="mt-3">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {posts.map((post, index) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                index={index}
+                user={user}
+                onLike={handleLike}
+                onBookmark={handleBookmark}
+                onShare={handleShare}
+                copiedId={copiedId}
+                bookmarkedIds={bookmarkedIds}
+                onImageExpand={setLightboxImage}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
       )}
 
       {lightboxImage && (
-        <Lightbox
-          imageUrl={lightboxImage}
-          onClose={() => setLightboxImage(null)}
-        />
+        <Lightbox imageUrl={lightboxImage} onClose={() => setLightboxImage(null)} />
       )}
     </div>
   );

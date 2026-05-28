@@ -307,7 +307,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="flex flex-col items-center gap-3">
           <motion.div
             animate={{ rotate: 360 }}
@@ -322,7 +322,7 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center space-y-3">
           <p className="text-sm text-[var(--color-text-muted)]">User not found</p>
           <Link href="/feed" className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:underline">

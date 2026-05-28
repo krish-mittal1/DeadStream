@@ -8,12 +8,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSimulationStore } from "../store/useSimulationStore";
 
-const SECTION = "border-b border-[var(--color-line)] px-4 py-5";
+const SECTION = "border-b border-[var(--color-line)] px-5 py-5";
 
 function SectionHeader({ icon, label, extra }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      <h3 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+      <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
         <span className="text-[var(--color-text-dim)]">{icon}</span>
         {label}
       </h3>
@@ -42,6 +42,7 @@ export function RightRail() {
   const communities = useSimulationStore((s) => s.communities);
   const events = useSimulationStore((s) => s.events);
   const posts = useSimulationStore((s) => s.posts);
+  const leaderboardData = useSimulationStore((s) => s.leaderboardData);
 
   const recentEventCount = events.filter(
     (e) => Date.now() - new Date(e.occurred_at || 0).getTime() < 60_000
@@ -54,7 +55,29 @@ export function RightRail() {
   const maxTrendScore = Math.max(...trends.map((t) => Number(t.score)), 1);
 
   return (
-    <aside className="hidden w-[280px] shrink-0 border-l border-[var(--color-line)] lg:flex lg:flex-col overflow-y-auto scrollbar-thin bg-[var(--color-bg-secondary)]">
+    <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
+
+      {/* ─── Status Bar ─── */}
+      <div className="px-5 py-4 border-b border-[var(--color-line)]">
+        <div className="flex items-center gap-3">
+          <span className={`flex items-center gap-1.5 text-xs font-bold ${
+            connected ? "text-[var(--color-green)]" : "text-[var(--color-red)]"
+          }`}>
+            <span className="relative flex h-2 w-2">
+              {connected && (
+                <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-55 animate-ping" />
+              )}
+              <span className={`relative inline-flex h-2 w-2 rounded-full ${
+                connected ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"
+              }`} />
+            </span>
+            {connected ? "Live" : "Offline"}
+          </span>
+          <span className="text-[11px] text-[var(--color-text-muted)] font-medium ml-auto">
+            {posts.length} posts
+          </span>
+        </div>
+      </div>
 
       {/* ─── Drama Feed ─── */}
       <AnimatePresence>
@@ -112,50 +135,25 @@ export function RightRail() {
 
       {/* ─── Live Status ─── */}
       <section className={SECTION}>
-        <SectionHeader icon={<Radio size={12} />} label="Live Status" />
-        <div className="space-y-3">
+        <SectionHeader icon={<Radio size={12} />} label="Network Status" />
+        <div className="grid grid-cols-2 gap-3">
           {[
-            {
-              label: "Socket",
-              value: (
-                <span className={`flex items-center gap-1.5 text-xs font-bold ${connected ? "text-[var(--color-green)]" : "text-[var(--color-red)]"}`}>
-                  <span className="relative flex h-2 w-2">
-                    {connected && <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-55 animate-ping" />}
-                    <span className={`relative inline-flex h-2 w-2 rounded-full ${connected ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"}`} />
-                  </span>
-                  {connected ? "Connected" : "Offline"}
-                </span>
-              ),
-            },
-            {
-              label: "Agents",
-              value: <span className="text-xs font-bold text-[var(--color-text)] tabular-nums">{agents.length}</span>,
-            },
-            {
-              label: "Posts total",
-              value: <span className="text-xs font-bold text-[var(--color-text)] tabular-nums">{posts.length}</span>,
-            },
-            {
-              label: "Events/min",
-              value: (
-                <motion.span
-                  key={recentEventCount}
-                  initial={{ y: 4, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className={`text-xs font-bold tabular-nums ${
-                    recentEventCount > 10 ? "text-[var(--color-accent)]" :
-                    recentEventCount > 5  ? "text-[var(--color-gold)]"   :
-                    "text-[var(--color-text)]"
-                  }`}
-                >
-                  {recentEventCount}
-                </motion.span>
-              ),
-            },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex items-center justify-between">
-              <span className="text-xs text-[var(--color-text-muted)]">{label}</span>
-              {value}
+            { label: "Agents", value: agents.length, color: "var(--color-blue)" },
+            { label: "Posts", value: posts.length, color: "var(--color-accent)" },
+            { label: "Events/min", value: recentEventCount, color: recentEventCount > 10 ? "var(--color-accent)" : "var(--color-gold)" },
+            { label: "Communities", value: communities.length, color: "var(--color-green)" },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-3">
+              <span className="text-[10px] text-[var(--color-text-muted)] font-medium">{label}</span>
+              <motion.span
+                key={value}
+                initial={{ y: 4, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                className="block mt-1 text-lg font-extrabold tabular-nums"
+                style={{ color }}
+              >
+                {value}
+              </motion.span>
             </div>
           ))}
         </div>
@@ -163,12 +161,20 @@ export function RightRail() {
 
       {/* ─── Trending ─── */}
       <section className={SECTION}>
-        <SectionHeader icon={<Flame size={12} />} label="Trending" />
+        <SectionHeader
+          icon={<Flame size={12} />}
+          label="Trending"
+          extra={
+            <Link href="/trending" className="text-[10px] font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+              View all
+            </Link>
+          }
+        />
         <div className="space-y-4">
           {trends.length === 0 && (
             <p className="text-xs text-[var(--color-text-muted)] italic">Warming up...</p>
           )}
-          {trends.slice(0, 6).map((trend, i) => (
+          {trends.slice(0, 5).map((trend, i) => (
             <motion.div
               key={`${trend.topic}-${i}`}
               initial={{ opacity: 0, x: -8 }}
@@ -207,13 +213,13 @@ export function RightRail() {
           icon={<Users size={12} />}
           label="Communities"
           extra={
-            <Link href="/communities" className="text-[11px] font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+            <Link href="/communities" className="text-[10px] font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
               View all
             </Link>
           }
         />
         <div className="space-y-1">
-          {communities.slice(0, 7).map((c) => {
+          {communities.slice(0, 6).map((c) => {
             const hue = Math.round((1 - Number(c.conflict_score)) * 120);
             return (
               <Link
@@ -245,10 +251,10 @@ export function RightRail() {
       </section>
 
       {/* ─── Active Agents ─── */}
-      <section className="flex-1 px-4 py-5">
+      <section className="flex-1 px-5 py-5">
         <SectionHeader icon={<Activity size={12} />} label="Active Agents" />
         <div className="space-y-2.5">
-          {agents.slice(0, 6).map((agent, i) => {
+          {agents.slice(0, 5).map((agent, i) => {
             const agitation = Number(agent.emotional_state?.agitation ?? 0.3);
             const confidence = Number(agent.emotional_state?.confidence ?? 0.5);
             const hue = Math.round(agent.activity_level * 120);
@@ -274,10 +280,7 @@ export function RightRail() {
                   </div>
                   <span
                     className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black"
-                    style={{
-                      background: `hsla(${hue}, 60%, 50%, 0.14)`,
-                      color: `hsl(${hue}, 75%, 62%)`,
-                    }}
+                    style={{ background: `hsla(${hue}, 60%, 50%, 0.14)`, color: `hsl(${hue}, 75%, 62%)` }}
                   >
                     {(agent.activity_level * 100).toFixed(0)}%
                   </span>
@@ -285,7 +288,6 @@ export function RightRail() {
                 <div className="text-[10px] text-[var(--color-text-muted)] truncate mb-2.5">
                   {agent.template}
                 </div>
-                {/* Mini stat bars */}
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { label: "Agit", value: agitation, color: `hsl(${Math.round((1 - agitation) * 120)}, 70%, 55%)` },
@@ -312,6 +314,6 @@ export function RightRail() {
           })}
         </div>
       </section>
-    </aside>
+    </div>
   );
 }

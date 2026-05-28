@@ -107,7 +107,7 @@ export function FeedSkeleton() {
 
 export function PageSkeleton() {
   return (
-    <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+    <div className="flex items-center justify-center py-24">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}

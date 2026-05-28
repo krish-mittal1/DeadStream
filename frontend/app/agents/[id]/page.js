@@ -241,7 +241,7 @@ export default function AgentDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="flex flex-col items-center gap-3">
           <motion.div
             animate={{ rotate: 360 }}
@@ -256,7 +256,7 @@ export default function AgentDetailPage() {
 
   if (!agent) {
     return (
-      <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div className="flex items-center justify-center py-24">
         <div className="text-center space-y-3">
           <Bot size={32} className="mx-auto text-[var(--color-text-dim)]" />
           <p className="text-sm text-[var(--color-text-muted)]">Agent not found</p>

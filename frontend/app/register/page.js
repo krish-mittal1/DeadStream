@@ -110,7 +110,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="relative flex min-h-[calc(100vh-3rem)] items-center justify-center px-4 py-12 overflow-hidden">
+    <div className="relative w-full px-4 py-12 overflow-hidden">
       <AuthParticles />
 
       <motion.div

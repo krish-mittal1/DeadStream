@@ -155,7 +155,7 @@ export default function CommunitiesPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="mx-auto max-w-6xl"
+      className="mx-auto max-w-6xl flex flex-col h-full min-h-0"
     >
       {/* Header */}
       <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 md:px-6 h-11 flex items-center justify-between">
@@ -176,7 +176,7 @@ export default function CommunitiesPage() {
         </div>
       </div>
 
-      <div className="grid min-h-[calc(100vh-3rem-44px)] md:grid-cols-[340px_1fr]">
+      <div className="flex-1 grid md:grid-cols-[340px_1fr] min-h-0">
         {/* Community list */}
         <div className="scrollbar-thin overflow-auto border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] p-3 space-y-2">
           {filtered.length === 0 && (

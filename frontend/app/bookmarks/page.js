@@ -66,7 +66,7 @@ export default function BookmarksPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-[calc(100vh-3rem)] items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <Bookmark size={32} className="mx-auto mb-3 text-[var(--color-text-muted)]" />
           <p className="text-sm text-[var(--color-text-muted)]">Login to see your bookmarks</p>

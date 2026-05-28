@@ -1,13 +1,12 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { MessageCircle, Bookmark, Share2, ChevronDown, ChevronUp, ImageIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { AlertTriangle, Clock, Expand, Zap } from "lucide-react";
-import { useMemo } from "react";
+import { useState, useCallback } from "react";
 import { VoteButtons } from "./VoteButtons";
 import { PostActions } from "./PostActions";
-import { UserHoverCard } from "../UserHoverCard";
-import { getAvatarColor, timeAgo } from "./helpers";
+import { useSimulationStore } from "../../store/useSimulationStore";
 
 const avatarGradients = [
   "linear-gradient(135deg,#ff4500,#ff6534)",
@@ -25,253 +24,224 @@ function getAvatarBg(username) {
   return avatarGradients[i % avatarGradients.length];
 }
 
-/* ─── Agent Writing Indicator ────────────────────────────── */
-function WritingIndicator({ agitation = 0, visible = false }) {
-  if (!visible) return null;
-  const pulseDuration = Math.max(0.6, 2.4 - agitation * 1.8);
-  const dots = [0, 1, 2];
+const itemVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.98 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { delay: i * 0.03, type: "spring", stiffness: 350, damping: 30 },
+  }),
+  exit: { opacity: 0, scale: 0.96, transition: { duration: 0.15 } },
+};
+
+export function PostCard({
+  post,
+  index = 0,
+  user,
+  onLike,
+  onBookmark,
+  onShare,
+  copiedId,
+  bookmarkedIds,
+  onImageExpand,
+  isReply = false,
+  depth = 0,
+  threadConnector = false,
+  isLastInThread = false,
+}) {
+  const isBookmarked = bookmarkedIds?.has(post.id);
+  const isCopied = copiedId === post.id;
+  const [threadExpanded, setThreadExpanded] = useState(true);
+  const [imgError, setImgError] = useState(false);
+  const selectPost = useSimulationStore((s) => s.selectPost);
+
+  const authorInitial = post.author_username?.[0]?.toUpperCase() || "?";
+
+  const handleReply = useCallback(() => {
+    selectPost(post);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [post, selectPost]);
+
   return (
     <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 20 }}
-      exit={{ opacity: 0, height: 0 }}
-      className="flex items-center gap-2 px-1 mb-1"
-    >
-      <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-cyan)]">
-        Agent is writing
-      </span>
-      <div className="flex items-center gap-[3px]">
-        {dots.map((i) => (
-          <motion.span
-            key={i}
-            className="h-[5px] w-[5px] rounded-full"
-            style={{ backgroundColor: "var(--color-cyan)" }}
-            animate={{
-              y: [0, -5, 0],
-              opacity: [0.4, 1, 0.4],
-              scale: [1, 1.25, 1],
-            }}
-            transition={{
-              duration: pulseDuration,
-              repeat: Infinity,
-              delay: i * (pulseDuration / 3),
-              ease: "easeInOut",
-            }}
-          />
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
-/* ─── Post Image ─────────────────────────────────────────── */
-function PostImage({ imageUrl, onExpand }) {
-  if (!imageUrl) return null;
-  return (
-    <div className="relative my-3 -mx-4 md:-mx-5 group/img cursor-pointer overflow-hidden">
-      <div className="relative bg-[var(--color-bg)] border-y border-[var(--color-line)]">
-        <img
-          src={imageUrl}
-          alt="Post image"
-          className="w-full max-h-80 object-contain transition-transform duration-700 ease-out group-hover/img:scale-[1.02]"
-          loading="lazy"
-          onClick={() => onExpand(imageUrl)}
-          onError={(e) => { e.target.style.display = "none"; }}
-        />
-        <div
-          onClick={() => onExpand(imageUrl)}
-          className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover/img:bg-black/30 transition-all duration-500"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            whileHover={{ scale: 1.12 }}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 backdrop-blur-sm opacity-0 group-hover/img:opacity-100 transition-all duration-300 pointer-events-none"
-          >
-            <Expand size={16} className="text-white" />
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Post Author ────────────────────────────────────────── */
-function PostAuthor({ post }) {
-  const isAI = post.author_username?.includes("_");
-  const isHot = post.controversy_score > 0.65;
-  const isSpicy = post.controversy_score > 0.5 && post.controversy_score <= 0.65;
-
-  return (
-    <div className="flex items-center gap-2 mb-2.5 flex-wrap">
-      <UserHoverCard userId={post.author_id} username={post.author_username} isAgent={isAI}>
-        <motion.div
-          whileHover={{ scale: 1.12 }}
-          whileTap={{ scale: 0.92 }}
-          transition={{ type: "spring", stiffness: 500, damping: 28 }}
-        >
-          <Link
-            href={`/profile/${post.author_id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white text-[10px] font-black ring-2 ring-transparent hover:ring-[var(--color-accent)]/30 transition-all duration-200"
-            style={{ background: getAvatarBg(post.author_username) }}
-          >
-            {post.author_username?.charAt(0).toUpperCase() || "?"}
-          </Link>
-        </motion.div>
-      </UserHoverCard>
-
-      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-        <UserHoverCard userId={post.author_id} username={post.author_username} isAgent={isAI}>
-          <Link
-            href={`/profile/${post.author_id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-accent)] transition-colors truncate"
-          >
-            @{post.author_username}
-          </Link>
-        </UserHoverCard>
-
-        {isAI && <span className="tag tag-ai shrink-0">AI</span>}
-
-        {post.community_name && (
-          <>
-            <span className="text-[var(--color-text-dim)] text-xs">in</span>
-            <Link
-              href="/communities"
-              onClick={(e) => e.stopPropagation()}
-              className="text-xs font-bold text-[var(--color-blue)] hover:underline shrink-0"
-            >
-              {post.community_name}
-            </Link>
-          </>
-        )}
-
-        <span className="text-[var(--color-text-dim)] text-xs shrink-0 flex items-center gap-1">
-          <Clock size={9} />
-          {timeAgo(post.created_at)}
-        </span>
-
-        {isHot && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="tag tag-hot inline-flex items-center gap-1 shrink-0 neon-pulse"
-          >
-            <AlertTriangle size={8} /> HOT
-          </motion.span>
-        )}
-        {isSpicy && !isHot && (
-          <span className="tag tag-spicy inline-flex items-center gap-1 shrink-0">
-            <Zap size={8} /> SPICY
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ─── Post Content ───────────────────────────────────────── */
-function PostContent({ post }) {
-  return (
-    <>
-      <Link href={`/post/${post.id}`} className="block group/title mb-1">
-        {post.title ? (
-          <h2 className="text-[15px] font-bold leading-snug text-[var(--color-text)] group-hover/title:text-[var(--color-accent)] transition-colors duration-150">
-            {post.title}
-          </h2>
-        ) : (
-          <p className="text-sm leading-relaxed text-[var(--color-text)] whitespace-pre-wrap break-words group-hover/title:text-[var(--color-text-secondary)] transition-colors">
-            {post.body}
-          </p>
-        )}
-      </Link>
-
-      {post.title && post.body && (
-        <Link href={`/post/${post.id}`} className="block mb-1">
-          <p className="text-sm leading-relaxed text-[var(--color-text-secondary)] whitespace-pre-wrap break-words line-clamp-3">
-            {post.body}
-          </p>
-        </Link>
-      )}
-    </>
-  );
-}
-
-/* ─── Post Card ──────────────────────────────────────────── */
-export function PostCard({
-  post, index, user, onLike, onBookmark, onShare,
-  copiedId, bookmarkedIds, onImageExpand,
-}) {
-  const hasConflict = post.controversy_score > 0.6;
-  const agitation = Number(post.agitation_level || 0);
-  const isAI = post.author_username?.includes("_");
-  const delay = useMemo(() => Math.min((index || 0) * 0.022, 0.22), [index]);
-
-  return (
-    <motion.article
-      id={`post-${post.id}`}
+      custom={index}
+      variants={itemVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       layout
-      tabIndex={0}
-      initial={{ opacity: 0, y: 14, scale: 0.99 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-      transition={{
-        type: "spring",
-        stiffness: 260,
-        damping: 26,
-        delay,
-      }}
-      className={`group relative flex gap-0 border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)] transition-all duration-300 hover:bg-[var(--color-panel)]/25 focus-visible:bg-[var(--color-panel)]/30 outline-none ${
-        hasConflict ? "conflict-glow" : ""
-      }`}
+      className={`group/post relative ${isReply ? "ml-8" : ""}`}
     >
-      {/* ─── Conflict bar ─── */}
-      {hasConflict && (
-        <motion.div
-          initial={{ scaleY: 0 }}
-          animate={{ scaleY: 1 }}
-          transition={{ delay: 0.2, duration: 0.4, ease: "easeOut" }}
-          className="absolute top-0 left-0 bottom-0 w-[3px] origin-top rounded-r-full shadow-[0_0_8px_rgba(255,69,0,0.3)]"
-          style={{
-            background: `linear-gradient(to bottom, rgba(255,69,0,${Math.min(1, post.controversy_score + 0.15)}), rgba(239,68,68,${Math.min(0.7, post.controversy_score)}))`,
-          }}
-        />
+      {/* ─── Thread connector line ─── */}
+      {threadConnector && (
+        <div className="absolute left-0 top-0 bottom-0 z-0">
+          <div className="thread-connector active" />
+          {isLastInThread && (
+            <div className="absolute left-0 bottom-0 w-[1rem] h-3 border-l-2 border-b-2 border-[var(--color-accent)] rounded-bl-xl"
+              style={{ borderColor: "rgba(255,69,0,0.25)" }} />
+          )}
+          <button
+            onClick={() => setThreadExpanded(!threadExpanded)}
+            className={`thread-collapse-btn ${!threadExpanded ? "collapsed" : ""}`}
+            title={threadExpanded ? "Collapse thread" : "Expand thread"}
+          />
+        </div>
       )}
 
-      {/* ─── Hover glow border (premium) ─── */}
-      <div
-        className="absolute inset-0 rounded-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(135deg, rgba(255,69,0,0.03), rgba(251,191,36,0.015), transparent)",
-        }}
-      />
+      {/* ─── Main card ─── */}
+      <motion.div
+        layout
+        className={`
+          relative z-10
+          rounded-2xl
+          border border-[var(--color-line)]
+          bg-[var(--color-panel)]
+          transition-all duration-200
+          ${isReply ? "mb-2" : "mb-3"}
+          hover:border-[var(--color-line-light)]
+          hover:bg-[var(--color-panel-hover)]
+          hover:shadow-[var(--shadow-sm)]
+        `}
+      >
+        <div className={`px-5 py-4 ${isReply ? "px-4 py-3" : ""}`}>
+          {/* ─── Author header ─── */}
+          <div className="flex items-center gap-3 mb-3">
+            <Link href={`/profile/${post.author_id}`} className="shrink-0">
+              <div
+                className="avatar avatar-md"
+                style={{ background: getAvatarBg(post.author_username) }}
+              >
+                {authorInitial}
+              </div>
+            </Link>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/profile/${post.author_id}`}
+                  className="text-sm font-bold text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors truncate"
+                >
+                  {post.author_display_name || post.author_username}
+                </Link>
+                {post.is_agent && <span className="tag tag-ai text-[9px]">AI</span>}
+              </div>
+              <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
+                <span>@{post.author_username}</span>
+                <span className="text-[var(--color-text-dim)]">·</span>
+                <span>{new Date(post.created_at).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+            </div>
+          </div>
 
-      {/* ─── Vote column ─── */}
-      <div className="flex flex-col items-center pt-3 pl-2 pr-1 shrink-0 relative z-10">
-        <VoteButtons post={post} user={user} onVote={onLike} />
-      </div>
+          {/* ─── Title ─── */}
+          {post.title && (
+            <Link href={`/post/${post.id}`} className="block mb-2">
+              <h3 className="text-base font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
+                {post.title}
+              </h3>
+            </Link>
+          )}
 
-      {/* ─── Content ─── */}
-      <div className="min-w-0 flex-1 px-3 py-3 md:py-4 md:pr-5 relative z-10">
-        {/* Writing indicator for AI agents */}
-        {isAI && (
-          <WritingIndicator agitation={agitation} visible={true} />
+          {/* ─── Body ─── */}
+          {post.body && (
+            <Link href={`/post/${post.id}`}>
+              <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed mb-3">
+                {post.body.length > 300 ? `${post.body.slice(0, 300)}…` : post.body}
+              </p>
+            </Link>
+          )}
+
+          {/* ─── Image ─── */}
+          {post.image_url && !imgError && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mb-3 rounded-xl overflow-hidden border border-[var(--color-line)] cursor-pointer"
+              onClick={() => onImageExpand?.(post.image_url)}
+            >
+              <img
+                src={post.image_url}
+                alt="Post image"
+                className="w-full max-h-80 object-cover transition-transform duration-300 hover:scale-[1.02]"
+                onError={() => setImgError(true)}
+                loading="lazy"
+              />
+            </motion.div>
+          )}
+
+          {/* ─── Action bar ─── */}
+          <div className="flex items-center gap-1 -ml-1 mt-2">
+            <VoteButtons
+              postId={post.id}
+              likeCount={post.like_count}
+              onLike={onLike}
+            />
+
+            <button
+              onClick={handleReply}
+              className="post-action-btn group"
+              title="Reply"
+            >
+              <MessageCircle size={15} />
+              <span>{post.reply_count > 0 ? post.reply_count : ""}</span>
+            </button>
+
+            <button
+              onClick={() => onBookmark(post.id)}
+              className={`post-action-btn ${isBookmarked ? "active" : ""}`}
+              title={isBookmarked ? "Remove bookmark" : "Bookmark"}
+            >
+              <Bookmark size={15} fill={isBookmarked ? "currentColor" : "none"} />
+            </button>
+
+            <button
+              onClick={() => onShare(post)}
+              className={`post-action-btn ${isCopied ? "active" : ""}`}
+              title="Share"
+            >
+              <Share2 size={15} />
+              {isCopied && <span className="text-[9px] font-bold">Copied!</span>}
+            </button>
+
+            <Link href={`/post/${post.id}`} className="post-action-btn ml-auto text-[10px] text-[var(--color-text-dim)]">
+              View full post
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ─── Collapsible thread replies ─── */}
+      <AnimatePresence initial={false}>
+        {threadExpanded && post.replies?.length > 0 && (
+          <motion.div
+            key="replies"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            {post.replies.map((reply, ri) => (
+              <PostCard
+                key={reply.id}
+                post={reply}
+                index={index + ri * 0.1}
+                user={user}
+                onLike={onLike}
+                onBookmark={onBookmark}
+                onShare={onShare}
+                copiedId={copiedId}
+                bookmarkedIds={bookmarkedIds}
+                onImageExpand={onImageExpand}
+                isReply
+                depth={depth + 1}
+                threadConnector={ri < post.replies.length - 1}
+                isLastInThread={ri === post.replies.length - 1}
+              />
+            ))}
+          </motion.div>
         )}
-
-        <PostAuthor post={post} />
-        <PostContent post={post} />
-        <PostImage imageUrl={post.image_url} onExpand={onImageExpand} />
-        <PostActions
-          post={post}
-          user={user}
-          onLike={onLike}
-          onBookmark={onBookmark}
-          onShare={onShare}
-          copied={copiedId}
-          bookmarkedIds={bookmarkedIds}
-        />
-      </div>
-    </motion.article>
+      </AnimatePresence>
+    </motion.div>
   );
 }
