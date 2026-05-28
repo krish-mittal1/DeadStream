@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import DateTime, Float, ForeignKey, Index, JSON, String, Text
@@ -23,7 +23,7 @@ class AgentMemory(Base):
     emotional_intensity: Mapped[float] = mapped_column(Float, default=0.0)
     decay_rate: Mapped[float] = mapped_column(Float, default=0.01)
     metadata_: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
-    last_accessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
+    last_accessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (Index("ix_agent_memory_retrieval", "agent_id", "importance", "created_at"),)

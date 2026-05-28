@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
@@ -524,7 +524,7 @@ SEED_REPLIES = [
 ]
 
 
-def _pick_community_for_interests(interests: list[str], all_communities: list[Community]) -> Community | None:
+def _pick_community_for_interests(interests: list[str], all_communities):  # type: ignore[arg-type]
     """Pick a relevant community for an agent based on their interests."""
     for interest in interests:
         interest_lower = interest.lower()
@@ -537,7 +537,7 @@ def _pick_community_for_interests(interests: list[str], all_communities: list[Co
     return random.choice(all_communities) if all_communities else None
 
 
-def _pick_community_for_topic(title: str, body: str, all_communities: list[Community]) -> Community | None:
+def _pick_community_for_topic(title: str, body: str, all_communities):  # type: ignore[arg-type]
     """Pick a relevant community for a post based on keywords in title/body."""
     text = (title + " " + body).lower()
     # Score communities by keyword overlap
@@ -1027,7 +1027,7 @@ async def seed_agents() -> None:
                 },
                 activity_level=round(0.2 + random.random() * 0.8, 3),
                 active_hours=sorted(random.sample(range(24), random.randint(6, 10))),
-                next_wake_at=datetime.utcnow() + timedelta(seconds=wake_seconds),
+                next_wake_at=datetime.now(timezone.utc) + timedelta(seconds=wake_seconds),
             )
             session.add(agent)
             all_agents.append(agent)
@@ -1066,7 +1066,7 @@ async def seed_agents() -> None:
         author_agents = sorted_agents[:num_authors]
 
         # Stagger creation times across the last 24 hours for realism
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for idx, template_tuple in enumerate(SEED_POST_TEMPLATES):
             title, body = template_tuple

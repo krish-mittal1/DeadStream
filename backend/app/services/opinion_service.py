@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,7 +61,7 @@ class OpinionService:
         edge.stance = round(max(-1.0, min(1.0, new_stance)), 4)
         new_conf = float(edge.confidence) + confidence_delta
         edge.confidence = round(max(0.05, min(1.0, new_conf)), 4)
-        edge.updated_at = datetime.utcnow()
+        edge.updated_at = datetime.now(timezone.utc)
 
     async def get_all_stances(
         self, session: AsyncSession, agent_id: uuid.UUID, limit: int = 10

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.ai.providers import CURATED_IMAGES, get_provider
 from app.core.metrics import AGENT_ACTIONS
@@ -149,14 +149,12 @@ class AgentEngine:
                 await event_store.append(session, "agent_beef", user.id, rival_rel.target_user_id, beef_payload)
                 # Notify rival user if they are human
                 if not rival_user.is_agent:
-                    from app.services.notification_service import notification_service as ns
                     from app.models.notification import Notification
                     notif = Notification(
                         user_id=rival_user.id,
                         actor_id=user.id,
                         type="beef",
                         entity_id=None,
-                        read=False,
                     )
                     session.add(notif)
                 AGENT_ACTIONS.labels(action="roast").inc()
@@ -218,7 +216,7 @@ class AgentEngine:
 
         else:
             # Regular post — use opinion stance as context
-            stance, conf = await opinion_service.get_stance(session, agent.id, topic)
+            stance, _ = await opinion_service.get_stance(session, agent.id, topic)
             stance_label = opinion_service.stance_to_label(stance)
             dominant_emotion = self._get_dominant_emotion(agent)
 
@@ -262,7 +260,7 @@ class AgentEngine:
                 await memory_service.remember(session, agent.id, f"Noticed a rival replied to my post: {reply.body[:80]}", "beef", 0.5)
 
         # Track cognitive drift: save ideology snapshots periodically
-        await cognitive_drift_service.drift_personality(session, agent, recent_posts)
+        await cognitive_drift_service.drift_personality(session, agent, list(recent_posts))
         if random.random() < 0.05:  # ~5% chance to save a snapshot each wake
             await cognitive_drift_service.take_snapshot(session, agent)
 
@@ -270,10 +268,10 @@ class AgentEngine:
         await memory_service.maybe_summarize(session, agent.id, get_provider())
 
         self._drift_emotion(agent)
-        agent.last_wake_at = datetime.utcnow()
-        sleep_seconds = random.randint(15, 200) / max(agent.activity_level, 0.1)
+        agent.last_wake_at = datetime.now(timezone.utc)
+        sleep_seconds = random.randint(15, 200) / max(float(agent.activity_level or 0.5), 0.1)
         sleep_seconds = max(5, min(7200, sleep_seconds))  # bound between 5s and 2h
-        agent.next_wake_at = datetime.utcnow() + timedelta(seconds=sleep_seconds)
+        agent.next_wake_at = datetime.now(timezone.utc) + timedelta(seconds=sleep_seconds)
         await event_store.append(session, "agent_slept", user.id, agent.id, {
             "next_wake_at": agent.next_wake_at.isoformat(),
             "action": action,
@@ -281,7 +279,7 @@ class AgentEngine:
                 "action_taken": action,
                 "dominant_emotion": self._get_dominant_emotion(agent),
                 "agitation_after": round(float(agent.emotional_state.get("agitation", 0.3)), 2),
-                "topic": topic[:80] if isinstance(topic, str) else "",
+                "topic": topic[:80],
             },
         })
         await session.commit()
@@ -290,7 +288,7 @@ class AgentEngine:
     # Topic selection
     # -----------------------------------------------------------------------
 
-    def _choose_topic(self, agent: Agent, posts: list[Post]) -> str:
+    def _choose_topic(self, agent: Agent, posts: Sequence[Post]) -> str:
         """Pick a topic: trending, from posts, or from agent interests."""
         # 25% chance: pick from trending topics
         if random.random() < 0.25:
@@ -309,7 +307,7 @@ class AgentEngine:
     # Action decision
     # -----------------------------------------------------------------------
 
-    def _decide_action(self, agent: Agent, posts: list[Post]) -> str:
+    def _decide_action(self, agent: Agent, posts: Sequence[Post]) -> str:
         agitation = float(agent.emotional_state.get("agitation", 0.3))
         activity = float(agent.activity_level or 0.5)
         drama = float(agent.emotional_state.get("drama", 0.3))
@@ -338,7 +336,7 @@ class AgentEngine:
     # Target selection
     # -----------------------------------------------------------------------
 
-    async def _pick_target_smart(self, session: AsyncSession, agent: Agent, posts: list[Post]) -> Post:
+    async def _pick_target_smart(self, session: AsyncSession, agent: Agent, posts: Sequence[Post]) -> Post:
         rivals = await relationship_service.get_rivals(session, agent.id, limit=8)
         rival_ids = {r.target_user_id for r in rivals}
         rival_map = {r.target_user_id: r.rivalry for r in rivals}
@@ -365,7 +363,7 @@ class AgentEngine:
         return random.choice(weighted[:top_n])
 
     async def _pick_like_target(
-        self, session: AsyncSession, agent: Agent, posts: list[Post], user: User
+        self, session: AsyncSession, agent: Agent, posts: Sequence[Post], user: User
     ) -> Optional[Post]:
         allies = await relationship_service.get_allies(session, agent.id, limit=8)
         ally_ids = {a.target_user_id for a in allies}
@@ -525,7 +523,7 @@ class AgentEngine:
         elif agitation < 0.2:
             emotions["coolness"] += 0.2
 
-        dominant = max(emotions, key=emotions.get)
+        dominant = max(emotions, key=lambda k: emotions[k])  # type: ignore[arg-type]
         return dominant
 
     def _extract_title_body(self, composed: str) -> tuple[Optional[str], str]:
@@ -616,7 +614,7 @@ class AgentEngine:
         self,
         agent: Agent,
         topic: str,
-        memories: list,
+        memories: list,  # type: ignore[type-arg]
         mode: str,
         target: Optional[str] = None,
         rel_type: str = "neutral",
@@ -625,7 +623,7 @@ class AgentEngine:
         roast_target_username: Optional[str] = None,
     ) -> str:
         provider = get_provider()
-        memory_context = "\n".join(f"- {m.content}" for m in memories[:4]) or "No prior memories on this topic."
+        memory_context = "\n".join(f"- {getattr(m, 'content', '')}" for m in memories[:4]) or "No prior memories on this topic."
         agitation = float(agent.emotional_state.get("agitation", 0.3))
         confidence = float(agent.emotional_state.get("confidence", 0.5))
 

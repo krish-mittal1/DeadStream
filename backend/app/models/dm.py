@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
@@ -19,7 +19,7 @@ class DirectMessageGroup(Base):
     participant_a: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     participant_b: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     last_message_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("participant_a", "participant_b", name="uq_dm_pair"),)
 
@@ -34,7 +34,7 @@ class DirectMessage(Base):
     sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     body: Mapped[str] = mapped_column(Text)
     read: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (Index("ix_dm_group_chrono", "dm_group_id", "created_at"),)
 
@@ -50,7 +50,7 @@ class GroupChat(Base):
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_message_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class GroupChatParticipant(Base):
@@ -62,7 +62,7 @@ class GroupChatParticipant(Base):
     group_chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("group_chats.id"), index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     role: Mapped[str] = mapped_column(String(40), default="participant")  # "participant" | "moderator"
-    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("group_chat_id", "user_id", name="uq_gc_participant"),)
 
@@ -76,6 +76,6 @@ class GroupChatMessage(Base):
     group_chat_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("group_chats.id"), index=True)
     sender_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     body: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (Index("ix_gc_message_chrono", "group_chat_id", "created_at"),)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, JSON, String, Text
@@ -24,7 +24,7 @@ class DisruptionEvent(Base):
     infection_rate: Mapped[float] = mapped_column(Float, default=0.0)  # 0.0 - 1.0 how far it's spread
     infected_count: Mapped[int] = mapped_column(default=0)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_disruption_active", "kind", "active"),)
@@ -43,4 +43,4 @@ class TrollFaction(Base):
     aggression: Mapped[float] = mapped_column(Float, default=0.8)
     posts_made: Mapped[int] = mapped_column(default=0)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

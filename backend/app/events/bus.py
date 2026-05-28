@@ -24,7 +24,7 @@ class EventBus:
         try:
             client = await self.connect()
             encoded = json.dumps(payload, default=str)
-            await client.publish("events:live", encoded)
+            await client.publish("events:live", encoded)  # type: ignore[union-attr]
             await client.xadd("events:stream", {"event": encoded}, maxlen=1_000_000, approximate=True)
         except Exception as exc:
             logger.warning("redis_publish_failed", error=str(exc), event_type=event_type)

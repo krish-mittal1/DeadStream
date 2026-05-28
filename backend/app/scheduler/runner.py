@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 
@@ -38,7 +38,7 @@ class AgentScheduler:
 
     def _check_rate_limit(self, agent_id: str) -> bool:
         """Return True if agent is allowed to act (under the rate limit)."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         window_start = now - timedelta(seconds=60)
         # Prune old entries
         timestamps = [t for t in self._action_log[agent_id] if t > window_start]
@@ -46,7 +46,7 @@ class AgentScheduler:
         return len(timestamps) < settings.agent_rate_limit_per_minute
 
     def _record_action(self, agent_id: str) -> None:
-        self._action_log[agent_id].append(datetime.utcnow())
+        self._action_log[agent_id].append(datetime.now(timezone.utc))
 
     async def tick(self) -> None:
         async with SessionLocal() as session:
@@ -56,7 +56,7 @@ class AgentScheduler:
             due = (
                 await session.execute(
                     select(Agent)
-                    .where(Agent.next_wake_at <= datetime.utcnow())
+                    .where(Agent.next_wake_at <= datetime.now(timezone.utc))
                     .order_by(Agent.next_wake_at)
                     .limit(settings.max_agent_actions_per_tick)
                     .with_for_update(skip_locked=True)

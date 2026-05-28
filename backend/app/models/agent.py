@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import DateTime, Float, ForeignKey, JSON, String
@@ -23,7 +23,7 @@ class Agent(Base):
     personality_traits: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
     activity_level: Mapped[float] = mapped_column(Float, default=0.5)
     active_hours: Mapped[list[int]] = mapped_column(JSON, default=list)
-    next_wake_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    next_wake_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
     last_wake_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -46,5 +46,5 @@ class OpinionEdge(Base):
     topic: Mapped[str] = mapped_column(String(120), index=True)
     stance: Mapped[float] = mapped_column(Float, default=0.0)
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

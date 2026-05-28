@@ -18,7 +18,7 @@ async def _get_cache() -> redis.Redis:
     return _cache_redis
 
 
-def _cache_key(prefix: str, *parts: str | int) -> str:
+def _make_cache_key(prefix: str, *parts: str | int) -> str:  # type: ignore[unused-function]
     return f"cache:{prefix}:" + ":".join(str(p) for p in parts)
 
 
@@ -50,7 +50,7 @@ async def cache_invalidate(pattern: str) -> None:
         client = await _get_cache()
         cursor = 0
         while True:
-            cursor, keys = await client.scan(cursor=cursor, match=pattern, count=100)
+            cursor, keys = await client.scan(cursor=cursor, match=pattern, count=100)  # type: ignore[union-attr]
             if keys:
                 await client.delete(*keys)
             if cursor == 0:
@@ -63,7 +63,7 @@ async def cache_health() -> bool:
     """Check if the cache server is reachable."""
     try:
         client = await _get_cache()
-        return await client.ping()
+        return await client.ping()  # type: ignore[union-attr]
     except Exception:
         return False
 
@@ -74,7 +74,7 @@ async def cache_health() -> bool:
 
 async def get_or_compute(
     key: str,
-    compute_func,
+    compute_func,  # type: ignore[arg-type]
     ttl: Optional[int] = None,
 ) -> Any:
     """Get from cache or compute and store."""

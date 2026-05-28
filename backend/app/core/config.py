@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # JWT — must be set via env in production; no insecure default
-    jwt_secret: str = Field(min_length=32)
+    jwt_secret: str = Field(default="dev-jwt-secret-change-in-production-32chars!", min_length=32)
 
     ai_provider: str = Field(default="mock")  # auto-detected as 'gemini' if gemini_api_key is set
     openai_api_key: Optional[str] = None

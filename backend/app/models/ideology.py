@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import DateTime, Float, ForeignKey, Index, JSON, String
@@ -25,6 +25,6 @@ class IdeologySnapshot(Base):
     political_leaning: Mapped[str] = mapped_column(String(120), default="")
     activity_level: Mapped[float] = mapped_column(Float, default=0.5)
     snapshot_type: Mapped[str] = mapped_column(String(40), default="auto")  # "auto" | "manual"
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (Index("ix_ideology_agent_time", "agent_id", "created_at"),)

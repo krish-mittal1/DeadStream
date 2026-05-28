@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from typing import Optional
 
@@ -20,5 +20,5 @@ class User(Base):
     bio: Mapped[str] = mapped_column(Text, default="")
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_agent: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 

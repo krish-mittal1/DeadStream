@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from typing import Optional
 
@@ -23,7 +23,7 @@ class Post(Base):
     image_url: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True, default=None)
     controversy_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
     virality_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (Index("ix_posts_feed_rank", "created_at", "virality_score", "controversy_score"),)
 
@@ -34,7 +34,7 @@ class Like(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id"), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("user_id", "post_id", name="uq_likes_user_post"),)
 
@@ -46,6 +46,6 @@ class Follow(Base):
     follower_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     followee_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     strength: Mapped[float] = mapped_column(Float, default=0.1)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("follower_id", "followee_id", name="uq_follows_pair"),)

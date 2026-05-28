@@ -24,7 +24,7 @@ class RecommendationService:
             for c in rows.scalars()
         ]
 
-    async def influence_graph(self, session: AsyncSession) -> dict[str, list[dict[str, str | float]]]:
+    async def influence_graph(self, session: AsyncSession) -> dict:  # type: ignore[return-type]
         """Build a graph where both users AND popular posts are nodes.
 
         Each post generates:

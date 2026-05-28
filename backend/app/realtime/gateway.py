@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Optional
+from typing import Any, Optional
 
 import redis.asyncio as redis
 import socketio
@@ -14,7 +14,7 @@ from app.core.metrics import ACTIVE_WS
 logger = get_logger(__name__)
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins=settings.cors_origins)
 _listener_task: Optional[asyncio.Task[None]] = None
-_pubsub: Optional[redis.client.PubSub] = None  # Track for cleanup
+_pubsub: Any = None  # Track for cleanup
 
 
 @sio.event
@@ -44,11 +44,11 @@ async def typing(sid, data):  # type: ignore[no-untyped-def]
 
 async def redis_listener() -> None:
     global _pubsub
-    client = redis.from_url(settings.redis_url, decode_responses=True)
-    _pubsub = client.pubsub()
-    await _pubsub.subscribe("events:live")
+    client: redis.Redis = redis.from_url(settings.redis_url, decode_responses=True)  # type: ignore[attr-defined]
+    _pubsub = client.pubsub()  # type: ignore[union-attr]
+    await _pubsub.subscribe("events:live")  # type: ignore[union-attr]
     try:
-        async for message in _pubsub.listen():
+        async for message in _pubsub.listen():  # type: ignore[union-attr]
             if message.get("type") != "message":
                 continue
             try:

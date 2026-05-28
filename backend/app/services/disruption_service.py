@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import random
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.store import event_store
+from app.schemas import CreatePostRequest
+from app.schemas import DisruptionEventResponse
 from app.models.disruption import DisruptionEvent, TrollFaction
 from app.models.user import User
-from app.models.social import Post
-from app.schemas import DisruptionEventResponse, CreatePostRequest
 from app.services.feed import feed_service
 
 TROLL_NAMES = [
@@ -79,7 +79,7 @@ class DisruptionService:
         await session.flush()
 
         created_count = 0
-        for i in range(min(count, 20)):
+        for _ in range(min(count, 20)):
             username = f"{random.choice(TROLL_NAMES)}_{random.randint(100, 999)}"
             # Create troll user if not exists
             existing = await session.scalar(
@@ -159,7 +159,7 @@ class DisruptionService:
         event = await session.get(DisruptionEvent, disruption_id)
         if event:
             event.active = False
-            event.ended_at = datetime.utcnow()
+            event.ended_at = datetime.now(timezone.utc)
             await session.commit()
             await event_store.append(session, "disruption_ended", None, disruption_id, {})
 

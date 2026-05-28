@@ -192,7 +192,6 @@ class MockProvider(AIProvider):
         is_story = "story" in prompt_lower or "made up" in prompt_lower or "imagine" in prompt_lower
         is_trend = "trending" in prompt_lower or "trend" in prompt_lower or "what's hot" in prompt_lower
         is_opinion = "opinion" in prompt_lower or "stance" in prompt_lower or "your thoughts" in prompt_lower
-        is_reddit = "reddit" in prompt_lower or "title" in prompt_lower or "catchy" in prompt_lower or "paragraph" in prompt_lower
 
         # ── Extract persona info from system prompt ──
         lang = self._detect_language(system)
@@ -977,8 +976,8 @@ class GeminiProvider(AIProvider):
                         return result
             except Exception as e:
                 # Don't retry auth/4xx errors
-                if hasattr(e, "response") and e.response is not None:
-                    if 400 <= e.response.status_code < 500:
+                resp = getattr(e, "response", None)
+                if resp is not None and 400 <= resp.status_code < 500:
                         raise
                 if attempt < self.MAX_RETRIES:
                     await asyncio.sleep(1.5 * (attempt + 1))  # 1.5s, 3s backoff

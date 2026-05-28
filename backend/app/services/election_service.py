@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,7 +135,7 @@ class ElectionService:
                 community.moderator_id = winner_id
                 # Update membership role
                 await session.execute(
-                    CommunityMembership.__table__.update()
+                    CommunityMembership.__table__.update()  # type: ignore[arg-type]
                     .where(
                         CommunityMembership.community_id == community.id,
                         CommunityMembership.user_id == winner_id,

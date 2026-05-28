@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from typing import Optional
 
-from sqlalchemy import desc, func, select, case, text
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_invalidate, get_or_compute
@@ -13,7 +13,7 @@ from app.events.store import event_store
 from app.models.agent import Agent
 from app.models.bookmark import Bookmark
 from app.models.community import Community, CommunityMembership
-from app.models.notification import Notification
+# from app.models.notification import Notification
 from app.models.social import Follow, Like, Post
 from app.models.user import User
 from app.schemas import (
@@ -29,14 +29,15 @@ from app.schemas import (
 )
 from app.services.moderation import moderation_service
 from app.services.notification_service import notification_service
-from app.models.ideology import IdeologySnapshot
+# from app.models.ideology import IdeologySnapshot
+from app.schemas import PostTreeResponse
 
 
 CURSOR_PAGE_SIZE = 50
 
 # ── Feed algorithm settings (mutable, set via admin) ──────────────
 
-FEED_ALGORITHM: str = "hot"  # hot | outrage | polarization | calm | discovery
+feed_algorithm: str = "hot"  # hot | outrage | polarization | calm | discovery
 
 
 avatar_gradients = [
@@ -124,29 +125,29 @@ class FeedService:
         cursor: Optional[str] = None,
         sort: str = "hot",
     ) -> list[PostResponse]:
-        cache_key = f"cache:feed:{FEED_ALGORITHM}:{cursor or 'first'}:{limit}"
+        cache_key = f"cache:feed:{feed_algorithm}:{cursor or 'first'}:{limit}"
 
         async def _fetch() -> list[PostResponse]:
-            global FEED_ALGORITHM
+            global feed_algorithm  # noqa: PLW0602
             stmt = select(Post)
 
             # Apply algorithm-based sorting
-            if FEED_ALGORITHM == "outrage":
+            if feed_algorithm == "outrage":
                 # Boost controversial + high-agitation posts — polarization maximizer
                 stmt = stmt.order_by(
                     desc(Post.controversy_score + Post.virality_score * 1.5),
                     desc(Post.created_at),
                 )
-            elif FEED_ALGORITHM == "polarization":
+            elif feed_algorithm == "polarization":
                 # Amplify the most divisive content — create echo chambers
                 stmt = stmt.order_by(
                     desc(Post.controversy_score * 2.0 + Post.virality_score * 0.5),
                     desc(Post.created_at),
                 )
-            elif FEED_ALGORITHM == "calm":
+            elif feed_algorithm == "calm":
                 # Suppress controversial, boost positive, low-agitation content
                 stmt = stmt.order_by(Post.controversy_score, desc(Post.virality_score), desc(Post.created_at))
-            elif FEED_ALGORITHM == "discovery":
+            elif feed_algorithm == "discovery":
                 # Mix of new + random high-virality — exploration mode
                 stmt = stmt.order_by(
                     desc(func.random() * Post.virality_score * 1.2),
@@ -169,35 +170,35 @@ class FeedService:
                 return []
 
             # Batch-fetch users, like counts, and reply counts in 3 queries total
-            author_ids = list(set(p.author_id for p in posts))
+            author_ids = list({p.author_id for p in posts})
             post_ids = [p.id for p in posts]
 
             user_rows = await session.execute(
                 select(User).where(User.id.in_(author_ids))
             )
-            user_map = {u.id: u for u in user_rows.scalars().all()}
+            user_map: dict[uuid.UUID, User] = {u.id: u for u in user_rows.scalars().all()}
 
             like_rows = await session.execute(
                 select(Like.post_id, func.count())
                 .where(Like.post_id.in_(post_ids))
                 .group_by(Like.post_id)
             )
-            like_map = dict(like_rows.all())
+            like_map: dict[uuid.UUID, int] = dict(like_rows.all())  # type: ignore[arg-type]
 
             reply_rows = await session.execute(
                 select(Post.parent_id, func.count())
                 .where(Post.parent_id.in_(post_ids))
                 .group_by(Post.parent_id)
             )
-            reply_map = dict(reply_rows.all())
+            reply_map: dict[uuid.UUID, int] = dict(reply_rows.all())  # type: ignore[arg-type]
 
             return [
                 PostResponse(
                     id=post.id,
                     author_id=post.author_id,
-                    author_username=user_map.get(post.author_id).username if user_map.get(post.author_id) else "unknown",
-                    author_display_name=user_map.get(post.author_id).display_name or (user_map.get(post.author_id).username if user_map.get(post.author_id) else "unknown"),
-                    is_agent=user_map.get(post.author_id).is_agent if user_map.get(post.author_id) else False,
+                    author_username=getattr(user_map.get(post.author_id), "username", "unknown"),
+                    author_display_name=getattr(user_map.get(post.author_id), "display_name", None) or getattr(user_map.get(post.author_id), "username", "unknown"),
+                    is_agent=getattr(user_map.get(post.author_id), "is_agent", False),
                     title=post.title,
                     body=post.body,
                     image_url=post.image_url,
@@ -238,7 +239,7 @@ class FeedService:
                     pass
 
             posts = (await session.execute(stmt)).scalars().all()
-            return await self._batch_to_response(session, posts)
+            return await self._batch_to_response(session, list(posts))
 
         return await get_or_compute(cache_key, _fetch)
 
@@ -313,7 +314,7 @@ class FeedService:
             .limit(50)
         )
         posts = (await session.execute(stmt)).scalars().all()
-        return await self._batch_to_response(session, posts)
+        return await self._batch_to_response(session, list(posts))
 
     async def list_communities(self, session: AsyncSession) -> list[CommunityResponse]:
         cache_key = "cache:communities"
@@ -333,13 +334,13 @@ class FeedService:
                 .where(CommunityMembership.community_id.in_(community_ids))
                 .group_by(CommunityMembership.community_id)
             )
-            member_count_map = dict(member_rows.all())
+            member_count_map: dict[uuid.UUID, int] = dict(member_rows.all())  # type: ignore[arg-type]
             post_rows = await session.execute(
                 select(Post.community_id, func.count())
                 .where(Post.community_id.in_(community_ids))
                 .group_by(Post.community_id)
             )
-            post_count_map = dict(post_rows.all())
+            post_count_map: dict[uuid.UUID, int] = dict(post_rows.all())  # type: ignore[arg-type]
 
             responses: list[CommunityResponse] = []
             for community in communities:
@@ -373,8 +374,7 @@ class FeedService:
         following_count = await session.scalar(
             select(func.count()).select_from(Follow).where(Follow.follower_id == user_id)
         ) or 0
-        like_subq = select(Like.id).join(Post, Like.post_id == Post.id).where(Post.author_id == user.id).subquery()
-        like_count = await session.scalar(select(func.count()).select_from(like_subq)) or 0
+        like_count = await session.scalar(select(func.count(Like.id)).join(Post, Like.post_id == Post.id).where(Post.author_id == user.id)) or 0
 
         return UserProfileResponse(
             id=user.id,
@@ -403,8 +403,7 @@ class FeedService:
         post_count = await session.scalar(
             select(func.count()).select_from(Post).where(Post.author_id == user.id)
         ) or 0
-        like_subq = select(Like.id).join(Post, Like.post_id == Post.id).where(Post.author_id == user.id).subquery()
-        like_count = await session.scalar(select(func.count()).select_from(like_subq)) or 0
+        like_count = await session.scalar(select(func.count(Like.id)).join(Post, Like.post_id == Post.id).where(Post.author_id == user.id)) or 0
         follower_count = await session.scalar(
             select(func.count()).select_from(Follow).where(Follow.followee_id == user.id)
         ) or 0
@@ -443,7 +442,7 @@ class FeedService:
             .limit(limit)
         )
         posts = (await session.execute(stmt)).scalars().all()
-        return await self._batch_to_response(session, posts)
+        return await self._batch_to_response(session, list(posts))
 
     async def bookmark_post(
         self, session: AsyncSession, user_id: uuid.UUID, post_id: uuid.UUID
@@ -463,11 +462,11 @@ class FeedService:
     async def remove_bookmark(
         self, session: AsyncSession, user_id: uuid.UUID, post_id: uuid.UUID
     ) -> None:
-        await session.execute(
-            Bookmark.__table__.delete().where(
-                Bookmark.user_id == user_id, Bookmark.post_id == post_id
-            )
+        bm = await session.scalar(
+            select(Bookmark).where(Bookmark.user_id == user_id, Bookmark.post_id == post_id)
         )
+        if bm:
+            await session.delete(bm)
         await session.commit()
         await cache_invalidate("cache:bookmarks:*")
 
@@ -491,7 +490,7 @@ class FeedService:
                 .order_by(desc(Post.virality_score + Post.controversy_score))
                 .limit(20)
             )
-            topics: dict[str, dict] = {}
+            topics: dict[str, dict[str, float | int]] = {}
             for title, body, virality, controversy in rows:
                 text = title or body or ""
                 words = [w.strip("#.,!?").lower() for w in text.split() if len(w) > 3]
@@ -502,7 +501,7 @@ class FeedService:
                     topics[word]["count"] += 1
             sorted_topics = sorted(topics.items(), key=lambda x: x[1]["score"], reverse=True)[:15]
             return [
-                TrendingTopicResponse(topic=t, score=round(d["score"], 2), post_count=d["count"])
+                TrendingTopicResponse(topic=t, score=round(d["score"], 2), post_count=int(d["count"]))
                 for t, d in sorted_topics
             ]
 
@@ -528,15 +527,14 @@ class FeedService:
             .where(Post.author_id.in_(user_ids))
             .group_by(Post.author_id)
         )
-        post_count_map = dict(post_count_rows.all())
-        like_subq = select(Like.id).join(Post, Like.post_id == Post.id).where(Post.author_id.in_(user_ids)).subquery()
+        post_count_map: dict[uuid.UUID, int] = dict(post_count_rows.all())  # type: ignore[arg-type]
         like_count_rows = await session.execute(
             select(Post.author_id, func.count(Like.id))
             .outerjoin(Like, Like.post_id == Post.id)
             .where(Post.author_id.in_(user_ids))
             .group_by(Post.author_id)
         )
-        like_count_map = dict(like_count_rows.all())
+        like_count_map: dict[uuid.UUID, int] = dict(like_count_rows.all())  # type: ignore[arg-type]
 
         for agent, user in rows:
             post_count = int(post_count_map.get(user.id, 0))
@@ -583,7 +581,7 @@ class FeedService:
             .limit(limit)
         )
         posts = (await session.execute(stmt)).scalars().all()
-        return await self._batch_to_response(session, posts)
+        return await self._batch_to_response(session, list(posts))
 
     async def _batch_to_response(
         self, session: AsyncSession, posts: list[Post]
@@ -593,27 +591,27 @@ class FeedService:
         if not posts:
             return []
 
-        author_ids = list(set(p.author_id for p in posts))
+        author_ids = list({p.author_id for p in posts})
         post_ids = [p.id for p in posts]
 
         user_rows = await session.execute(
             select(User).where(User.id.in_(author_ids))
         )
-        user_map = {u.id: u for u in user_rows.scalars().all()}
+        user_map: dict[uuid.UUID, User] = {u.id: u for u in user_rows.scalars().all()}
 
         like_rows = await session.execute(
             select(Like.post_id, func.count())
             .where(Like.post_id.in_(post_ids))
             .group_by(Like.post_id)
         )
-        like_map = dict(like_rows.all())
+        like_map: dict[uuid.UUID, int] = dict(like_rows.all())  # type: ignore[arg-type]
 
         reply_rows = await session.execute(
             select(Post.parent_id, func.count())
             .where(Post.parent_id.in_(post_ids))
             .group_by(Post.parent_id)
         )
-        reply_map = dict(reply_rows.all())
+        reply_map: dict[uuid.UUID, int] = dict(reply_rows.all())  # type: ignore[arg-type]
 
         results = []
         for post in posts:
@@ -625,7 +623,7 @@ class FeedService:
                     id=post.id,
                     author_id=post.author_id,
                     author_username=user.username if user else "unknown",
-                    author_display_name=user.display_name or (user.username if user else "unknown"),
+                    author_display_name=getattr(user, 'display_name', None) or (user.username if user else "unknown"),
                     is_agent=user.is_agent if user else False,
                     title=post.title,
                     body=post.body,
@@ -649,7 +647,7 @@ class FeedService:
             id=post.id,
             author_id=post.author_id,
             author_username=user.username if user else "unknown",
-            author_display_name=user.display_name or (user.username if user else "unknown"),
+            author_display_name=getattr(user, 'display_name', None) or (user.username if user else "unknown"),
             is_agent=user.is_agent if user else False,
             title=post.title,
             body=post.body,
@@ -667,9 +665,8 @@ class FeedService:
 
     async def get_faction_graph(
         self, session: AsyncSession
-    ) -> dict:
+    ) -> dict[str, object]:
         """Compute the faction polarization graph based on agent relationships."""
-        from app.models.community import Community
         from app.models.agent import AgentRelationship
 
         agents = (await session.execute(select(Agent).limit(100))).scalars().all()
@@ -754,16 +751,16 @@ class FeedService:
 
     @classmethod
     def set_algorithm(cls, algorithm: str) -> None:
-        global FEED_ALGORITHM
+        global feed_algorithm
         valid = {"hot", "outrage", "polarization", "calm", "discovery"}
         if algorithm not in valid:
             raise ValueError(f"Invalid algorithm: {algorithm}. Valid: {valid}")
-        FEED_ALGORITHM = algorithm
+        feed_algorithm = algorithm
 
     @classmethod
     def get_algorithm(cls) -> str:
-        global FEED_ALGORITHM
-        return FEED_ALGORITHM
+        global feed_algorithm
+        return feed_algorithm
 
     async def get_comment_tree(
         self,
@@ -794,11 +791,11 @@ class FeedService:
                 return []
 
             # Batch-fetch users for all children at this depth level
-            author_ids = list(set(child.author_id for child in children))
+            author_ids = list({child.author_id for child in children})
             user_rows = await session.execute(
                 select(User).where(User.id.in_(author_ids))
             )
-            user_map = {u.id: u for u in user_rows.scalars().all()}
+            user_map: dict[uuid.UUID, User] = {u.id: u for u in user_rows.scalars().all()}
 
             # Batch-fetch like counts
             child_ids = [child.id for child in children]
@@ -807,7 +804,7 @@ class FeedService:
                 .where(Like.post_id.in_(child_ids))
                 .group_by(Like.post_id)
             )
-            like_map = dict(like_rows.all())
+            like_map: dict[uuid.UUID, int] = dict(like_rows.all())  # type: ignore[arg-type]
 
             # Batch-fetch reply counts
             reply_rows = await session.execute(
@@ -815,7 +812,7 @@ class FeedService:
                 .where(Post.parent_id.in_(child_ids))
                 .group_by(Post.parent_id)
             )
-            reply_map = dict(reply_rows.all())
+            reply_map: dict[uuid.UUID, int] = dict(reply_rows.all())  # type: ignore[arg-type]
 
             result = []
             for child in children:
@@ -828,7 +825,7 @@ class FeedService:
                         id=child.id,
                         author_id=child.author_id,
                         author_username=user.username if user else "unknown",
-                        author_display_name=user.display_name or (user.username if user else "unknown"),
+                        author_display_name=getattr(user, 'display_name', None) or (user.username if user else "unknown"),
                         is_agent=user.is_agent if user else False,
                         body=child.body,
                         parent_id=child.parent_id,
@@ -854,7 +851,7 @@ class FeedService:
             id=post.id,
             author_id=post.author_id,
             author_username=user.username if user else "unknown",
-            author_display_name=user.display_name or (user.username if user else "unknown"),
+            author_display_name=getattr(user, 'display_name', None) or (user.username if user else "unknown"),
             is_agent=user.is_agent if user else False,
             body=post.body,
             parent_id=post.parent_id,

@@ -45,7 +45,7 @@ class Embedder:
             if self._loaded:
                 return
             try:
-                from sentence_transformers import SentenceTransformer
+                from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
 
                 logger.info("Loading sentence-transformers model: all-MiniLM-L6-v2")
                 self._model = SentenceTransformer(
@@ -79,7 +79,7 @@ class Embedder:
 
         if self._model is not None:
             # Use real sentence embedding
-            import numpy as np
+            import numpy as np  # type: ignore[import-untyped]
 
             vec = self._model.encode(text, normalize_embeddings=True)
             return vec.tolist()

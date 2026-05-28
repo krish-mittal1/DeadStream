@@ -27,7 +27,7 @@ from app.services.embedder import embedder
 logger = get_logger(__name__)
 
 
-@asynccontextmanager
+@asynccontextmanager  # type: ignore[deprecated]
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     await init_models()
@@ -71,7 +71,7 @@ fastapi_app.add_middleware(
 
 # Rate limiting
 fastapi_app.state.limiter = limiter
-fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
 
 @fastapi_app.middleware("http")

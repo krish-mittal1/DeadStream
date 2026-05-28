@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
-
 from sqlalchemy import desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,16 +69,17 @@ class NotificationService:
                 .select_from(Notification)
                 .where(Notification.user_id == user_id, Notification.read == False)  # noqa: E712
             )
-        ) or 0
+        ) or 0  # noqa: E711
 
     async def mark_read(self, session: AsyncSession, notification_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """Mark a single notification as read."""
-        result = await session.execute(
+        await session.execute(
             update(Notification)
             .where(Notification.id == notification_id, Notification.user_id == user_id)
             .values(read=True)
         )
-        return result.rowcount > 0
+        cnt = await session.scalar(select(func.count()).select_from(Notification).where(Notification.id == notification_id, Notification.user_id == user_id)) or 0
+        return int(cnt) > 0
 
     async def mark_all_read(self, session: AsyncSession, user_id: uuid.UUID) -> None:
         """Mark all notifications as read."""

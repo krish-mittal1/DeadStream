@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import DateTime, ForeignKey, Index, JSON, String, UniqueConstraint
@@ -20,7 +20,7 @@ class Event(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     correlation_id: Mapped[str] = mapped_column(String(120), index=True)
     causation_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, index=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     __table_args__ = (
         Index("ix_events_replay", "occurred_at", "type"),

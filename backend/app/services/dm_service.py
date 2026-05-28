@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.providers import get_provider
 from app.events.store import event_store
-from app.models.agent import Agent
 from app.models.dm import (
     DirectMessage,
     DirectMessageGroup,
@@ -160,11 +159,13 @@ class DMService:
                 stmt = stmt.where(DirectMessage.created_at < before_msg.created_at)
 
         rows = (await session.execute(stmt)).scalars().all()
+        rows = list(rows)
         rows.reverse()  # Return in chronological order
 
         # Mark messages as read
+        from sqlalchemy import update as sql_update
         await session.execute(
-            DirectMessage.__table__.update()
+            sql_update(DirectMessage.__table__)  # type: ignore[arg-type]
             .where(
                 DirectMessage.dm_group_id == dm_group_id,
                 DirectMessage.sender_id != user_id,
@@ -360,6 +361,7 @@ class DMService:
                 stmt = stmt.where(GroupChatMessage.created_at < before_msg.created_at)
 
         rows = (await session.execute(stmt)).scalars().all()
+        rows = list(rows)
         rows.reverse()
 
         responses = []

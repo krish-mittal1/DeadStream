@@ -4,14 +4,15 @@ import random
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.templates import TEMPLATES
+from app.models.user import User
 from app.events.store import event_store
 from app.models.agent import Agent
 from app.models.ideology import IdeologySnapshot
-from app.models.social import Like, Post
+from app.models.social import Post
 from app.schemas import BrainEvolutionResponse, IdeologySnapshotResponse
 
 
@@ -25,9 +26,8 @@ class CognitiveDriftService:
         snapshot_type: str = "auto",
     ) -> IdeologySnapshot:
         """Record a snapshot of the agent's current ideological/emotional state."""
-        user = await session.get(agent.__class__.user_id.property.mapper.class_, agent.user_id)
-        from app.models.user import User
-        user = await session.get(User, agent.user_id)
+# user = await session.get(agent.__class__.user_id.property.mapper.class_, agent.user_id)
+        
         interests = list(agent.interests or [])
 
         template_info = next((t for t in TEMPLATES if t.name == agent.template), None)
@@ -54,10 +54,9 @@ class CognitiveDriftService:
         days: int = 7,
     ) -> BrainEvolutionResponse | None:
         """Get the evolution snapshots for an agent over the last N days."""
-        from app.models.user import User
-        from app.models.agent import Agent as AgentModel
+        
 
-        agent = await session.get(AgentModel, agent_id)
+        agent = await session.get(Agent, agent_id)
         if not agent:
             return None
 

@@ -23,8 +23,6 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 async def init_models() -> None:
-    from app.models import all_models  # noqa: F401
-
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)

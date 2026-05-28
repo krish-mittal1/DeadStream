@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import asc, desc, func, select, text
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.store import event_store
@@ -127,7 +127,7 @@ class MemoryService:
         result = ranked
 
         for memory in result:
-            memory.last_accessed_at = datetime.utcnow()
+            memory.last_accessed_at = datetime.now(timezone.utc)
         return result
 
     async def decay(self, session: AsyncSession, agent_id: uuid.UUID) -> None:
@@ -165,8 +165,7 @@ class MemoryService:
                 .limit(200)
             )
         ).scalars().all()
-
-        keep = list(all_memories[:KEEP_TOP_N])
+        
         compress = list(all_memories[KEEP_TOP_N:])
 
         if not compress:

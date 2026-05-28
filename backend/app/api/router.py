@@ -11,17 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import current_user
 from app.db.session import get_session
 from app.events.store import event_store
-from app.models.agent import Agent
-from app.models.bookmark import Bookmark
 from app.models.community import Community, CommunityMembership
-from app.models.notification import Notification
 from app.models.social import Like, Post
 from app.models.user import User
+from app.models.agent import Agent
 from app.schemas import (
     AgentDetailResponse,
     AgentProfile,
     AuthResponse,
     BookmarkResponse,
+    CommunityDetailResponse,
     CommunityResponse,
     CreatePostRequest,
     LeaderboardEntry,
@@ -32,14 +31,10 @@ from app.schemas import (
     TrendingTopicResponse,
     UserProfileResponse,
     FeedAlgorithmUpdateRequest,
-    FactionGraphResponse,
-    FactionNode,
-    FactionEdge,
     InjectFakeNewsRequest,
     DisruptionEventResponse,
     TrollFarmAttackResponse,
     BrainEvolutionResponse,
-    IdeologySnapshotResponse,
     SendDirectMessageRequest,
     DirectMessageResponse,
     DirectMessageGroupResponse,
@@ -48,10 +43,8 @@ from app.schemas import (
     GroupChatResponse,
     GroupChatMessageResponse,
     GroupChatParticipantResponse,
-    CommunityDetailResponse,
     ElectionResponse,
     VoteRequest,
-    PostTreeResponse,
 )
 from app.core.exceptions import AppError
 from app.services.auth import auth_service
@@ -69,7 +62,7 @@ api_router = APIRouter()
 # ── Health ───────────────────────────────────────────────────────────
 
 @api_router.get("/health")
-async def health(session: AsyncSession = Depends(get_session)) -> dict:
+async def health(session: AsyncSession = Depends(get_session)) -> dict[str, object]:
     from app.core.cache import cache_health
     db_ok = False
     try:
@@ -99,9 +92,9 @@ async def search(
     category: str = Query("all", description="all | posts | agents | communities"),
     limit: int = Query(5, ge=1, le=20),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, object]]:
     """Server-side search across posts, agents, and communities."""
-    results: list[dict] = []
+    results: list[dict[str, object]] = []
     pattern = f"%{q}%"
 
     if category in ("all", "posts"):
@@ -230,7 +223,7 @@ async def like_post(
     post_id: uuid.UUID,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, object]:
     like_count = await feed_service.like_post(session, user, post_id)
     return {"status": "ok", "like_count": like_count}
 
@@ -271,7 +264,7 @@ async def events(
     cursor: Optional[str] = Query(default=None, description="Opaque cursor for pagination"),
     limit: int = Query(100, ge=1, le=500),
     session: AsyncSession = Depends(get_session),
-) -> list[dict]:
+) -> list[dict[str, object]]:
     rows = await event_store.replay(session, limit)
     return [e.model_dump(mode="json") for e in rows]
 
@@ -313,7 +306,7 @@ async def community_feed(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> list[PostResponse]:
-    return await feed_service.list_community_feed(session, community_id, limit, offset)
+    return await feed_service.list_community_feed(session, community_id, limit, cursor=None)
 
 
 @api_router.post("/communities/{community_id}/join")
@@ -474,7 +467,7 @@ async def leaderboard(
 @api_router.get("/admin/faction-graph")
 async def faction_graph(
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, object]:
     return await feed_service.get_faction_graph(session)
 
 
@@ -482,7 +475,7 @@ async def faction_graph(
 async def set_feed_algorithm(
     request: FeedAlgorithmUpdateRequest,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, str]:
     """Change the global feed algorithm. Affects agent behavior simulation-wide."""
     try:
         feed_service.set_algorithm(request.algorithm)
@@ -497,7 +490,7 @@ async def set_feed_algorithm(
 
 
 @api_router.get("/admin/algorithm")
-async def get_feed_algorithm() -> dict:
+async def get_feed_algorithm() -> dict[str, str]:
     return {"algorithm": feed_service.get_algorithm()}
 
 
@@ -509,7 +502,7 @@ async def inject_fake_news(
     session: AsyncSession = Depends(get_session),
 ) -> DisruptionEventResponse:
     event = await disruption_service.inject_fake_news(session, request.title, request.body, request.source)
-    return disruption_service._to_response(event)
+    return disruption_service._to_response(event)  # type: ignore[private-usage]
 
 
 @api_router.post("/admin/disruptions/troll-farm", response_model=TrollFarmAttackResponse)
@@ -540,7 +533,7 @@ async def list_disruptions(
 async def stop_disruption(
     disruption_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, str]:
     await disruption_service.stop_disruption(session, disruption_id)
     return {"status": "stopped"}
 
@@ -549,7 +542,7 @@ async def stop_disruption(
 async def simulate_spread(
     disruption_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, object]:
     rate = await disruption_service.simulate_spread(session, disruption_id)
     return {"infection_rate": rate}
 
@@ -602,7 +595,7 @@ async def get_dm_messages(
 async def dm_unread_count(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, int]:
     count = await dm_service.get_unread_dm_count(session, user.id)
     return {"count": count}
 
@@ -705,7 +698,7 @@ async def get_group_participants(
 async def start_election(
     community_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, str]:
     election = await election_service.start_election(session, community_id)
     if not election:
         raise HTTPException(status_code=404, detail="community_not_found")
@@ -718,7 +711,7 @@ async def cast_vote(
     request: VoteRequest,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, str]:
     election = await election_service.get_active_election_for_community(session, community_id)
     if not election:
         raise HTTPException(status_code=404, detail="no_active_election")
@@ -741,7 +734,7 @@ async def get_active_election(
 async def end_election(
     election_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict:
+) -> dict[str, str | None]:
     election = await election_service.end_election(session, election_id)
     if not election:
         raise HTTPException(status_code=404, detail="election_not_found")
