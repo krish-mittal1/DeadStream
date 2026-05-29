@@ -186,9 +186,11 @@ export const useSimulationStore = create((set, get) => ({
   async post(body, image_url = null, title = null) {
     const { token, selectedPost } = get();
     if (!token) throw new Error("login_required");
-    const payload = { body, parent_id: selectedPost?.id || null };
+    const bodyText = body || title;
+    const titleText = selectedPost ? null : title;
+    const payload = { body: bodyText, parent_id: selectedPost?.id || null };
     if (image_url) payload.image_url = image_url;
-    if (title) payload.title = title;
+    if (titleText) payload.title = titleText;
     const post = await api.post(token, payload);
     set((state) => ({ posts: [post, ...state.posts], selectedPost: null }));
   },
