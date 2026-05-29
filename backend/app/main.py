@@ -19,7 +19,6 @@ from app.core.logging import configure_logging, get_logger
 from app.core.metrics import REQUEST_COUNT
 from app.core.ratelimit import limiter
 from app.db.session import close_engine, init_models
-from starlette.datastructures import MutableHeaders
 from app.realtime.gateway import sio, start_realtime_listener, stop_realtime_listener
 from app.scheduler.runner import scheduler
 from app.seed import seed_agents

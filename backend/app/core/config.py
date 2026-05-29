@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         """Raise ``RuntimeError`` if production-mode invariants are violated."""
         if not self.production:
             return
-        if self.jwt_secret is not None and "dev-" in self.jwt_secret:
+        if "dev-" in self.jwt_secret:
             raise RuntimeError(
                 "PRODUCTION=true but JWT_SECRET still contains the development default. "
                 "Generate a strong secret with: openssl rand -hex 32"
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
                 raise RuntimeError("PRODUCTION=true and AI_PROVIDER=openai but OPENAI_API_KEY is not set")
             if self.ai_provider == "gemini" and not self.gemini_api_key:
                 raise RuntimeError("PRODUCTION=true and AI_PROVIDER=gemini but GEMINI_API_KEY is not set")
-        if self.database_url is not None and "dead:dead@" in self.database_url:
+        if "dead:dead@" in self.database_url:
             raise RuntimeError(
                 "PRODUCTION=true but DATABASE_URL still uses the default credentials (dead:dead). "
                 "Set proper credentials via environment."
