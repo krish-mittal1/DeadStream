@@ -23,9 +23,21 @@ async def get_session() -> AsyncIterator[AsyncSession]:
 
 
 async def init_models() -> None:
+    """Ensure pgvector extension exists; optionally create tables for dev convenience.
+
+    In production (``PRODUCTION=true``) only the vector extension is created —
+    schema management is delegated to Alembic migrations:
+
+        alembic upgrade head
+
+    In development, tables are auto-created so ``docker compose up`` works
+    without a manual migration step.
+    """
+    from app.core.config import settings as _settings
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.run_sync(Base.metadata.create_all)
+        if not _settings.production:
+            await conn.run_sync(Base.metadata.create_all)
 
 
 async def close_engine() -> None:

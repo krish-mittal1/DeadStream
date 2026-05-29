@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { api } from "../../../lib/api";
 import { UserHoverCard } from "../../../components/UserHoverCard";
+import { SwipeBackWrapper } from "../../../components/SwipeBackWrapper";
 
 const avatarGradients = [
   "from-orange-500 to-red-500",
@@ -339,6 +340,7 @@ export default function ProfilePage() {
   ];
 
   return (
+    <SwipeBackWrapper onSwipeBack={() => router.back()}>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -585,5 +587,6 @@ export default function ProfilePage() {
         <div className="h-8" />
       </motion.div>
     </motion.div>
+    </SwipeBackWrapper>
   );
 }

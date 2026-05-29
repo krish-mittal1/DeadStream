@@ -293,16 +293,65 @@ class FeedService:
 
         async def _fetch() -> list[dict[str, str | float]]:
             rows = await session.execute(
-                select(Post.body, Post.virality_score, Post.controversy_score)
+                select(Post.title, Post.body, Post.virality_score, Post.controversy_score)
                 .where(Post.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0))
                 .order_by(desc(Post.virality_score + Post.controversy_score))
-                .limit(10)
+                .limit(15)
             )
-            trends = []
-            for body, virality, controversy in rows:
-                label = body.split()[0].strip("#.,!?").lower() if body.split() else "void"
-                trends.append({"topic": label, "score": float(virality + controversy)})
-            return trends
+            # Predefined topic keywords we look for in post content
+            TOPIC_KEYWORDS = [
+                "zomato", "swiggy", "ipl", "cricket", "bollywood", "chai", "traffic",
+                "startup", "layoff", "ai", "climate", "pollution", "gst", "budget",
+                "crypto", "stock", "metro", "bangalore", "delhi", "mumbai", "kolkata",
+                "instagram", "youtube", "netflix", "ott", "prime", "relationship",
+                "dating", "parents", "college", "exam", "job", "salary", "rent",
+                "inflation", "food", "diet", "fitness", "gym", "travel", "goa",
+                "memes", "troll", "politics", "election", "modi", "chandrayaan",
+                "vaccine", "covaxin", "wfh", "remote", "office", "corporate",
+                "work-life", "mental", "health", "anxiety", "depression", "therapy",
+                "university", "whatsapp", "instagram", "snapchat", "linkedin",
+                "night", "sleep", "insomnia", "chai-sutta", "beer", "party",
+                "wedding", "shaadi", "rishta", "arranged", "love", "breakup",
+                "reddit", "twitter", "x", "trending", "viral", "influencer",
+            ]
+
+            # Topics that should never appear as trends (junk words)
+            STOP_WORDS = {
+                "the", "a", "an", "this", "that", "these", "those", "it", "is", "was",
+                "are", "were", "be", "been", "being", "have", "has", "had", "do", "does",
+                "did", "will", "would", "could", "should", "may", "might", "shall",
+                "can", "need", "dare", "to", "of", "in", "for", "on", "with", "at",
+                "by", "from", "as", "into", "through", "during", "before", "after",
+                "above", "below", "between", "out", "off", "over", "under", "again",
+                "further", "then", "once", "here", "there", "when", "where", "why",
+                "how", "all", "each", "every", "both", "few", "more", "most", "other",
+                "some", "such", "no", "nor", "not", "only", "own", "same", "so",
+                "than", "too", "very", "just", "because", "but", "and", "or", "if",
+                "about", "really", "actually", "literally", "basically", "honestly",
+                "like", "just", "also", "even", "still", "already", "yet", "now",
+                "topic", "hot", "take", "unpopular", "opinion", "story", "true",
+                "guys", "bro", "bhai", "yaar", "log", "people", "someone", "everyone",
+                "nobody", "something", "anything", "nothing", "everything", "okay",
+            }
+
+            trends: dict[str, float] = {}
+            for title, body, virality, controversy in rows:
+                text = (title or "") + " " + (body or "")
+                words = [
+                    w.strip("#.,!?():;\"'[]").lower() for w in text.split()
+                    if len(w.strip("#.,!?():;\"'[]")) > 3
+                ]
+                # Score: count word frequency, weighted by virality+controversy
+                weight = float(virality + controversy) + 0.1
+                for word in words:
+                    if word in STOP_WORDS:
+                        continue
+                    # Boost predefined topic keywords
+                    boost = 3.0 if word in TOPIC_KEYWORDS else 1.0
+                    trends[word] = trends.get(word, 0.0) + weight * boost
+
+            sorted_trends = sorted(trends.items(), key=lambda x: x[1], reverse=True)[:10]
+            return [{"topic": t, "score": round(s, 2)} for t, s in sorted_trends]
 
         return await get_or_compute(cache_key, _fetch)
 
@@ -490,15 +539,57 @@ class FeedService:
                 .order_by(desc(Post.virality_score + Post.controversy_score))
                 .limit(20)
             )
+
+            TOPIC_KEYWORDS = [
+                "zomato", "swiggy", "ipl", "cricket", "bollywood", "chai", "traffic",
+                "startup", "layoff", "ai", "climate", "pollution", "gst", "budget",
+                "crypto", "stock", "metro", "bangalore", "delhi", "mumbai", "kolkata",
+                "instagram", "youtube", "netflix", "ott", "relationship",
+                "dating", "college", "exam", "job", "salary", "rent",
+                "inflation", "food", "fitness", "gym", "travel", "goa",
+                "memes", "politics", "election", "chandrayaan",
+                "wfh", "remote", "corporate", "mental", "health",
+                "whatsapp", "linkedin", "wedding", "love", "breakup",
+                "reddit", "viral", "influencer", "movie", "series",
+                "upgrade", "policy", "scheme", "yojana", "india",
+                "dosa", "idli", "paratha", "samosa", "biryani",
+                "railway", "bus", "flight", "petrol", "diesel",
+            ]
+
+            STOP_WORDS = {
+                "the", "a", "an", "this", "that", "these", "those", "it", "is", "was",
+                "are", "were", "be", "been", "have", "has", "had", "do", "does",
+                "did", "will", "would", "could", "should", "may", "might", "shall",
+                "can", "to", "of", "in", "for", "on", "with", "at",
+                "by", "from", "as", "into", "through", "during", "before", "after",
+                "above", "below", "between", "out", "off", "over", "under", "again",
+                "further", "then", "once", "here", "there", "when", "where", "why",
+                "how", "all", "each", "every", "both", "few", "more", "most", "other",
+                "some", "such", "no", "nor", "not", "only", "own", "same", "so",
+                "than", "too", "very", "just", "because", "but", "and", "or", "if",
+                "about", "really", "actually", "literally", "basically", "honestly",
+                "like", "just", "also", "even", "still", "already", "yet", "now",
+                "topic", "hot", "take", "unpopular", "opinion", "story", "true",
+                "guys", "bro", "bhai", "yaar", "log", "people", "everyone",
+                "nobody", "something", "anything", "nothing", "everything", "okay",
+                "without", "think", "know", "said", "tell", "see", "come", "go",
+            }
+
             topics: dict[str, dict[str, float | int]] = {}
             for title, body, virality, controversy in rows:
-                text = title or body or ""
-                words = [w.strip("#.,!?").lower() for w in text.split() if len(w) > 3]
-                for word in words[:3]:
+                text = (title or "") + " " + (body or "")
+                words = [
+                    w.strip("#.,!?():;\"'[]").lower() for w in text.split()
+                    if len(w.strip("#.,!?():;\"'[]")) > 3 and w.strip("#.,!?():;\"'[]").lower() not in STOP_WORDS
+                ]
+                weight = float(virality) + float(controversy) * 0.5 + 0.1
+                for word in words:
+                    boost = 3.0 if word in TOPIC_KEYWORDS else 1.0
                     if word not in topics:
                         topics[word] = {"score": 0.0, "count": 0}
-                    topics[word]["score"] += float(virality) + float(controversy) * 0.5
+                    topics[word]["score"] += weight * boost
                     topics[word]["count"] += 1
+
             sorted_topics = sorted(topics.items(), key=lambda x: x[1]["score"], reverse=True)[:15]
             return [
                 TrendingTopicResponse(topic=t, score=round(d["score"], 2), post_count=int(d["count"]))

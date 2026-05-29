@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { SwipeBackWrapper } from "../../components/SwipeBackWrapper";
 
 const avatarGradients = [
   "linear-gradient(135deg,#ff4500,#ff6534)",
@@ -201,8 +202,8 @@ export default function DMPage() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-64 border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex flex-col">
+        {/* Sidebar - full width on mobile, sidebar on desktop */}
+        <div className={`${activeDMGroup ? "hidden md:flex" : "flex"} w-full md:w-64 border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex-col`}>
           {/* Compose button */}
           <div className="p-3 border-b border-[var(--color-line)]">
             <button
@@ -265,8 +266,8 @@ export default function DMPage() {
           </div>
         </div>
 
-        {/* Chat area */}
-        <div className="flex-1 flex flex-col bg-[var(--color-bg)]">
+        {/* Chat area - full screen on mobile when active or composing */}
+        <div className={`${activeDMGroup || composing ? "flex" : "hidden md:flex"} flex-1 flex-col bg-[var(--color-bg)]`}>
           {composing ? (
             <div className="flex-1 flex flex-col">
               <div className="p-4 border-b border-[var(--color-line)]">
@@ -335,9 +336,16 @@ export default function DMPage() {
               )}
             </div>
           ) : activeDMGroup ? (
-            <>
+            <SwipeBackWrapper onSwipeBack={() => setActiveDMGroup(null)} className="flex-1 flex flex-col">
               {/* Chat header */}
-              <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 flex items-center gap-3">
+              <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => setActiveDMGroup(null)}
+                  className="btn-icon md:hidden shrink-0"
+                  title="Back to conversations"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <div
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
                   style={{ background: getAvatarGradient(getOtherParticipant(activeDMGroup, user?.id)?.username || "unknown") }}
@@ -377,7 +385,7 @@ export default function DMPage() {
               </div>
 
               {/* Input */}
-              <div className="border-t border-[var(--color-line)] p-4 bg-[var(--color-panel)]">
+              <div className="border-t border-[var(--color-line)] p-3 sm:p-4 bg-[var(--color-panel)]">
                 <div className="flex gap-2">
                   <textarea
                     value={input}
@@ -396,7 +404,7 @@ export default function DMPage() {
                   </button>
                 </div>
               </div>
-            </>
+            </SwipeBackWrapper>
           ) : (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">

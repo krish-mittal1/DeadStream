@@ -2,7 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useSimulationStore } from "../store/useSimulationStore";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { Navbar } from "../components/Navbar";
 import { RightRail } from "../components/RightRail";
@@ -52,14 +53,55 @@ function AmbientOrbs() {
 
 function PageTransition({ children }) {
   const pathname = usePathname();
+  const dirRef = useRef("forward");
+  const prevPathRef = useRef(pathname);
+
+  // Detect navigation direction by comparing pathname hierarchies
+  if (prevPathRef.current !== pathname) {
+    const prev = prevPathRef.current;
+    const curr = pathname;
+    const prevDepth = prev.split("/").filter(Boolean).length;
+    const currDepth = curr.split("/").filter(Boolean).length;
+
+    // Going deeper (e.g. /feed → /post/123) or to a sibling → forward
+    // Going shallower (e.g. /post/123 → /feed) → backward
+    // Same depth but different path → forward
+    if (
+      currDepth < prevDepth ||
+      (currDepth === prevDepth && curr < prev)
+    ) {
+      dirRef.current = "back";
+    } else {
+      dirRef.current = "forward";
+    }
+    prevPathRef.current = pathname;
+  }
+
+  const direction = dirRef.current;
+
+  const slideLeft = { x: 40, opacity: 0 };
+  const slideRight = { x: -40, opacity: 0 };
+  const center = { x: 0, opacity: 1 };
+
+  const variants = {
+    forward: { initial: slideLeft, exit: { x: -30, opacity: 0 } },
+    back: { initial: slideRight, exit: { x: 30, opacity: 0 } },
+  };
+
+  const v = variants[direction];
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
         key={pathname}
-        initial={{ opacity: 0, y: 12, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -12, scale: 0.98 }}
-        transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+        custom={direction}
+        initial={v.initial}
+        animate={center}
+        exit={v.exit}
+        transition={{
+          x: { type: "spring", stiffness: 380, damping: 35 },
+          opacity: { duration: 0.2 },
+        }}
       >
         {children}
       </motion.div>
@@ -134,10 +176,15 @@ function useFullWidth(pathname) {
 
 export function ClientShell({ children }) {
   const pathname = usePathname();
+  const bootstrap = useSimulationStore((s) => s.bootstrap);
   const showRail = useShowRail(pathname);
   const fullWidth = useFullWidth(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isLanding = pathname === "/";
+
+  useEffect(() => {
+    bootstrap();
+  }, [bootstrap]);
 
   return (
     <>
@@ -158,7 +205,7 @@ export function ClientShell({ children }) {
 
               {/* ─── Main Content Area ─── */}
               <div className="app-main">
-                <main className="app-main-content scrollbar-thin"
+                <main className="app-main-content scrollbar-thin" data-scroll-container
                   style={fullWidth ? { maxWidth: "100%" } : isAuthPage || isLanding ? { maxWidth: "100%", display: "flex", alignItems: "center", justifyContent: "center" } : {}}>
                   <PageTransition>{children}</PageTransition>
                 </main>

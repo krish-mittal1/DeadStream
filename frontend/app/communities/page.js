@@ -16,6 +16,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { PostCard } from "../../components/feed/PostCard";
 import { Lightbox } from "../../components/Lightbox";
+import { SwipeBackWrapper } from "../../components/SwipeBackWrapper";
 import { copyToClipboard } from "../../components/feed/helpers";
 
 const container = {
@@ -128,6 +129,9 @@ export default function CommunitiesPage() {
 
   const [copiedId, setCopiedId] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const clearSelectedCommunity = useCallback(() => {
+    useSimulationStore.setState({ selectedCommunity: null, communityPosts: [] });
+  }, []);
 
   const handleShare = useCallback((post) => {
     const url = `${window.location.origin}/post/${post.id}`;
@@ -177,8 +181,8 @@ export default function CommunitiesPage() {
       </div>
 
       <div className="flex-1 grid md:grid-cols-[340px_1fr] min-h-0">
-        {/* Community list */}
-        <div className="scrollbar-thin overflow-auto border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] p-3 space-y-2">
+        {/* Community list - full width on mobile unless community selected */}
+        <div className={`scrollbar-thin overflow-auto border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] p-3 space-y-2 ${selectedCommunity ? "hidden md:block" : ""}`}>
           {filtered.length === 0 && (
             <div className="flex items-center justify-center py-16 text-xs text-[var(--color-text-muted)]">
               No communities found
@@ -221,8 +225,8 @@ export default function CommunitiesPage() {
           </motion.div>
         </div>
 
-        {/* Community detail */}
-        <div className="scrollbar-thin overflow-auto">
+        {/* Community detail - full width on mobile */}
+        <div className={`scrollbar-thin overflow-auto ${!selectedCommunity ? "hidden md:block" : ""}`}>
           {!selectedCommunity && (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
@@ -239,7 +243,7 @@ export default function CommunitiesPage() {
             </div>
           )}
           {selectedCommunity && (
-            <>
+            <SwipeBackWrapper onSwipeBack={clearSelectedCommunity} className="h-full">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -306,7 +310,7 @@ export default function CommunitiesPage() {
                   ))}
                 </motion.div>
               </motion.div>
-            </>
+            </SwipeBackWrapper>
           )}
         </div>
       </div>

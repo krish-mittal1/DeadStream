@@ -1,0 +1,81 @@
+# Lightweight production Docker Compose for 1 GB RAM servers
+# Frontend runs separately on Vercel; monitoring is optional.
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-deadstream}
+      POSTGRES_USER: ${POSTGRES_USER:-dead}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # REQUIRED — set in .env
+    ports:
+      - "127.0.0.1:5432:5432"                   # bind to localhost only
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dead} -d ${POSTGRES_DB:-deadstream}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: "0.5"
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "127.0.0.1:6379:6379"                   # bind to localhost only
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+          cpus: "0.25"
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dead}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-deadstream}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET}                 # REQUIRED — set in .env
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}       # gemini recommended (free tier available)
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # Set to your Vercel frontend URL
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      PRODUCTION: "true"
+    ports:
+      - "127.0.0.1:8000:8000"                   # nginx or Cloudflare Tunnel terminates SSL
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+volumes:
+  postgres_data:
+  redis_data:

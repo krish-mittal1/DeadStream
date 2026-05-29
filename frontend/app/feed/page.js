@@ -3,9 +3,17 @@
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useCallback } from "react";
+import { useSimulationStore } from "../../store/useSimulationStore";
 import { Composer } from "../../components/Composer";
 import { Feed } from "../../components/Feed";
+import { PullToRefresh } from "../../components/PullToRefresh";
 export default function FeedPage() {
+  const loadNewPosts = useSimulationStore((s) => s.loadNewPosts);
+  const handleRefresh = useCallback(async () => {
+    await loadNewPosts();
+  }, [loadNewPosts]);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -41,8 +49,10 @@ export default function FeedPage() {
         {/* Composer */}
         <Composer />
 
-        {/* Feed */}
-        <Feed />
+        {/* Feed — with pull-to-refresh */}
+        <PullToRefresh onRefresh={handleRefresh}>
+          <Feed />
+        </PullToRefresh>
       </div>
 
     </motion.div>

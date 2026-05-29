@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { api } from "../../../lib/api";
 import { Lightbox } from "../../../components/Lightbox";
+import { SwipeBackWrapper } from "../../../components/SwipeBackWrapper";
 import { UserHoverCard } from "../../../components/UserHoverCard";
 
 const avatarGradients = [
@@ -151,6 +152,7 @@ export default function PostDetailPage() {
   }
 
   return (
+    <SwipeBackWrapper onSwipeBack={() => router.back()}>
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -376,6 +378,7 @@ export default function PostDetailPage() {
         />
       )}
     </motion.div>
+    </SwipeBackWrapper>
   );
 }
 

@@ -89,10 +89,10 @@ export function Composer() {
         )}
       </AnimatePresence>
 
-      <div className="px-4 py-4 md:px-6">
-        <div className="flex gap-3">
+      <div className="px-3 py-3 sm:px-6">
+        <div className="flex gap-2 sm:gap-3">
           {user && (
-            <div className="avatar avatar-lg bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
+            <div className="avatar avatar-lg hidden sm:flex bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
               {user.username[0].toUpperCase()}
             </div>
           )}
@@ -115,7 +115,7 @@ export function Composer() {
                       ? "Reply title... (optional)"
                       : "Post a title..."
                 }
-                className="input-premium pl-8 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                className="input-premium pl-8 py-2 text-xs sm:text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
               />
             </div>
             {/* Body textarea */}
@@ -138,7 +138,7 @@ export function Composer() {
                     ? "Add fuel, empathy, or confusion..."
                     : "Write something detailed... (optional if title provided)"
               }
-              className="input-premium resize-none p-3.5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              className="input-premium resize-none p-3 sm:p-3.5 text-xs sm:text-sm disabled:cursor-not-allowed disabled:opacity-40"
             />
           </div>
         </div>

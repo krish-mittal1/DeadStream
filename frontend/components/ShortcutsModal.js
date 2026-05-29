@@ -1,8 +1,8 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useDragControls, useTransform, animate } from "framer-motion";
 import { Command, Keyboard, X } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 const shortcuts = [
   { keys: ["?"], desc: "Show this modal" },
@@ -58,6 +58,57 @@ export function ShortcutsModal({ open, onClose }) {
     };
   }, [open, handleKeyDown]);
 
+const dragY = useMotionValue(0);
+  const dragControls = useDragControls();
+  const hasDraggedRef = useRef(false);
+  const [hapticPulse, setHapticPulse] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      dragY.set(0);
+      hasDraggedRef.current = false;
+      setHapticPulse(false);
+    }
+  }, [open]);
+
+  const prevCrossedRef = useRef(false);
+
+  const handleDrag = useCallback(
+    (_, info) => {
+      const crossed = info.offset.y > 100;
+      if (crossed && !prevCrossedRef.current) {
+        setHapticPulse(true);
+        setTimeout(() => setHapticPulse(false), 300);
+      }
+      prevCrossedRef.current = crossed;
+    },
+    [],
+  );
+
+  const handleDragEnd = useCallback(
+    (_, info) => {
+      setHapticPulse(false);
+      if (info.offset.y > 100 || info.velocity.y > 500) {
+        hasDraggedRef.current = true;
+        animate(dragY, 400, {
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+          onComplete: () => onClose?.(),
+        });
+      } else {
+        const damping = info.velocity.y > 100 ? 22 : 30;
+        animate(dragY, 0, {
+          type: "spring",
+          stiffness: 300,
+          damping,
+          velocity: info.velocity.y,
+        });
+      }
+    },
+    [onClose],
+  );
+
   return (
     <AnimatePresence>
       {open && (
@@ -66,9 +117,9 @@ export function ShortcutsModal({ open, onClose }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[200] flex flex-col justify-end sm:justify-center sm:items-center sm:p-4"
           onClick={(e) => {
-            if (e.target === e.currentTarget) onClose?.();
+            if (!hasDraggedRef.current && e.target === e.currentTarget) onClose?.();
           }}
         >
           {/* Backdrop */}
@@ -79,18 +130,36 @@ export function ShortcutsModal({ open, onClose }) {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
 
-          {/* Modal */}
+          {/* Modal — swipe down to dismiss */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            style={{ y: dragY }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95, y: 30 }}
             transition={{
               type: "spring",
               stiffness: 350,
               damping: 30,
             }}
-            className="relative w-full max-w-md rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)] shadow-2xl overflow-hidden"
+            dragControls={dragControls}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 200 }}
+            dragElastic={{ top: 0, bottom: 0.35 }}
+            dragTransition={{ power: 0.1, timeConstant: 250 }}
+            onDrag={handleDrag}
+            onDragEnd={handleDragEnd}
+            className={`relative w-full sm:max-w-md max-w-full sm:rounded-2xl rounded-t-2xl border border-[var(--color-line)] bg-[var(--color-panel)] shadow-2xl overflow-hidden flex flex-col sm:max-h-[80vh] max-h-[85dvh] transition-shadow duration-200 ${
+              hapticPulse ? "shadow-[0_0_40px_rgba(255,69,0,0.25)]" : ""
+            }`}
           >
+            {/* Drag handle bar (mobile) — only this triggers the swipe-down */}
+            <motion.div
+              onPointerDown={(e) => dragControls.start(e)}
+              className="flex items-center justify-center pt-2 pb-1 sm:hidden cursor-grab active:cursor-grabbing"
+            >
+              <div className="w-9 h-1 rounded-full bg-[var(--color-text-dim)]" />
+            </motion.div>
+
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-line)]">
               <div className="flex items-center gap-2.5">
@@ -110,7 +179,7 @@ export function ShortcutsModal({ open, onClose }) {
             </div>
 
             {/* Shortcuts list */}
-            <div className="scrollbar-thin max-h-[60vh] overflow-y-auto p-5 space-y-0.5">
+            <div className="scrollbar-thin sm:max-h-[60vh] max-h-full overflow-y-auto p-5 space-y-0.5">
               {shortcuts.map(({ keys, desc }) => (
                 <div
                   key={keys.join("-")}

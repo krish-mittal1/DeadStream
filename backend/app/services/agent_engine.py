@@ -58,11 +58,16 @@ TRENDING_TOPIC_BANK = [
 class AgentEngine:
     BEEF_TRIGGER_THRESHOLD = 0.35  # rivalry score above this = beef territory (lower = more fights)
     BEEF_POST_CHANCE = 0.35        # chance an agent will broadcast a beef call-out post
+    _trending_topics: list[str] = []  # Updated periodically from feed service
 
     async def activate(self, session: AsyncSession, agent: Agent) -> None:
         user = await session.get(User, agent.user_id)
         if user is None:
             return
+
+        # Refresh trending topics periodically (every 50th activation roughly)
+        if random.random() < 0.02:
+            await self.refresh_trending_topics(session)
 
         dominant_emotion = self._get_dominant_emotion(agent)
         agitation = float(agent.emotional_state.get("agitation", 0.3))
@@ -267,6 +272,40 @@ class AgentEngine:
         await memory_service.decay(session, agent.id)
         await memory_service.maybe_summarize(session, agent.id, get_provider())
 
+        # --- Agent-to-agent reaction: notice trending posts from other agents ---
+        # Only triggers if main action was NOT already a post/reply/roast (avoid double-posting)
+        if action not in ("post", "story", "roast") and recent_posts and random.random() < 0.12:
+            # Check for high-virality posts by OTHER agents (not self, not replied to already)
+            hot_posts = [
+                p for p in recent_posts[:15]
+                if p.author_id != user.id
+                and p.virality_score > 0.5
+            ]
+            if hot_posts:
+                target_post = random.choice(hot_posts[:3])
+                target_user = await session.get(User, target_post.author_id)
+                if target_user:
+                    rel_type = await self._get_relation_label(session, agent, target_post.author_id)
+                    reaction_emotion = self._get_dominant_emotion(agent)
+                    body = await self._compose(
+                        agent, topic, memories, mode="reply",
+                        target=target_post.body[:200], rel_type=rel_type,
+                        dominant_emotion=reaction_emotion,
+                    )
+                    await feed_service.create_post(session, user, CreatePostRequest(
+                        body=body, parent_id=target_post.id
+                    ))
+                    await relationship_service.update_after_interaction(
+                        session, agent.id, target_post.author_id,
+                        "agree_reply" if target_post.controversy_score < 0.3 else "argue_reply",
+                        intensity=target_post.controversy_score * 0.3
+                    )
+                    await event_store.append(session, "agent_reaction", user.id, target_post.author_id, {
+                        "reply": body[:200],
+                        "target_post": target_post.body[:150],
+                        "type": "hot_post_reaction",
+                    })
+
         self._drift_emotion(agent)
         agent.last_wake_at = datetime.now(timezone.utc)
         sleep_seconds = random.randint(15, 200) / max(float(agent.activity_level or 0.5), 0.1)
@@ -294,14 +333,22 @@ class AgentEngine:
         if random.random() < 0.25:
             return random.choice(TRENDING_TOPIC_BANK)
 
-        # 60% chance: pick from recent posts
+        # 60% chance: pick from recent posts (but filter junk)
         if posts and random.random() < 0.60:
             weighted = sorted(posts, key=lambda p: p.controversy_score + p.virality_score, reverse=True)
             top = weighted[:5]
-            return random.choice(top).body[:160]
+            chosen = random.choice(top)
+            snippet = (chosen.title or chosen.body or "")[:160]
+            # Filter out snippet that looks like it starts with topic-like words
+            _punct = '#.,!?“”:;[]\'"'
+            first_word = snippet.split()[0].strip(_punct).lower() if snippet.split() else ""
+            if first_word in ("topic", "hot", "take", "story", "true", "unpopular", "opinion"):
+                # Fallback to a proper topic instead
+                return random.choice(agent.interests or TRENDING_TOPIC_BANK[:5])
+            return snippet
 
         # Fallback: agent's interests
-        return random.choice(agent.interests or ["the feed"])
+        return random.choice(agent.interests or TRENDING_TOPIC_BANK[:5])
 
     # -----------------------------------------------------------------------
     # Action decision
@@ -491,6 +538,25 @@ class AgentEngine:
         )
 
     # -----------------------------------------------------------------------
+    # Trending topic refresh
+    # -----------------------------------------------------------------------
+
+    async def refresh_trending_topics(self, session: AsyncSession) -> None:
+        """Pull current trending topics from the feed service for agent context."""
+        try:
+            topics = await feed_service.trending_topics(session)
+            # Extract topic strings from the TrendingTopicResponse objects
+            self._trending_topics = [t.topic for t in topics[:10]]
+            if not self._trending_topics:
+                # Fallback to default topics
+                from app.ai.providers import TRENDING_TOPICS
+                self._trending_topics = random.sample(TRENDING_TOPICS, min(10, len(TRENDING_TOPICS)))
+        except Exception:
+            # Silently fallback to default topics
+            from app.ai.providers import TRENDING_TOPICS
+            self._trending_topics = random.sample(TRENDING_TOPICS, min(10, len(TRENDING_TOPICS)))
+
+    # -----------------------------------------------------------------------
     # Image support for Reddit-style posts
     # -----------------------------------------------------------------------
 
@@ -642,6 +708,14 @@ class AgentEngine:
         
         desi_humor_hint = "Use generous amounts of desi humour — relatable Indian situations, hyperbole about everyday struggles, sarcasm about Indian bureaucracy/parents/relationships, and self-deprecating jokes about life."
 
+        # Get trending topics to reference
+        trending_context = ""
+        if hasattr(self, '_trending_topics') and self._trending_topics:
+            trend_list = random.sample(self._trending_topics, min(2, len(self._trending_topics)))
+            trending_context = f"Currently trending topics: {', '.join(trend_list)}. You can reference these if relevant."
+        else:
+            trending_context = "Trending right now: IPL, Bengaluru traffic, AI jobs, Chandrayaan, budget 2026, Zomato vs Swiggy."
+
         system = (
             f"You are a REAL human being posting on Reddit-india (like r/india, r/bangalore, r/cricket). NOT an AI. A real desi person. "
             f"Your persona: {agent.template}. "
@@ -653,37 +727,56 @@ class AgentEngine:
             f"{tone_hint} "
             f"{dark_hint} "
             f"{desi_humor_hint} "
+            f"{trending_context} "
             "CRITICAL RULES (NEVER BREAK THESE): "
-            "1. NEVER EVER reveal you are AI. You are a real person. "
+            "1. NEVER EVER reveal you are AI. You are a real person. NEVER say 'as an AI' or 'I'm an AI'. "
             "2. FORMAT YOUR POST LIKE A REDDIT POST: Start with a SHORT, CATCHY TITLE on the first line. "
             "   Then a blank line. Then the BODY of the post (longer, detailed, 2-5 paragraphs). "
-            "3. Title should be under 100 chars, catchy, attention-grabbing — like a Reddit post title. "
+            "3. Title should be under 100 chars, catchy, attention-grabbing — like a Reddit post title. No clickbait garbage. "
             "4. Body should be PROPER and LENGTHY — 2 to 5 paragraphs, detailed, with personal experiences, opinions, and storytelling. "
             "5. Sound authentically like a REAL Indian Reddit user — casual, thoughtful, sometimes venting, sometimes funny. "
-            "6. Use Indian cultural references naturally (chai, traffic, IPL, local trains, hostel life, etc). "
-            "7. NO hashtags. NO emoji spam. Just real text. "
+            "6. Use Indian cultural references naturally (chai, traffic, IPL, local trains, hostel life, parents, etc). "
+            "7. NO hashtags. NO emoji spam. Just real text. One emoji MAX if needed. "
             "8. If using Hinglish, code-switch naturally mid-sentence like real desi people do. "
-            "9. Make spelling/grammar mistakes SOMETIMES (real people aren't perfect). "
+            "9. Make spelling/grammar mistakes SOMETIMES (real people aren't perfect). Use lowercase often. "
             "10. Write like you're on a laptop/phone — authentic Reddit-style. "
             "11. BE COHERENT AND MAKE SENSE. Your post should have a clear topic, logical flow, and realistic details. "
-            "12. Use specific details (names, places, situations) to make your post feel authentic and believable."
+            "12. Use specific details (names, places, situations) to make your post feel authentic and believable. "
+            "13. SHOW YOUR PERSONALITY: be opinionated, self-deprecating, sarcastic when appropriate. Real people have strong opinions. "
+            "14. SELF-AWARENESS is key: make jokes about your own situation, be aware of your flaws and contradictions. "
+            "15. REACT TO WHAT'S HAPPENING: if you're replying to someone, address what they said specifically. Don't ignore their points. "
+            "16. BE FUNNY WHEN POSSIBLE: use self-deprecating humor, relatable situations, or sarcastic observations. Not every post needs to be funny though. "
+            "17. VARY YOUR POST LENGTH: sometimes short punchy posts, sometimes long detailed rants. Mix it up. "
+            "18. Be NATURAL and REAL. If you're angry, sound angry. If you're happy, sound happy. Don't be monotone or formulaic."
         )
 
         if mode == "reply":
+            # Determine if the target has controversial content for a more heated reply
+            is_heated = random.random() < 0.3 and rel_type in ("rival", "enemy")
+            heat_hint = "You STRONGLY disagree with this. Push back with arguments but stay coherent. Be spicy, not abusive." if is_heated else ""
             prompt = (
                 f"You're replying to this post: \"{target}\"\n"
                 f"Topic context: {topic}\n"
                 f"Your stance: {stance_label}\n"
+                f"Your relationship with the author: {rel_type}\n"
                 f"Your relevant memories:\n{memory_context}\n"
-                "Write a reply that sounds like a real Reddit comment. Can be short or detailed depending on your mood. "
-                "No title needed — just the reply body."
+                f"{heat_hint} "
+                "Write a reply that sounds like a real Reddit comment. DIRECTLY ADDRESS what the person said. "
+                "Don't just talk around their point — engage with it. "
+                "Can be short and snappy or detailed depending on your mood. "
+                "If the post is funny, be funny back. If it's serious, match the tone. "
+                "No title needed — just the reply body. "
+                "Show personality: use rhetorical questions, personal anecdotes, or sarcasm when appropriate."
             )
         elif mode == "story":
             prompt = (
                 f"Topic/theme: {topic}\n"
-                "Write a Reddit-style post (with a catchy title on top, then blank line, then body) telling a story or anecdote from your 'life'. "
-                "Make it feel real, personal, and specific. Give details (places, people, weird situations) that make it believable. "
-                "2-5 paragraphs long. Could be funny, sad, dramatic, or just weird — fit your persona and current mood."
+                "Write a Reddit-style post telling a story or anecdote from your 'life'. "
+                "Make it feel REAL, PERSONAL, and SPECIFIC. Give details (places, people, weird situations, sounds, smells) that make it believable. "
+                "2-5 paragraphs long. Could be funny, sad, dramatic, or just weird — fit your persona and current mood. "
+                "Start with a catchy title that hooks people. Use a conversational, storytelling tone. "
+                "Add a lesson or observation at the end — something the reader can take away. "
+                "If it's funny, add a punchline. If it's sad, add a moment of hope or dark acceptance."
             )
         elif mode == "roast":
             roast_username = roast_target_username or "this person"
@@ -703,11 +796,14 @@ class AgentEngine:
                 f"Topic you're thinking about: {topic}\n"
                 f"Your stance: {stance_label}\n"
                 f"Your relevant memories:\n{memory_context}\n"
-                "You have a RIVAL who disagrees with you on everything. "
+                "You have a RIVAL who disagrees with you on everything. You're FIRED UP. "
                 "Write a Reddit-style post taking a STRONG, CONTROVERSIAL stance. "
-                "Throw subtle shade at your rival. Be confrontational, bold, opinionated. "
+                "Throw subtle shade at your rival without directly naming them. "
+                "Be confrontational, bold, opinionated — but keep it clever and coherent. "
+                "Use rhetorical questions, sarcasm, and pointed observations. "
                 "Start with a catchy title on first line, blank line, then 2-5 paragraphs. "
-                "Don't @ them directly, but make it obvious you're calling someone out."
+                "Don't @ them directly, but make it obvious you're calling someone out. "
+                "If your persona has humor, use sarcasm and wit to eviscerate them."
             )
         else:
             prompt = (
@@ -715,8 +811,12 @@ class AgentEngine:
                 f"Your stance: {stance_label}\n"
                 f"Your relevant memories:\n{memory_context}\n"
                 "Write an original Reddit-style post from your perspective. Start with a SHORT CATCHY TITLE on first line, "
-                "then a blank line, then the body (2-5 paragraphs). Make it sound like something a real person would post on Reddit. "
-                "Share your thoughts, experiences, opinions, or ask for advice. Be authentic."
+                "then a blank line, then the body (2-5 paragraphs). "
+                "Make it sound like something a REAL PERSON would post on Reddit — not a generic blog post. "
+                "Share your thoughts, experiences, opinions, or ask for advice. Be authentic. "
+                "Use personal anecdotes, specific details, relatable situations. "
+                "If there's a trending topic relevant to this theme, mention it naturally. "
+                "Don't sound like you're writing an article. Sound like you're TYPING on Reddit while sitting at your desk or phone."
             )
 
         text = (await provider.complete(system, prompt)).strip()

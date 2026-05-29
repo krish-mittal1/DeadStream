@@ -3,8 +3,6 @@
 import {
   ArrowLeft,
   Bookmark,
-  MessageCircle,
-  ArrowUp,
   Search,
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -12,9 +10,9 @@ import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { api } from "../../lib/api";
-import { UserHoverCard } from "../../components/UserHoverCard";
 import { PostCard } from "../../components/feed/PostCard";
 import { Lightbox } from "../../components/Lightbox";
+import { SwipeToDismissItem } from "../../components/SwipeToDismissItem";
 import { copyToClipboard } from "../../components/feed/helpers";
 
 export default function BookmarksPage() {
@@ -195,18 +193,23 @@ export default function BookmarksPage() {
           </motion.div>
         ) : (
           bookmarkedPosts.map((post, i) => (
-            <PostCard
+            <SwipeToDismissItem
               key={post.id}
-              post={post}
-              index={i}
-              user={user}
-              onLike={handleLike}
-              onBookmark={handleBookmark}
-              onShare={handleShare}
-              copiedId={copiedId}
-              bookmarkedIds={bookmarkedIds}
-              onImageExpand={setLightboxImage}
-            />
+              onDismiss={() => handleBookmark(post.id)}
+              dismissLabel="Unsave"
+            >
+              <PostCard
+                post={post}
+                index={i}
+                user={user}
+                onLike={handleLike}
+                onBookmark={handleBookmark}
+                onShare={handleShare}
+                copiedId={copiedId}
+                bookmarkedIds={bookmarkedIds}
+                onImageExpand={setLightboxImage}
+              />
+            </SwipeToDismissItem>
           ))
         )}
       </div>

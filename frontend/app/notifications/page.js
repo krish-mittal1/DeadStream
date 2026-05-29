@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { SwipeToDismissItem } from "../../components/SwipeToDismissItem";
 
 const notifIcons = {
   reply: MessageCircle,
@@ -193,49 +194,54 @@ export default function NotificationsPage() {
             const Icon = notifIcons[notif.type] || Bell;
             const color = notifColors[notif.type] || "var(--color-text-muted)";
             return (
-              <motion.div
+              <SwipeToDismissItem
                 key={notif.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(i * 0.02, 0.3) }}
-                onClick={() => {
-                  if (!notif.read) markNotifRead(notif.id);
-                  if (notif.entity_id) window.open(`/post/${notif.entity_id}`, "_self");
-                }}
-                className={`flex items-start gap-3 px-4 md:px-6 py-4 transition-all duration-200 cursor-pointer ${
-                  notif.read
-                    ? "bg-[var(--color-bg-secondary)] hover:bg-[var(--color-panel)]/30"
-                    : "bg-[var(--color-panel)] hover:bg-[var(--color-panel-hover)]/50"
-                }`}
+                onDismiss={() => { if (!notif.read) markNotifRead(notif.id); }}
+                dismissLabel="Dismiss"
               >
-                <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: `${color}15` }}
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.3) }}
+                  onClick={() => {
+                    if (!notif.read) markNotifRead(notif.id);
+                    if (notif.entity_id) window.open(`/post/${notif.entity_id}`, "_self");
+                  }}
+                  className={`flex items-start gap-3 px-4 md:px-6 py-4 transition-all duration-200 cursor-pointer ${
+                    notif.read
+                      ? "bg-[var(--color-bg-secondary)] hover:bg-[var(--color-panel)]/30"
+                      : "bg-[var(--color-panel)] hover:bg-[var(--color-panel-hover)]/50"
+                  }`}
                 >
-                  <Icon size={16} style={{ color }} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-[var(--color-text)]">
-                    <span className="font-semibold">@{notif.actor_username}</span>{" "}
-                    {notif.type === "reply"
-                      ? "replied to your post"
-                      : notif.type === "like"
-                        ? "liked your post"
-                        : "followed you"}
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--color-text-dim)]">
-                    {new Date(notif.created_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                {!notif.read && (
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--color-accent)]" />
-                )}
-              </motion.div>
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                    style={{ backgroundColor: `${color}15` }}
+                  >
+                    <Icon size={16} style={{ color }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-[var(--color-text)]">
+                      <span className="font-semibold">@{notif.actor_username}</span>{" "}
+                      {notif.type === "reply"
+                        ? "replied to your post"
+                        : notif.type === "like"
+                          ? "liked your post"
+                          : "followed you"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-[var(--color-text-dim)]">
+                      {new Date(notif.created_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  {!notif.read && (
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--color-accent)]" />
+                  )}
+                </motion.div>
+              </SwipeToDismissItem>
             );
           })
         )}

@@ -68,6 +68,10 @@ jobs:
           cache: "pip"
       - run: pip install -e ".[dev]"
       - run: pip install pytest pytest-asyncio httpx aiosqlite
+      - name: Run database migrations
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://dead:dead@localhost:5432/deadstream_test
       - name: Run all tests (unit + integration)
         run: pytest -v --tb=short
 

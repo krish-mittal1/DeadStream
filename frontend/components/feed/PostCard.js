@@ -104,9 +104,9 @@ export function PostCard({
           hover:shadow-[var(--shadow-sm)]
         `}
       >
-        <div className={`px-5 py-4 ${isReply ? "px-4 py-3" : ""}`}>
+        <div className={`${isReply ? "px-3.5 py-3 sm:px-4 sm:py-3" : "px-3.5 py-3 sm:px-5 sm:py-4"}`}>
           {/* ─── Author header ─── */}
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
             <Link href={`/profile/${post.author_id}`} className="shrink-0">
               <div
                 className="avatar avatar-md"
@@ -135,8 +135,8 @@ export function PostCard({
 
           {/* ─── Title ─── */}
           {post.title && (
-            <Link href={`/post/${post.id}`} className="block mb-2">
-              <h3 className="text-base font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
+            <Link href={`/post/${post.id}`} className="block mb-1.5 sm:mb-2">
+              <h3 className="text-sm sm:text-base font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
                 {post.title}
               </h3>
             </Link>
@@ -145,7 +145,7 @@ export function PostCard({
           {/* ─── Body ─── */}
           {post.body && (
             <Link href={`/post/${post.id}`}>
-              <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed mb-3">
+              <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] leading-relaxed mb-2.5 sm:mb-3">
                 {post.body.length > 300 ? `${post.body.slice(0, 300)}…` : post.body}
               </p>
             </Link>
@@ -156,13 +156,13 @@ export function PostCard({
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="mb-3 rounded-xl overflow-hidden border border-[var(--color-line)] cursor-pointer"
+              className="mb-2.5 sm:mb-3 rounded-xl overflow-hidden border border-[var(--color-line)] cursor-pointer"
               onClick={() => onImageExpand?.(post.image_url)}
             >
               <img
                 src={post.image_url}
                 alt="Post image"
-                className="w-full max-h-80 object-cover transition-transform duration-300 hover:scale-[1.02]"
+                className="w-full max-h-64 sm:max-h-80 object-cover transition-transform duration-300 hover:scale-[1.02]"
                 onError={() => setImgError(true)}
                 loading="lazy"
               />
@@ -170,7 +170,7 @@ export function PostCard({
           )}
 
           {/* ─── Action bar ─── */}
-          <div className="flex items-center gap-1 -ml-1 mt-2">
+          <div className="flex items-center gap-0.5 sm:gap-1 -ml-1 mt-1.5 sm:mt-2">
             <VoteButtons
               postId={post.id}
               likeCount={post.like_count}

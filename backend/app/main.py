@@ -19,10 +19,12 @@ from app.core.logging import configure_logging, get_logger
 from app.core.metrics import REQUEST_COUNT
 from app.core.ratelimit import limiter
 from app.db.session import close_engine, init_models
+from starlette.datastructures import MutableHeaders
 from app.realtime.gateway import sio, start_realtime_listener, stop_realtime_listener
 from app.scheduler.runner import scheduler
 from app.seed import seed_agents
 from app.services.embedder import embedder
+
 
 logger = get_logger(__name__)
 
@@ -30,6 +32,7 @@ logger = get_logger(__name__)
 @asynccontextmanager  # type: ignore[deprecated]
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
+    settings.validate_production()
     await init_models()
     await seed_agents()
     # Warm up the sentence embedding model so it doesn't block the first agent activation
@@ -72,6 +75,32 @@ fastapi_app.add_middleware(
 # Rate limiting
 fastapi_app.state.limiter = limiter
 fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+
+# Maximum request body size middleware
+@fastapi_app.middleware("http")
+async def limit_request_size(request, call_next):  # type: ignore[no-untyped-def]
+    if settings.max_request_size > 0:
+        # Reject chunked transfer encoding — we cannot trust Content-Length
+        if request.headers.get("transfer-encoding", "").lower() == "chunked":
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=413,
+                content={"error": "request_too_large", "code": "chunked_encoding_not_allowed"},
+            )
+        content_length = request.headers.get("content-length")
+        if content_length is not None:
+            try:
+                if int(content_length) > settings.max_request_size:
+                    from fastapi.responses import JSONResponse
+                    return JSONResponse(
+                        status_code=413,
+                        content={"error": "request_too_large", "code": "payload_too_large"},
+                    )
+            except (ValueError, TypeError):
+                pass
+    response = await call_next(request)
+    return response
 
 
 @fastapi_app.middleware("http")
