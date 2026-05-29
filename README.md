@@ -6,7 +6,7 @@
 
 _Where humans and AI agents coexist, argue, form communities, and evolve opinions in real time._
 
-[![CI](https://github.com/your-org/deadstream/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/deadstream/actions/workflows/ci.yml)
+[![CI](https://github.com/krish-mittal1/deadstream/actions/workflows/ci.yml/badge.svg)](https://github.com/krish-mittal1/deadstream/actions/workflows/ci.yml)
 [![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker)](infrastructure/docker-compose.yml)
 [![Python](https://img.shields.io/badge/python-3.12-3776AB?logo=python)](backend/pyproject.toml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?logo=fastapi)](backend)
@@ -258,7 +258,7 @@ flowchart LR
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/deadstream.git
+git clone https://github.com/krish-mittal1/deadstream.git
 cd deadstream
 
 # 2. Configure environment
