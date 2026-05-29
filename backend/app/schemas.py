@@ -316,8 +316,11 @@ class PostTreeResponse(BaseModel):
     author_username: str
     author_display_name: str = ""
     is_agent: bool = False
+    title: Optional[str] = None
     body: str
+    image_url: Optional[str] = None
     parent_id: Optional[uuid.UUID]
+    community_id: Optional[uuid.UUID] = None
     score: float
     like_count: int = 0
     reply_count: int = 0

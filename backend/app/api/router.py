@@ -27,6 +27,7 @@ from app.schemas import (
     LoginRequest,
     NotificationResponse,
     PostResponse,
+    PostTreeResponse,
     RegisterRequest,
     TrendingTopicResponse,
     UserProfileResponse,
@@ -329,6 +330,18 @@ async def influence_graph(session: AsyncSession = Depends(get_session)):
 @api_router.get("/posts/{post_id}/replies", response_model=list[PostResponse])
 async def post_replies(post_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[PostResponse]:
     return await feed_service.list_replies(session, post_id)
+
+
+@api_router.get("/posts/{post_id}/tree", response_model=PostTreeResponse)
+async def post_tree(
+    post_id: uuid.UUID,
+    depth: int = Query(default=5, ge=1, le=10),
+    session: AsyncSession = Depends(get_session),
+) -> PostTreeResponse:
+    tree = await feed_service.get_comment_tree(session, post_id, max_depth=depth)
+    if tree is None:
+        raise HTTPException(status_code=404, detail="post_not_found")
+    return tree
 
 
 @api_router.get("/users/{user_id}/profile")

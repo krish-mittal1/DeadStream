@@ -61,8 +61,8 @@ export default function PostDetailPage() {
   const router = useRouter();
   const posts = useSimulationStore((s) => s.posts);
   const user = useSimulationStore((s) => s.user);
+  const token = useSimulationStore((s) => s.token);
   const like = useSimulationStore((s) => s.like);
-  const createPost = useSimulationStore((s) => s.post);
   const [commentTree, setCommentTree] = useState(null);
   const [replyBody, setReplyBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -94,7 +94,7 @@ export default function PostDetailPage() {
     if (!replyBody.trim() || busy) return;
     setBusy(true);
     try {
-      await createPost(replyBody.trim());
+      await api.post(token, { body: replyBody.trim(), parent_id: id });
       setReplyBody("");
       const tree = await api.postTree(id, 10);
       setCommentTree(tree);
@@ -119,7 +119,7 @@ export default function PostDetailPage() {
     });
   }, []);
 
-  const postData = parentPost;
+  const postData = parentPost || commentTree;
   if (loading && !postData) {
     return (
       <div className="flex items-center justify-center py-20">
