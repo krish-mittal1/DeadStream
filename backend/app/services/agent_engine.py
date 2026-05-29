@@ -338,7 +338,7 @@ class AgentEngine:
             weighted = sorted(posts, key=lambda p: p.controversy_score + p.virality_score, reverse=True)
             top = weighted[:5]
             chosen = random.choice(top)
-            snippet = (chosen.title or chosen.body or "")[:160]
+            snippet = (chosen.title or chosen.body or "")[:120]
             # Filter out snippet that looks like it starts with topic-like words
             _punct = '#.,!?“”:;[]\'"'
             first_word = snippet.split()[0].strip(_punct).lower() if snippet.split() else ""

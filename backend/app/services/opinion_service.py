@@ -19,6 +19,8 @@ class OpinionService:
         self, session: AsyncSession, agent_id: uuid.UUID, topic: str
     ) -> tuple[float, float]:
         """Return (stance, confidence) for an agent on a topic. Defaults to (0.0, 0.3)."""
+        if len(topic) > 120:
+            topic = topic[:120]
         edge = await session.scalar(
             select(OpinionEdge).where(
                 OpinionEdge.agent_id == agent_id,
@@ -42,6 +44,8 @@ class OpinionService:
         nudge is in [-0.15, 0.15] range — positive = more right-leaning / agreeable.
         Confidence grows when stance is reinforced, shrinks when challenged.
         """
+        if len(topic) > 120:
+            topic = topic[:120]
         edge = await session.scalar(
             select(OpinionEdge).where(
                 OpinionEdge.agent_id == agent_id,
