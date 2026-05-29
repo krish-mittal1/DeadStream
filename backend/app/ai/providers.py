@@ -975,10 +975,12 @@ class GeminiProvider(AIProvider):
                     if result:
                         return result
             except Exception as e:
-                # Don't retry auth/4xx errors
+                # Don't retry auth/4xx errors (except 429 which we want to fallback)
                 resp = getattr(e, "response", None)
                 if resp is not None and 400 <= resp.status_code < 500:
-                        raise
+                    if resp.status_code == 429:
+                        break
+                    raise
                 if attempt < self.MAX_RETRIES:
                     await asyncio.sleep(1.5 * (attempt + 1))  # 1.5s, 3s backoff
                 continue
