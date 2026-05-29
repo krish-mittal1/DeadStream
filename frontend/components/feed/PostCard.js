@@ -174,6 +174,7 @@ export function PostCard({
             <VoteButtons
               postId={post.id}
               likeCount={post.like_count}
+              user={user}
               onLike={onLike}
             />
 
