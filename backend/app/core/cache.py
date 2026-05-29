@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
+from pydantic import BaseModel
 import redis.asyncio as redis
 
 from app.core.config import settings
@@ -22,6 +23,18 @@ def _make_cache_key(prefix: str, *parts: str | int) -> str:  # type: ignore[unus
     return f"cache:{prefix}:" + ":".join(str(p) for p in parts)
 
 
+def _jsonable(value: Any) -> Any:
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    if isinstance(value, list):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    return value
+
+
 async def cache_get(key: str) -> Any | None:
     """Get a cached value. Returns deserialized JSON or None on miss/error."""
     try:
@@ -39,7 +52,7 @@ async def cache_set(key: str, value: Any, ttl: Optional[int] = None) -> None:
     try:
         client = await _get_cache()
         ttl = ttl if ttl is not None else settings.cache_ttl_seconds
-        await client.setex(key, ttl, json.dumps(value, default=str))
+        await client.setex(key, ttl, json.dumps(_jsonable(value), default=str))
     except Exception:
         pass
 
