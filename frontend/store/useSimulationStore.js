@@ -24,7 +24,7 @@ export const useSimulationStore = create((set, get) => ({
   activeView: "feed",
   connected: false,
   loading: true,
-  feedSort: "hot",
+  feedSort: "new",
   feedCursor: null,
   socket: null,
   // Notifications

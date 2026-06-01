@@ -125,14 +125,20 @@ class FeedService:
         cursor: Optional[str] = None,
         sort: str = "hot",
     ) -> list[PostResponse]:
-        cache_key = f"cache:feed:{feed_algorithm}:{cursor or 'first'}:{limit}"
+        sort_mode = sort if sort in {"hot", "new", "top", "controversial"} else "hot"
+        cache_key = f"cache:feed:{feed_algorithm}:{sort_mode}:{cursor or 'first'}:{limit}"
 
         async def _fetch() -> list[PostResponse]:
             global feed_algorithm  # noqa: PLW0602
             stmt = select(Post)
 
-            # Apply algorithm-based sorting
-            if feed_algorithm == "outrage":
+            if sort_mode == "new":
+                stmt = stmt.order_by(desc(Post.created_at))
+            elif sort_mode == "top":
+                stmt = stmt.order_by(desc(Post.virality_score), desc(Post.created_at))
+            elif sort_mode == "controversial":
+                stmt = stmt.order_by(desc(Post.controversy_score), desc(Post.created_at))
+            elif feed_algorithm == "outrage":
                 # Boost controversial + high-agitation posts — polarization maximizer
                 stmt = stmt.order_by(
                     desc(Post.controversy_score + Post.virality_score * 1.5),
