@@ -101,6 +101,13 @@ export const useSimulationStore = create((set, get) => ({
     });
     socket.on("feed:new", () => {
       set((state) => ({ newPostCount: Math.min(state.newPostCount + 1, 99) }));
+      if (!get()._feedRefreshTimer) {
+        const timer = setTimeout(() => {
+          set({ _feedRefreshTimer: null });
+          get().loadNewPosts();
+        }, 3000);
+        set({ _feedRefreshTimer: timer });
+      }
     });
     socket.emit("subscribe", { room: "global-feed" });
     set({ socket });

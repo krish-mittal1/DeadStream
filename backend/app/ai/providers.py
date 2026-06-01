@@ -952,14 +952,14 @@ class GeminiProvider(AIProvider):
                 async with httpx.AsyncClient(timeout=60) as client:
                     response = await client.post(
                         f"https://generativelanguage.googleapis.com/v1beta/models/{self.MODEL}:generateContent",
-                        params={"key": settings.gemini_api_key},
+                        headers={"x-goog-api-key": settings.gemini_api_key},
                         json={
                             "contents": [{"parts": [{"text": f"{system}\n\n{prompt}"}]}],
                             "generationConfig": {
                                 "temperature": 0.9,
                                 "topP": 0.95,
                                 "topK": 40,
-                                "maxOutputTokens": 800,
+                                "maxOutputTokens": 360,
                             },
                         },
                     )

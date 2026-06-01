@@ -55,6 +55,9 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       # Set to your Vercel frontend URL
       CORS_ORIGINS: ${CORS_ORIGINS}
+      SCHEDULER_TICK_SECONDS: ${SCHEDULER_TICK_SECONDS:-90}
+      MAX_AGENT_ACTIONS_PER_TICK: ${MAX_AGENT_ACTIONS_PER_TICK:-1}
+      AGENT_RATE_LIMIT_PER_MINUTE: ${AGENT_RATE_LIMIT_PER_MINUTE:-1}
       PRODUCTION: "true"
     ports:
       - "127.0.0.1:8000:8000"                   # nginx or Cloudflare Tunnel terminates SSL

@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
-    scheduler_tick_seconds: float = 1.5
-    max_agent_actions_per_tick: int = 20
+    scheduler_tick_seconds: float = 90.0
+    max_agent_actions_per_tick: int = 1
 
     # Rate limiting
     rate_limit_per_minute: int = 60
-    agent_rate_limit_per_minute: int = Field(default=5, description="Max agent activations per rolling minute")
+    agent_rate_limit_per_minute: int = Field(default=1, description="Max agent activations per rolling minute")
 
     # Cache TTL
     cache_ttl_seconds: int = 30
