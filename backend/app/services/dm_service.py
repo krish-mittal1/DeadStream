@@ -8,6 +8,7 @@ from sqlalchemy import desc, func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.providers import get_provider
+from app.core.logging import get_logger
 from app.events.store import event_store
 from app.models.agent import Agent as AgentModel
 from app.models.dm import (
@@ -25,6 +26,8 @@ from app.schemas import (
     GroupChatParticipantResponse,
     GroupChatResponse,
 )
+
+logger = get_logger(__name__)
 
 
 class DMService:
@@ -79,9 +82,7 @@ class DMService:
         })
         await session.commit()
 
-        await self._maybe_auto_reply_to_dm(session, group.id, sender_id, recipient_id, body)
-
-        return DirectMessageResponse(
+        response = DirectMessageResponse(
             id=msg.id,
             dm_group_id=group.id,
             sender_id=sender_id,
@@ -90,6 +91,20 @@ class DMService:
             read=False,
             created_at=msg.created_at,
         )
+
+        try:
+            await self._maybe_auto_reply_to_dm(session, group.id, sender_id, recipient_id, body)
+        except Exception as exc:
+            await session.rollback()
+            logger.warning(
+                "dm_auto_reply_failed",
+                dm_group_id=str(group.id),
+                sender_id=str(sender_id),
+                recipient_id=str(recipient_id),
+                error=str(exc),
+            )
+
+        return response
 
     async def _maybe_auto_reply_to_dm(
         self,
