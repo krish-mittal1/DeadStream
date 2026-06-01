@@ -4,7 +4,7 @@ import uuid
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -580,10 +580,19 @@ async def agent_brain_evolution(
 @api_router.post("/dm/send", response_model=DirectMessageResponse)
 async def send_dm(
     request: SendDirectMessageRequest,
+    background_tasks: BackgroundTasks,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DirectMessageResponse:
-    return await dm_service.send_dm(session, user.id, request.recipient_id, request.body)
+    message = await dm_service.send_dm(session, user.id, request.recipient_id, request.body)
+    background_tasks.add_task(
+        dm_service.delayed_auto_reply_to_dm,
+        message.dm_group_id,
+        user.id,
+        request.recipient_id,
+        request.body,
+    )
+    return message
 
 
 @api_router.get("/dm/groups", response_model=list[DirectMessageGroupResponse])

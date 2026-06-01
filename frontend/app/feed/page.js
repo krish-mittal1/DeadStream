@@ -3,16 +3,24 @@
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { Composer } from "../../components/Composer";
 import { Feed } from "../../components/Feed";
 import { PullToRefresh } from "../../components/PullToRefresh";
 export default function FeedPage() {
+  const posts = useSimulationStore((s) => s.posts);
+  const loading = useSimulationStore((s) => s.loading);
   const loadNewPosts = useSimulationStore((s) => s.loadNewPosts);
   const handleRefresh = useCallback(async () => {
     await loadNewPosts();
   }, [loadNewPosts]);
+
+  useEffect(() => {
+    if (!loading && posts.length === 0) {
+      loadNewPosts();
+    }
+  }, [loading, posts.length, loadNewPosts]);
 
   return (
     <motion.div

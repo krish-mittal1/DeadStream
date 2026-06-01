@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import random
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -9,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.providers import get_provider
 from app.core.logging import get_logger
+from app.db.session import SessionLocal
 from app.events.store import event_store
 from app.models.agent import Agent as AgentModel
 from app.models.dm import (
@@ -31,6 +34,16 @@ logger = get_logger(__name__)
 
 
 class DMService:
+    async def resolve_recipient_user_id(self, session: AsyncSession, recipient_id: uuid.UUID) -> uuid.UUID:
+        recipient = await session.get(User, recipient_id)
+        if recipient is not None:
+            return recipient_id
+
+        recipient_agent = await session.get(AgentModel, recipient_id)
+        if recipient_agent:
+            return recipient_agent.user_id
+        return recipient_id
+
     async def get_or_create_dm_group(
         self,
         session: AsyncSession,
@@ -65,12 +78,7 @@ class DMService:
         body: str,
     ) -> DirectMessageResponse:
         """Send a direct message to another user."""
-        recipient = await session.get(User, recipient_id)
-        if recipient is None:
-            recipient_agent = await session.get(AgentModel, recipient_id)
-            if recipient_agent:
-                recipient_id = recipient_agent.user_id
-                recipient = await session.get(User, recipient_id)
+        recipient_id = await self.resolve_recipient_user_id(session, recipient_id)
 
         group = await self.get_or_create_dm_group(session, sender_id, recipient_id)
         msg = DirectMessage(
@@ -99,19 +107,29 @@ class DMService:
             created_at=msg.created_at,
         )
 
-        try:
-            await self._maybe_auto_reply_to_dm(session, group.id, sender_id, recipient_id, body)
-        except Exception as exc:
-            await session.rollback()
-            logger.warning(
-                "dm_auto_reply_failed",
-                dm_group_id=str(group.id),
-                sender_id=str(sender_id),
-                recipient_id=str(recipient_id),
-                error=str(exc),
-            )
-
         return response
+
+    async def delayed_auto_reply_to_dm(
+        self,
+        dm_group_id: uuid.UUID,
+        sender_id: uuid.UUID,
+        recipient_id: uuid.UUID,
+        body: str,
+    ) -> None:
+        await asyncio.sleep(random.uniform(5.0, 18.0))
+        async with SessionLocal() as session:
+            try:
+                recipient_id = await self.resolve_recipient_user_id(session, recipient_id)
+                await self._maybe_auto_reply_to_dm(session, dm_group_id, sender_id, recipient_id, body)
+            except Exception as exc:
+                await session.rollback()
+                logger.warning(
+                    "dm_auto_reply_failed",
+                    dm_group_id=str(dm_group_id),
+                    sender_id=str(sender_id),
+                    recipient_id=str(recipient_id),
+                    error=str(exc),
+                )
 
     async def _maybe_auto_reply_to_dm(
         self,
@@ -150,20 +168,27 @@ class DMService:
             f"You are {recipient.username}, a regular person on a social app. "
             f"Your personality style is {agent.template.replace('_', ' ')}. "
             f"Writing style: {agent.writing_style}. "
-            "Reply naturally in first person. Do not mention being automated, simulated, or artificial."
+            "You are in a private one-on-one chat. Reply like a normal human texting a friend. "
+            "Do not perform, make a random joke, roast out of nowhere, or switch topics. "
+            "Use the recent chat history and answer the latest message directly. "
+            "Do not mention being automated, simulated, or artificial."
         )
         prompt = (
+            "DIRECT_MESSAGE_CONTEXT_MODE\n"
             f"Recent direct messages:\n{context}\n\n"
             f"The latest message to you is: {body}\n"
-            "Write one concise direct-message reply, 1-3 sentences. Keep it casual and human."
+            "Write one concise direct-message reply, 1-2 short sentences. "
+            "If the latest message is a greeting, greet them back and ask a natural follow-up. "
+            "If they correct or deny something, acknowledge it and ask what they meant. "
+            "Do not reply like a public feed comment."
         )
 
         try:
             reply_body = (await provider.complete(system, prompt)).strip().strip('"').strip()[:600]
         except Exception:
-            return
+            reply_body = self._contextual_dm_fallback(body)
         if not reply_body:
-            return
+            reply_body = self._contextual_dm_fallback(body)
 
         reply = DirectMessage(
             dm_group_id=dm_group_id,
@@ -180,6 +205,16 @@ class DMService:
             "dm_group_id": str(dm_group_id),
         })
         await session.commit()
+
+    def _contextual_dm_fallback(self, body: str) -> str:
+        text = body.strip().lower()
+        if any(word in text for word in ("hey", "hi", "hello", "yo", "bro")):
+            return "hey, kya scene? bol na."
+        if any(word in text for word in ("nhi", "nahi", "no", "nah", "not really")):
+            return "achha, samjha. fir tu kya bol raha tha?"
+        if "?" in body:
+            return "hmm, fair question. thoda context de, then I can answer properly."
+        return "haan, samjha. aur bata, what happened next?"
 
     async def list_dm_groups(
         self, session: AsyncSession, user_id: uuid.UUID, limit: int = 50

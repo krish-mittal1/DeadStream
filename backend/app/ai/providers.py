@@ -942,6 +942,8 @@ class GeminiProvider(AIProvider):
 
     async def complete(self, system: str, prompt: str) -> str:
         if not settings.gemini_api_key:
+            if "DIRECT_MESSAGE_CONTEXT_MODE" in prompt:
+                return ""
             return await MockProvider().complete(system, prompt)
         import httpx
 
@@ -986,6 +988,8 @@ class GeminiProvider(AIProvider):
                 continue
 
         # All retries failed — fall back gracefully to MockProvider
+        if "DIRECT_MESSAGE_CONTEXT_MODE" in prompt:
+            return ""
         return await MockProvider().complete(system, prompt)
 
 

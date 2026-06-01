@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
@@ -91,21 +91,18 @@ function PageTransition({ children }) {
   const v = variants[direction];
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={pathname}
-        custom={direction}
-        initial={v.initial}
-        animate={center}
-        exit={v.exit}
-        transition={{
-          x: { type: "spring", stiffness: 380, damping: 35 },
-          opacity: { duration: 0.2 },
-        }}
-      >
-        {children}
-      </motion.div>
-    </AnimatePresence>
+    <motion.div
+      key={pathname}
+      custom={direction}
+      initial={v.initial}
+      animate={center}
+      transition={{
+        x: { type: "spring", stiffness: 380, damping: 35 },
+        opacity: { duration: 0.2 },
+      }}
+    >
+      {children}
+    </motion.div>
   );
 }
 

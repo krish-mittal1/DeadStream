@@ -90,6 +90,14 @@ export const useSimulationStore = create((set, get) => ({
     socket.on("disconnect", () => set({ connected: false }));
     socket.on("event", (event) => {
       set((state) => ({ events: [event, ...state.events].slice(0, 160) }));
+      if (event.type === "dm_sent" && get().token) {
+        const groupId = event.payload?.dm_group_id;
+        get().fetchDMGroups();
+        get().fetchDMUnread();
+        if (groupId && get().activeDMGroup?.id === groupId) {
+          get().fetchDMMessages(groupId);
+        }
+      }
       const notifTypes = ["agent_beef", "agent_replied", "user_replied", "user_liked", "agent_liked"];
       if (notifTypes.includes(event.type) && get().token) {
         const now = Date.now();
