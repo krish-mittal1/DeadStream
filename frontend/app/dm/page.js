@@ -35,6 +35,10 @@ function getOtherParticipant(group, userId) {
   return { id: group.participant_a_id, username: group.participant_a_username };
 }
 
+function getRecipientUserId(agent) {
+  return agent?.user_id || agent?.id;
+}
+
 /* ─── Typing Indicator ──────────────────────────────────── */
 function TypingIndicator({ visible = false }) {
   if (!visible) return null;
@@ -135,7 +139,7 @@ export default function DMPage() {
   const composeInputRef = useRef(null);
 
   const selectedRecipient = useMemo(
-    () => agents.find((agent) => agent.id === sendingTo),
+    () => agents.find((agent) => getRecipientUserId(agent) === sendingTo || agent.id === sendingTo),
     [agents, sendingTo]
   );
 
@@ -154,7 +158,7 @@ export default function DMPage() {
   const filteredRecipients = useMemo(() => {
     const q = recipientQuery.trim().toLowerCase();
     return agents
-      .filter((agent) => agent.id !== user?.id)
+      .filter((agent) => getRecipientUserId(agent) !== user?.id)
       .filter((agent) => {
         if (!q) return true;
         return (
@@ -195,7 +199,7 @@ export default function DMPage() {
             id: msg.dm_group_id,
             participant_a_id: user?.id,
             participant_a_username: user?.username,
-            participant_b_id: selectedRecipient?.id || sendingTo,
+            participant_b_id: getRecipientUserId(selectedRecipient) || sendingTo,
             participant_b_username: selectedRecipient?.username || "Chat",
           };
           setActiveDMGroup(group);
@@ -231,7 +235,7 @@ export default function DMPage() {
   }, [handleSend]);
 
   const startNewChat = useCallback((agent) => {
-    setSendingTo(agent.id);
+    setSendingTo(getRecipientUserId(agent));
     setComposing(true);
     setActiveDMGroup(null);
     setSendError("");
@@ -416,10 +420,10 @@ export default function DMPage() {
                 )}
                 {filteredRecipients.map((agent) => (
                   <button
-                    key={agent.id}
-                    onClick={() => startNewChat(agent)}
-                    className={`w-full rounded-xl p-3 text-left transition-all duration-200 flex items-center gap-3 ${
-                      sendingTo === agent.id
+                      key={agent.id}
+                      onClick={() => startNewChat(agent)}
+                      className={`w-full rounded-xl p-3 text-left transition-all duration-200 flex items-center gap-3 ${
+                      sendingTo === getRecipientUserId(agent)
                         ? "bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30"
                         : "card hover:border-[var(--color-line-light)]"
                     }`}

@@ -250,6 +250,7 @@ async def agents(session: AsyncSession = Depends(get_session)) -> list[AgentProf
     return [
         AgentProfile(
             id=agent.id,
+            user_id=agent.user_id,
             username=user.username,
             template=agent.template,
             emotional_state=agent.emotional_state,

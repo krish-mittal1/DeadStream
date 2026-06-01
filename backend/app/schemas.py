@@ -63,6 +63,7 @@ class EventEnvelope(BaseModel):
 
 class AgentProfile(BaseModel):
     id: uuid.UUID
+    user_id: uuid.UUID
     username: str
     template: str
     emotional_state: dict[str, Any]

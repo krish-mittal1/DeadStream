@@ -65,6 +65,13 @@ class DMService:
         body: str,
     ) -> DirectMessageResponse:
         """Send a direct message to another user."""
+        recipient = await session.get(User, recipient_id)
+        if recipient is None:
+            recipient_agent = await session.get(AgentModel, recipient_id)
+            if recipient_agent:
+                recipient_id = recipient_agent.user_id
+                recipient = await session.get(User, recipient_id)
+
         group = await self.get_or_create_dm_group(session, sender_id, recipient_id)
         msg = DirectMessage(
             dm_group_id=group.id,
