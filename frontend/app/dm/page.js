@@ -4,11 +4,11 @@ import {
   ArrowLeft,
   MessageSquare,
   Send,
-  Bot,
+  Search,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { SwipeBackWrapper } from "../../components/SwipeBackWrapper";
 
@@ -127,7 +127,41 @@ export default function DMPage() {
   const [input, setInput] = useState("");
   const [sendingTo, setSendingTo] = useState(null);
   const [composing, setComposing] = useState(false);
+  const [conversationQuery, setConversationQuery] = useState("");
+  const [recipientQuery, setRecipientQuery] = useState("");
+  const [sendError, setSendError] = useState("");
+  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+
+  const selectedRecipient = useMemo(
+    () => agents.find((agent) => agent.id === sendingTo),
+    [agents, sendingTo]
+  );
+
+  const filteredGroups = useMemo(() => {
+    const q = conversationQuery.trim().toLowerCase();
+    if (!q) return dmGroups;
+    return dmGroups.filter((group) => {
+      const other = getOtherParticipant(group, user?.id);
+      return (
+        other?.username?.toLowerCase().includes(q) ||
+        group.last_message?.toLowerCase().includes(q)
+      );
+    });
+  }, [conversationQuery, dmGroups, user?.id]);
+
+  const filteredRecipients = useMemo(() => {
+    const q = recipientQuery.trim().toLowerCase();
+    return agents
+      .filter((agent) => agent.id !== user?.id)
+      .filter((agent) => {
+        if (!q) return true;
+        return (
+          agent.username?.toLowerCase().includes(q) ||
+          agent.template?.replace(/_/g, " ").toLowerCase().includes(q)
+        );
+      });
+  }, [agents, recipientQuery, user?.id]);
 
   useEffect(() => {
     if (token) {
@@ -141,25 +175,46 @@ export default function DMPage() {
   }, [dmMessages]);
 
   const handleSend = useCallback(async () => {
-    if (!input.trim()) return;
-    if (composing && sendingTo) {
-      const msg = await sendDM(sendingTo, input.trim());
-      setInput("");
-      if (msg) {
-        setActiveDMGroup({ id: msg.dm_group_id });
-        setComposing(false);
-        setSendingTo(null);
-        fetchDMGroups();
-      }
-    } else if (activeDMGroup) {
-      const other = getOtherParticipant(activeDMGroup, user?.id);
-      if (other) {
-        await sendDM(other.id, input.trim());
+    if (!input.trim() || sending) return;
+    setSending(true);
+    setSendError("");
+    try {
+      if (composing && sendingTo) {
+        const msg = await sendDM(sendingTo, input.trim());
         setInput("");
-        fetchDMMessages(activeDMGroup.id);
+        if (msg) {
+          const groups = await fetchDMGroups();
+          const group = groups?.find((item) => item.id === msg.dm_group_id) || {
+            id: msg.dm_group_id,
+            participant_a_id: user?.id,
+            participant_a_username: user?.username,
+            participant_b_id: selectedRecipient?.id || sendingTo,
+            participant_b_username: selectedRecipient?.username || "Chat",
+          };
+          setActiveDMGroup(group);
+          setComposing(false);
+          setSendingTo(null);
+          await fetchDMMessages(msg.dm_group_id);
+        } else {
+          setSendError("Message failed. Try again.");
+        }
+      } else if (activeDMGroup) {
+        const other = getOtherParticipant(activeDMGroup, user?.id);
+        if (other) {
+          const msg = await sendDM(other.id, input.trim());
+          setInput("");
+          if (msg) {
+            await fetchDMMessages(activeDMGroup.id);
+            fetchDMGroups();
+          } else {
+            setSendError("Message failed. Try again.");
+          }
+        }
       }
+    } finally {
+      setSending(false);
     }
-  }, [input, composing, sendingTo, sendDM, activeDMGroup, user, fetchDMMessages, setActiveDMGroup, fetchDMGroups]);
+  }, [input, sending, composing, sendingTo, sendDM, activeDMGroup, user, selectedRecipient, fetchDMMessages, setActiveDMGroup, fetchDMGroups]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -172,12 +227,14 @@ export default function DMPage() {
     setSendingTo(agent.id);
     setComposing(true);
     setActiveDMGroup(null);
+    setSendError("");
   }, [setActiveDMGroup]);
 
   const handleSelectGroup = useCallback((group) => {
     setActiveDMGroup(group);
     setComposing(false);
     setSendingTo(null);
+    setSendError("");
     fetchDMMessages(group.id);
   }, [setActiveDMGroup, fetchDMMessages]);
 
@@ -212,22 +269,36 @@ export default function DMPage() {
             >
               <MessageSquare size={14} /> New Message
             </button>
+            <div className="relative mt-2">
+              <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-dim)]" />
+              <input
+                value={conversationQuery}
+                onChange={(e) => setConversationQuery(e.target.value)}
+                placeholder="Search chats..."
+                className="input-premium h-9 w-full pl-8 text-xs"
+              />
+            </div>
           </div>
 
           {/* Conversations */}
           <div className="flex-1 overflow-auto p-2 space-y-1">
             {!user && (
               <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
-                Log in to message agents
+                Log in to message people
               </div>
             )}
             {user && dmGroups.length === 0 && !composing && (
               <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
                 No conversations yet.<br />
-                Start one with an agent!
+                Start one with someone!
               </div>
             )}
-            {dmGroups.map((group) => {
+            {user && dmGroups.length > 0 && filteredGroups.length === 0 && (
+              <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
+                No chats match that search.
+              </div>
+            )}
+            {filteredGroups.map((group) => {
               const other = getOtherParticipant(group, user?.id);
               const lastMsg = group.last_message;
               return (
@@ -272,10 +343,25 @@ export default function DMPage() {
             <div className="flex-1 flex flex-col">
               <div className="p-4 border-b border-[var(--color-line)]">
                 <h2 className="text-sm font-bold text-[var(--color-text)]">New Message</h2>
-                <p className="text-xs text-[var(--color-text-dim)] mt-1">Select an agent to message</p>
+                <p className="text-xs text-[var(--color-text-dim)] mt-1">Select a person to message</p>
+                <div className="relative mt-3">
+                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-dim)]" />
+                  <input
+                    value={recipientQuery}
+                    onChange={(e) => setRecipientQuery(e.target.value)}
+                    placeholder="Search people..."
+                    className="input-premium h-10 w-full pl-9 text-sm"
+                    autoFocus
+                  />
+                </div>
               </div>
               <div className="flex-1 overflow-auto p-3 space-y-2">
-                {agents.filter(a => a.id !== user?.id).map((agent) => (
+                {filteredRecipients.length === 0 && (
+                  <div className="p-6 text-center text-xs text-[var(--color-text-muted)]">
+                    No people match that search.
+                  </div>
+                )}
+                {filteredRecipients.map((agent) => (
                   <button
                     key={agent.id}
                     onClick={() => startNewChat(agent)}
@@ -296,7 +382,6 @@ export default function DMPage() {
                         <span className="text-sm font-semibold text-[var(--color-text)]">
                           {agent.username}
                         </span>
-                        <Bot size={12} className="text-[var(--color-accent)]" />
                       </div>
                       <p className="text-[11px] text-[var(--color-text-dim)]">
                         {agent.template?.replace(/_/g, " ")}
@@ -309,12 +394,15 @@ export default function DMPage() {
                 <div className="border-t border-[var(--color-line)] p-4 bg-[var(--color-panel)]">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="text-xs font-semibold text-[var(--color-text)]">
-                      To: @{agents.find(a => a.id === sendingTo)?.username}
+                      To: @{selectedRecipient?.username}
                     </span>
                     <button onClick={() => setSendingTo(null)} className="text-[10px] text-[var(--color-text-dim)] hover:text-[var(--color-text)]">
                       Change
                     </button>
                   </div>
+                  {sendError && (
+                    <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
+                  )}
                   <div className="flex gap-2">
                     <textarea
                       value={input}
@@ -326,7 +414,7 @@ export default function DMPage() {
                     />
                     <button
                       onClick={handleSend}
-                      disabled={!input.trim()}
+                      disabled={!input.trim() || sending}
                       className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
                     >
                       <Send size={15} />
@@ -356,7 +444,7 @@ export default function DMPage() {
                   <p className="text-sm font-semibold text-[var(--color-text)]">
                     {getOtherParticipant(activeDMGroup, user?.id)?.username || "Chat"}
                   </p>
-                  <p className="text-[10px] text-[var(--color-text-dim)]">Online</p>
+                  <p className="text-[10px] text-[var(--color-text-dim)]">Messages</p>
                 </div>
               </div>
 
@@ -371,11 +459,6 @@ export default function DMPage() {
                     </div>
                   </div>
                 )}
-                {/* Typing indicator */}
-                <AnimatePresence>
-                  <TypingIndicator visible={true} />
-                </AnimatePresence>
-
                 <AnimatePresence>
                   {(dmMessages[activeDMGroup.id] || []).map((msg) => (
                     <DMMessage key={msg.id} msg={msg} isOwn={msg.sender_id === user?.id} />
@@ -386,6 +469,9 @@ export default function DMPage() {
 
               {/* Input */}
               <div className="border-t border-[var(--color-line)] p-3 sm:p-4 bg-[var(--color-panel)]">
+                {sendError && (
+                  <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
+                )}
                 <div className="flex gap-2">
                   <textarea
                     value={input}
@@ -397,7 +483,7 @@ export default function DMPage() {
                   />
                   <button
                     onClick={handleSend}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || sending}
                     className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
                   >
                     <Send size={15} />
@@ -417,7 +503,7 @@ export default function DMPage() {
                   <MessageSquare size={32} className="text-[var(--color-text-muted)]" />
                 </motion.div>
                 <p className="text-sm text-[var(--color-text-muted)]">Select a conversation</p>
-                <p className="text-xs text-[var(--color-text-dim)] mt-1">Or start a new one with an AI agent</p>
+                <p className="text-xs text-[var(--color-text-dim)] mt-1">Or start a new conversation</p>
               </div>
             </div>
           )}

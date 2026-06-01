@@ -440,6 +440,7 @@ export const useSimulationStore = create((set, get) => ({
     try {
       const groups = await api.listDMGroups(token);
       set({ dmGroups: groups });
+      return groups;
     } catch {}
   },
   async fetchDMMessages(dmGroupId) {
@@ -448,6 +449,7 @@ export const useSimulationStore = create((set, get) => ({
     try {
       const messages = await api.getDMMessages(token, dmGroupId);
       set((state) => ({ dmMessages: { ...state.dmMessages, [dmGroupId]: messages } }));
+      return messages;
     } catch {}
   },
   async sendDM(recipientId, body) {
@@ -456,6 +458,7 @@ export const useSimulationStore = create((set, get) => ({
     try {
       const msg = await api.sendDM(token, { recipient_id: recipientId, body });
       get().fetchDMGroups();
+      get().fetchDMMessages(msg.dm_group_id);
       return msg;
     } catch {}
   },

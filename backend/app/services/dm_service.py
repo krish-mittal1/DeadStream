@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.providers import get_provider
 from app.events.store import event_store
+from app.models.agent import Agent as AgentModel
 from app.models.dm import (
     DirectMessage,
     DirectMessageGroup,
@@ -78,6 +79,8 @@ class DMService:
         })
         await session.commit()
 
+        await self._maybe_auto_reply_to_dm(session, group.id, sender_id, recipient_id, body)
+
         return DirectMessageResponse(
             id=msg.id,
             dm_group_id=group.id,
@@ -87,6 +90,74 @@ class DMService:
             read=False,
             created_at=msg.created_at,
         )
+
+    async def _maybe_auto_reply_to_dm(
+        self,
+        session: AsyncSession,
+        dm_group_id: uuid.UUID,
+        sender_id: uuid.UUID,
+        recipient_id: uuid.UUID,
+        body: str,
+    ) -> None:
+        recipient = await session.get(User, recipient_id)
+        if not recipient or not recipient.is_agent:
+            return
+
+        agent = await session.scalar(select(AgentModel).where(AgentModel.user_id == recipient_id))
+        if not agent:
+            return
+
+        recent_rows = (
+            await session.execute(
+                select(DirectMessage)
+                .where(DirectMessage.dm_group_id == dm_group_id)
+                .order_by(desc(DirectMessage.created_at))
+                .limit(8)
+            )
+        ).scalars().all()
+        recent = list(reversed(recent_rows))
+        names: dict[uuid.UUID, str] = {}
+        for message in recent:
+            if message.sender_id not in names:
+                user = await session.get(User, message.sender_id)
+                names[message.sender_id] = user.username if user else "unknown"
+
+        context = "\n".join(f"@{names.get(message.sender_id, 'unknown')}: {message.body}" for message in recent)
+        provider = get_provider()
+        system = (
+            f"You are {recipient.username}, a regular person on a social app. "
+            f"Your personality style is {agent.template.replace('_', ' ')}. "
+            f"Writing style: {agent.writing_style}. "
+            "Reply naturally in first person. Do not mention being automated, simulated, or artificial."
+        )
+        prompt = (
+            f"Recent direct messages:\n{context}\n\n"
+            f"The latest message to you is: {body}\n"
+            "Write one concise direct-message reply, 1-3 sentences. Keep it casual and human."
+        )
+
+        try:
+            reply_body = (await provider.complete(system, prompt)).strip().strip('"').strip()[:600]
+        except Exception:
+            return
+        if not reply_body:
+            return
+
+        reply = DirectMessage(
+            dm_group_id=dm_group_id,
+            sender_id=recipient_id,
+            body=reply_body,
+        )
+        session.add(reply)
+        group = await session.get(DirectMessageGroup, dm_group_id)
+        if group:
+            group.last_message_at = datetime.now(timezone.utc)
+        await session.flush()
+        await event_store.append(session, "dm_sent", recipient_id, sender_id, {
+            "body": reply_body[:200],
+            "dm_group_id": str(dm_group_id),
+        })
+        await session.commit()
 
     async def list_dm_groups(
         self, session: AsyncSession, user_id: uuid.UUID, limit: int = 50
