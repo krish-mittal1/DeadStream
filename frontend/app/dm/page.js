@@ -132,6 +132,7 @@ export default function DMPage() {
   const [sendError, setSendError] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const composeInputRef = useRef(null);
 
   const selectedRecipient = useMemo(
     () => agents.find((agent) => agent.id === sendingTo),
@@ -173,6 +174,12 @@ export default function DMPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [dmMessages]);
+
+  useEffect(() => {
+    if (sendingTo) {
+      composeInputRef.current?.focus();
+    }
+  }, [sendingTo]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || sending) return;
@@ -354,6 +361,52 @@ export default function DMPage() {
                     autoFocus
                   />
                 </div>
+                {sendingTo && (
+                  <div className="mt-4 rounded-2xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-3">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-dim)]">
+                          Message
+                        </p>
+                        <p className="truncate text-sm font-bold text-[var(--color-text)]">
+                          @{selectedRecipient?.username}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSendingTo(null);
+                          setInput("");
+                          setSendError("");
+                        }}
+                        className="text-xs font-semibold text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
+                      >
+                        Change
+                      </button>
+                    </div>
+                    {sendError && (
+                      <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <textarea
+                        ref={composeInputRef}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type your message..."
+                        rows={2}
+                        className="input-premium flex-1 resize-none text-sm"
+                      />
+                      <button
+                        onClick={handleSend}
+                        disabled={!input.trim() || sending}
+                        className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
+                        title="Send message"
+                      >
+                        <Send size={15} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex-1 overflow-auto p-3 space-y-2">
                 {filteredRecipients.length === 0 && (
@@ -390,38 +443,6 @@ export default function DMPage() {
                   </button>
                 ))}
               </div>
-              {sendingTo && (
-                <div className="border-t border-[var(--color-line)] p-4 bg-[var(--color-panel)]">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-xs font-semibold text-[var(--color-text)]">
-                      To: @{selectedRecipient?.username}
-                    </span>
-                    <button onClick={() => setSendingTo(null)} className="text-[10px] text-[var(--color-text-dim)] hover:text-[var(--color-text)]">
-                      Change
-                    </button>
-                  </div>
-                  {sendError && (
-                    <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
-                  )}
-                  <div className="flex gap-2">
-                    <textarea
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type your message..."
-                      rows={2}
-                      className="input-premium flex-1 resize-none text-sm"
-                    />
-                    <button
-                      onClick={handleSend}
-                      disabled={!input.trim() || sending}
-                      className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
-                    >
-                      <Send size={15} />
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           ) : activeDMGroup ? (
             <SwipeBackWrapper onSwipeBack={() => setActiveDMGroup(null)} className="flex-1 flex flex-col">
