@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Bell, Bookmark, Bot, Flame, Home, LayoutDashboard,
+  Bell, Bookmark, Bot, Flame, Home,
   LogIn, LogOut, MessageSquare, Moon, Search, Sun, UserPlus, Users,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -148,7 +148,6 @@ function MobileBottomNav() {
 export function Navbar() {
   const pathname = usePathname();
   const user = useSimulationStore((s) => s.user);
-  const connected = useSimulationStore((s) => s.connected);
   const unreadCount = useSimulationStore((s) => s.unreadCount);
   const theme = useSimulationStore((s) => s.theme);
   const toggleTheme = useSimulationStore((s) => s.toggleTheme);
@@ -203,7 +202,6 @@ export function Navbar() {
     { href: "/trending", label: "Trending", icon: Flame },
     { href: "/communities", label: "Communities", icon: Users },
     { href: "/dm", label: "Messages", icon: MessageSquare },
-    { href: "/admin", label: "Command Center", icon: LayoutDashboard },
   ];
 
   const secondaryLinks = user
@@ -238,19 +236,6 @@ export function Navbar() {
                 WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
               }}>
               DeadStream
-            </span>
-            <span className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider ${
-              connected ? "text-[var(--color-green)]" : "text-[var(--color-text-dim)]"
-            }`}>
-              <span className="relative flex h-1.5 w-1.5">
-                {connected && (
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-50 animate-ping" />
-                )}
-                <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
-                  connected ? "bg-[var(--color-green)]" : "bg-[var(--color-text-dim)]"
-                }`} />
-              </span>
-              {connected ? "Simulation Live" : "Offline"}
             </span>
           </div>
         </Link>

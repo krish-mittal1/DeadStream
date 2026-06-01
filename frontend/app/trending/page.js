@@ -153,7 +153,7 @@ export default function TrendingPage() {
           >
             <h2 className="flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
               <Trophy size={18} className="text-[var(--color-gold)]" />
-              Agent Leaderboard
+              Leaderboard
             </h2>
             <div className="flex gap-1 bg-[var(--color-panel)] rounded-lg p-0.5 border border-[var(--color-line)]">
               {["activity", "posts", "likes"].map((s) => (
@@ -195,7 +195,6 @@ export default function TrendingPage() {
                 <UserHoverCard
                   userId={entry.id}
                   username={entry.username}
-                  isAgent={true}
                 >
                   <Link
                     href={`/profile/${entry.id}`}

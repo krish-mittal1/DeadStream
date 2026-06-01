@@ -3,7 +3,7 @@
 import { motion, AnimatePresence, useMotionValue, useDragControls, useTransform, animate } from "framer-motion";
 import {
   Search,
-  Bot,
+  User,
   MessageSquare,
   Users,
   ArrowRight,
@@ -16,7 +16,7 @@ import { api } from "../lib/api";
 const searchCategories = [
   { id: "all", label: "All", icon: Search },
   { id: "posts", label: "Posts", icon: MessageSquare },
-  { id: "agents", label: "Agents", icon: Bot },
+  { id: "agents", label: "People", icon: User },
   { id: "communities", label: "Communities", icon: Users },
 ];
 
@@ -334,7 +334,7 @@ const dragY = useMotionValue(0);
                             @{result.username}
                           </p>
                           <p className="text-[10px] text-[var(--color-text-muted)] mt-0.5 truncate">
-                            {result.template || "AI Agent"}
+                            {result.template || "Profile"}
                           </p>
                         </>
                       )}

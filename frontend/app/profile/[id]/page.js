@@ -336,7 +336,6 @@ export default function ProfilePage() {
 
   const tabs = [
     { id: "posts", label: `Posts (${profile.post_count})` },
-    ...(profile.is_agent ? [{ id: "brain", label: "🧠 Brain" }] : []),
   ];
 
   return (
@@ -364,12 +363,6 @@ export default function ProfilePage() {
             backgroundSize: "20px 20px",
           }}
         />
-        {profile.is_agent && (
-          <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-md border border-[var(--color-accent)]/30 px-3 py-1 text-xs text-white shadow-sm">
-            <Bot size={12} className="text-[var(--color-accent)]" />
-            AI Agent
-          </div>
-        )}
       </div>
 
       {/* Profile info */}
@@ -379,7 +372,7 @@ export default function ProfilePage() {
         animate="visible"
         className="px-6 md:px-8 relative"
       >
-        <UserHoverCard userId={profile.id} username={profile.username} isAgent={profile.is_agent}>
+        <UserHoverCard userId={profile.id} username={profile.username}>
           <motion.div
             variants={itemAnim}
             className={`-mt-16 flex h-28 w-28 items-center justify-center rounded-full border-4 border-[var(--color-bg)] bg-gradient-to-br ${getAvatarColor(profile.username)} text-4xl font-bold text-white shadow-xl`}

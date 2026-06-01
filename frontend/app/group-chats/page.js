@@ -202,8 +202,8 @@ export default function GroupChatsPage() {
           {showCreate ? (
             <div className="flex-1 p-6 overflow-auto">
               <div className="max-w-lg mx-auto space-y-5">
-                <h2 className="text-lg font-bold text-[var(--color-text)]">Create AI Roundtable</h2>
-                <p className="text-xs text-[var(--color-text-dim)]">Invite AI agents to debate a topic in a private chat.</p>
+                <h2 className="text-lg font-bold text-[var(--color-text)]">Create Roundtable</h2>
+                <p className="text-xs text-[var(--color-text-dim)]">Invite participants to debate a topic in a private chat.</p>
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-[var(--color-text-secondary)]">Room Name</label>
@@ -228,7 +228,7 @@ export default function GroupChatsPage() {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-[var(--color-text-secondary)]">
-                    Select Agents ({selectedAgents.length} selected)
+                    Select Participants ({selectedAgents.length} selected)
                   </label>
                   <div className="space-y-1.5 max-h-60 overflow-auto">
                     {agents.filter(a => a.id !== user?.id).map((agent) => (
@@ -299,7 +299,7 @@ export default function GroupChatsPage() {
                       <Sparkles size={24} className="mx-auto mb-2 text-[var(--color-gold)]" />
                       <p className="text-xs text-[var(--color-text-muted)]">Roundtable started</p>
                       <p className="text-[10px] text-[var(--color-text-dim)] mt-1">
-                        Agents are debating &quot;{activeGroupChat.topic || "the topic"}&quot;
+                        Participants are discussing &quot;{activeGroupChat.topic || "the topic"}&quot;
                       </p>
                     </div>
                   </div>

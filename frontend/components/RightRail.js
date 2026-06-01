@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  Activity, AlertTriangle, Flame, MessageCircle,
-  Radio, Swords, Users, Zap,
-} from "lucide-react";
+import { Flame, MessageCircle, Swords, Users, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSimulationStore } from "../store/useSimulationStore";
@@ -12,7 +9,7 @@ const SECTION = "border-b border-[var(--color-line)] px-5 py-5";
 
 function SectionHeader({ icon, label, extra }) {
   return (
-    <div className="flex items-center justify-between mb-4">
+    <div className="mb-4 flex items-center justify-between">
       <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
         <span className="text-[var(--color-text-dim)]">{icon}</span>
         {label}
@@ -24,7 +21,7 @@ function SectionHeader({ icon, label, extra }) {
 
 function TrendBar({ score, max }) {
   return (
-    <div className="h-1 rounded-full bg-[var(--color-panel-2)] overflow-hidden mt-1.5">
+    <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--color-panel-2)]">
       <motion.div
         initial={{ width: 0 }}
         animate={{ width: `${Math.min(100, (score / (max || 1)) * 100)}%` }}
@@ -36,17 +33,9 @@ function TrendBar({ score, max }) {
 }
 
 export function RightRail() {
-  const connected = useSimulationStore((s) => s.connected);
   const trends = useSimulationStore((s) => s.trends);
-  const agents = useSimulationStore((s) => s.agents);
   const communities = useSimulationStore((s) => s.communities);
   const events = useSimulationStore((s) => s.events);
-  const posts = useSimulationStore((s) => s.posts);
-  const leaderboardData = useSimulationStore((s) => s.leaderboardData);
-
-  const recentEventCount = events.filter(
-    (e) => Date.now() - new Date(e.occurred_at || 0).getTime() < 60_000
-  ).length;
 
   const dramaEvents = events
     .filter((e) => e.type === "agent_beef" || e.type === "agent_argue")
@@ -55,31 +44,7 @@ export function RightRail() {
   const maxTrendScore = Math.max(...trends.map((t) => Number(t.score)), 1);
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto scrollbar-thin">
-
-      {/* ─── Status Bar ─── */}
-      <div className="px-5 py-4 border-b border-[var(--color-line)]">
-        <div className="flex items-center gap-3">
-          <span className={`flex items-center gap-1.5 text-xs font-bold ${
-            connected ? "text-[var(--color-green)]" : "text-[var(--color-red)]"
-          }`}>
-            <span className="relative flex h-2 w-2">
-              {connected && (
-                <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--color-green)] opacity-55 animate-ping" />
-              )}
-              <span className={`relative inline-flex h-2 w-2 rounded-full ${
-                connected ? "bg-[var(--color-green)]" : "bg-[var(--color-red)]"
-              }`} />
-            </span>
-            {connected ? "Live" : "Offline"}
-          </span>
-          <span className="text-[11px] text-[var(--color-text-muted)] font-medium ml-auto">
-            {posts.length} posts
-          </span>
-        </div>
-      </div>
-
-      {/* ─── Drama Feed ─── */}
+    <div className="flex h-full flex-col overflow-y-auto scrollbar-thin">
       <AnimatePresence>
         {dramaEvents.length > 0 && (
           <motion.section
@@ -91,8 +56,8 @@ export function RightRail() {
               icon={<Swords size={12} />}
               label={<span className="text-red-400">Drama Feed</span>}
               extra={
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[9px] font-black text-red-400 uppercase tracking-wide">
-                  <Zap size={8} /> LIVE
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-red-400">
+                  <Zap size={8} /> Hot
                 </span>
               }
             />
@@ -109,18 +74,18 @@ export function RightRail() {
                     className="group rounded-xl border border-red-500/10 bg-red-500/[0.04] p-3 transition-all duration-200 hover:border-red-500/20 hover:bg-red-500/8"
                   >
                     <div className="flex items-start gap-2">
-                      <span className="mt-0.5 text-red-400/80 shrink-0">
+                      <span className="mt-0.5 shrink-0 text-red-400/80">
                         {event.type === "agent_beef" ? <Swords size={11} /> : <MessageCircle size={11} />}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-[10px] leading-relaxed text-red-300/90 line-clamp-2">
+                        <p className="line-clamp-2 text-[10px] leading-relaxed text-red-300/90">
                           {event.payload?.roast
-                            ? `🔥 ${event.payload.roast.slice(0, 75)}${event.payload.roast.length > 75 ? "…" : ""}`
+                            ? `${event.payload.roast.slice(0, 75)}${event.payload.roast.length > 75 ? "..." : ""}`
                             : event.payload?.target
-                              ? `⚔️ ${event.payload.target.slice(0, 60)}…`
-                              : "💬 Argument brewing"}
+                              ? `${event.payload.target.slice(0, 60)}...`
+                              : "A heated thread is picking up"}
                         </p>
-                        <p className="mt-1 text-[9px] text-red-400/40 font-medium">
+                        <p className="mt-1 text-[9px] font-medium text-red-400/40">
                           {new Date(event.occurred_at || Date.now()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
@@ -133,46 +98,19 @@ export function RightRail() {
         )}
       </AnimatePresence>
 
-      {/* ─── Live Status ─── */}
-      <section className={SECTION}>
-        <SectionHeader icon={<Radio size={12} />} label="Network Status" />
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: "Agents", value: agents.length, color: "var(--color-blue)" },
-            { label: "Posts", value: posts.length, color: "var(--color-accent)" },
-            { label: "Events/min", value: recentEventCount, color: recentEventCount > 10 ? "var(--color-accent)" : "var(--color-gold)" },
-            { label: "Communities", value: communities.length, color: "var(--color-green)" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-3">
-              <span className="text-[10px] text-[var(--color-text-muted)] font-medium">{label}</span>
-              <motion.span
-                key={value}
-                initial={{ y: 4, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                className="block mt-1 text-lg font-extrabold tabular-nums"
-                style={{ color }}
-              >
-                {value}
-              </motion.span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── Trending ─── */}
       <section className={SECTION}>
         <SectionHeader
           icon={<Flame size={12} />}
           label="Trending"
           extra={
-            <Link href="/trending" className="text-[10px] font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+            <Link href="/trending" className="text-[10px] font-bold text-[var(--color-accent)] transition-colors hover:text-[var(--color-accent-hover)]">
               View all
             </Link>
           }
         />
         <div className="space-y-4">
           {trends.length === 0 && (
-            <p className="text-xs text-[var(--color-text-muted)] italic">Warming up...</p>
+            <p className="text-xs italic text-[var(--color-text-muted)]">Warming up...</p>
           )}
           {trends.slice(0, 5).map((trend, i) => (
             <motion.div
@@ -183,20 +121,20 @@ export function RightRail() {
               className="group cursor-default"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`text-[10px] font-black shrink-0 tabular-nums ${
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={`shrink-0 tabular-nums text-[10px] font-black ${
                     i === 0 ? "text-[var(--color-gold)]" : i < 3 ? "text-[var(--color-accent)]" : "text-[var(--color-text-dim)]"
                   }`}>
                     #{i + 1}
                   </span>
-                  <span className="text-sm font-bold text-[var(--color-text)] truncate group-hover:text-[var(--color-accent)] transition-colors">
+                  <span className="truncate text-sm font-bold text-[var(--color-text)] transition-colors group-hover:text-[var(--color-accent)]">
                     {trend.topic}
                   </span>
                 </div>
                 <motion.span
                   animate={{ scale: [1, 1.06, 1] }}
                   transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="text-[10px] font-bold text-[var(--color-text-muted)] tabular-nums shrink-0"
+                  className="shrink-0 tabular-nums text-[10px] font-bold text-[var(--color-text-muted)]"
                 >
                   {Number(trend.score).toFixed(1)}
                 </motion.span>
@@ -207,13 +145,12 @@ export function RightRail() {
         </div>
       </section>
 
-      {/* ─── Communities ─── */}
       <section className={SECTION}>
         <SectionHeader
           icon={<Users size={12} />}
           label="Communities"
           extra={
-            <Link href="/communities" className="text-[10px] font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors">
+            <Link href="/communities" className="text-[10px] font-bold text-[var(--color-accent)] transition-colors hover:text-[var(--color-accent-hover)]">
               View all
             </Link>
           }
@@ -225,91 +162,23 @@ export function RightRail() {
               <Link
                 key={c.id}
                 href="/communities"
-                className="group flex items-center justify-between rounded-lg p-2 -mx-2 transition-all duration-150 hover:bg-[var(--color-panel)]/60"
+                className="-mx-2 flex items-center justify-between rounded-lg p-2 transition-all duration-150 hover:bg-[var(--color-panel)]/60"
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex min-w-0 items-center gap-2">
                   <div
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-white text-[10px] font-black shrink-0"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white"
                     style={{ background: `hsl(${hue}, 70%, 45%)` }}
                   >
                     {c.name?.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-sm font-medium text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors truncate">
+                  <span className="truncate text-sm font-medium text-[var(--color-text)] transition-colors hover:text-[var(--color-accent)]">
                     {c.name}
                   </span>
                 </div>
-                <span
-                  className="shrink-0 text-[10px] font-bold tabular-nums"
-                  style={{ color: `hsl(${hue}, 75%, 58%)` }}
-                >
+                <span className="shrink-0 tabular-nums text-[10px] font-bold" style={{ color: `hsl(${hue}, 75%, 58%)` }}>
                   {Number(c.conflict_score).toFixed(1)}
                 </span>
               </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ─── Active Agents ─── */}
-      <section className="flex-1 px-5 py-5">
-        <SectionHeader icon={<Activity size={12} />} label="Active Agents" />
-        <div className="space-y-2.5">
-          {agents.slice(0, 5).map((agent, i) => {
-            const agitation = Number(agent.emotional_state?.agitation ?? 0.3);
-            const confidence = Number(agent.emotional_state?.confidence ?? 0.5);
-            const hue = Math.round(agent.activity_level * 120);
-            return (
-              <motion.div
-                key={agent.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, type: "spring", stiffness: 380, damping: 28 }}
-                className="group rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] p-3 transition-all duration-200 hover:border-[var(--color-line-light)] hover:bg-[var(--color-panel-hover)]"
-              >
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white text-[9px] font-black"
-                      style={{ background: `hsl(${hue}, 65%, 48%)` }}
-                    >
-                      {agent.username?.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="truncate text-xs font-bold text-[var(--color-text)]">
-                      @{agent.username?.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                  <span
-                    className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-black"
-                    style={{ background: `hsla(${hue}, 60%, 50%, 0.14)`, color: `hsl(${hue}, 75%, 62%)` }}
-                  >
-                    {(agent.activity_level * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="text-[10px] text-[var(--color-text-muted)] truncate mb-2.5">
-                  {agent.template}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: "Agit", value: agitation, color: `hsl(${Math.round((1 - agitation) * 120)}, 70%, 55%)` },
-                    { label: "Conf", value: confidence, color: "var(--color-blue)" },
-                  ].map(({ label, value, color }) => (
-                    <div key={label}>
-                      <div className="flex justify-between text-[8px] text-[var(--color-text-dim)] mb-0.5 font-bold uppercase tracking-wider">
-                        <span>{label}</span><span>{(value * 100).toFixed(0)}%</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-[var(--color-panel-2)] overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${value * 100}%` }}
-                          transition={{ duration: 0.7, ease: "easeOut" }}
-                          className="h-full rounded-full"
-                          style={{ background: color }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
             );
           })}
         </div>

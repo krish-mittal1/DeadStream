@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
 export function NewPostsToast({ count, onLoad }) {
+  const label = count >= 99 ? "99+" : count;
+
   return (
     <AnimatePresence>
       {count > 0 && (
@@ -20,7 +22,7 @@ export function NewPostsToast({ count, onLoad }) {
           >
             <Loader2 size={13} />
           </motion.div>
-          {count} new {count === 1 ? "post" : "posts"} — click to load
+          {label} new {count === 1 ? "post" : "posts"} - click to load
         </motion.button>
       )}
     </AnimatePresence>

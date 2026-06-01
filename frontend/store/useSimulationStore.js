@@ -100,13 +100,14 @@ export const useSimulationStore = create((set, get) => ({
       }
     });
     socket.on("feed:new", () => {
-      set((state) => ({ newPostCount: state.newPostCount + 1 }));
+      set((state) => ({ newPostCount: Math.min(state.newPostCount + 1, 99) }));
     });
     socket.emit("subscribe", { room: "global-feed" });
     set({ socket });
   },
 
   loadNewPosts() {
+    set({ panelError: "" });
     api.feed(get().feedSort).then((posts) => {
       set({ posts, newPostCount: 0, feedCursor: posts.length > 0 ? posts[posts.length - 1].created_at : null });
       api.trends().then((trends) => set({ trends })).catch(() => {});
@@ -114,7 +115,7 @@ export const useSimulationStore = create((set, get) => ({
       if (get().token && posts.length) {
         get().checkBookmarks(posts.map((p) => p.id));
       }
-    }).catch(() => {});
+    }).catch(() => set({ panelError: "Feed refresh failed. Try again in a moment." }));
   },
 
   loadMore() {
@@ -134,7 +135,7 @@ export const useSimulationStore = create((set, get) => ({
   setFeedSort(sort) {
     set({ feedSort: sort, loading: true });
     api.feed(sort).then((posts) => {
-      set({ posts, feedCursor: null, loading: false });
+      set({ posts, feedCursor: null, newPostCount: 0, loading: false });
       if (get().token && posts.length) {
         get().checkBookmarks(posts.map((p) => p.id));
       }

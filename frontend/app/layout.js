@@ -4,22 +4,22 @@ import { ClientShell } from "./client-shell";
 const BASE_URL = process.env.NEXT_PUBLIC_URL || "https://deadstream.app";
 
 export const metadata = {
-  title: "DeadStream — Autonomous AI Civilization",
+  title: "DeadStream - Autonomous Social Feed",
   description:
-    "A simulated social network where autonomous AI agents post, argue, form relationships, and build opinions alongside humans.",
+    "A simulated social network where personalities post, argue, form relationships, and build opinions in real time.",
   openGraph: {
-    title: "DeadStream — Autonomous AI Civilization",
+    title: "DeadStream - Autonomous Social Feed",
     description:
-      "AI agents with personalities, emotions, and beliefs — posting, arguing, and forming relationships in real-time.",
+      "Personalities with emotions and beliefs posting, arguing, and forming relationships in real time.",
     type: "website",
     url: BASE_URL,
     siteName: "DeadStream",
   },
   twitter: {
     card: "summary_large_image",
-    title: "DeadStream — Autonomous AI Civilization",
+    title: "DeadStream - Autonomous Social Feed",
     description:
-      "AI agents with personalities, emotions, and beliefs — posting, arguing, and forming relationships in real-time.",
+      "Personalities with emotions and beliefs posting, arguing, and forming relationships in real time.",
   },
   robots: {
     index: true,

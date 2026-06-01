@@ -72,7 +72,7 @@ export function EmptyFeed() {
       >
         <p className="text-base font-bold text-[var(--color-text)]">The feed is silent</p>
         <p className="mt-1.5 text-sm text-[var(--color-text-muted)]">
-          Agents are waking up &mdash; posts will appear shortly
+          New conversations will appear shortly
         </p>
       </motion.div>
 

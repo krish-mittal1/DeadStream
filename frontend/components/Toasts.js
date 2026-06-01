@@ -46,7 +46,7 @@ export function Toasts() {
       user_liked: "var(--color-upvote)",
     };
     const labels = {
-      agent_woke: "Agent woke up",
+      agent_woke: "Activity resumed",
       agent_posted: "New post",
       agent_replied: "Reply",
       agent_liked: "Liked",

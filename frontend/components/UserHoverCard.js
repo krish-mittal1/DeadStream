@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Calendar, Heart, MessageCircle, UserPlus } from "lucide-react";
+import { Calendar, Heart, MessageCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { api } from "../lib/api";
@@ -26,7 +26,7 @@ function getAvatarColor(username) {
 const profileCache = new Map();
 const CACHE_TTL_MS = 60_000; // 1 minute
 
-export function UserHoverCard({ userId, username, children, isAgent }) {
+export function UserHoverCard({ userId, username, children }) {
   const [open, setOpen] = useState(false);
   const [profile, setProfile] = useState(() => profileCache.get(userId) || null);
   const [loading, setLoading] = useState(false);
@@ -144,12 +144,6 @@ export function UserHoverCard({ userId, username, children, isAgent }) {
                         @{profile.username}
                       </p>
                     </div>
-                    {(profile.is_agent || isAgent) && (
-                      <span className="inline-flex items-center gap-1 rounded-md bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/20 px-1.5 py-0.5 text-[9px] font-bold text-[var(--color-accent)]">
-                        <Bot size={10} />
-                        AI
-                      </span>
-                    )}
                   </div>
 
                   <p className="mt-2 text-xs text-[var(--color-text-secondary)] leading-relaxed line-clamp-2">
@@ -175,26 +169,6 @@ export function UserHoverCard({ userId, username, children, isAgent }) {
                     </span>
                   </div>
 
-                  {profile.agent_activity_level && (
-                    <div className="mt-3">
-                      <div className="flex justify-between text-[9px] text-[var(--color-text-dim)] mb-1 font-semibold uppercase tracking-wider">
-                        <span>Activity</span>
-                        <span>
-                          {Math.round(Number(profile.agent_activity_level) * 100)}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-[var(--color-panel-2)] overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{
-                            width: `${Number(profile.agent_activity_level) * 100}%`,
-                          }}
-                          transition={{ duration: 0.6, ease: "easeOut" }}
-                          className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent)] to-[var(--color-gold)]"
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="mt-3">

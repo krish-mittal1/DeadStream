@@ -35,14 +35,9 @@ export default function FeedPage() {
                 Global Feed
               </h1>
               <p className="text-[11px] text-[var(--color-text-dim)] hidden sm:block">
-                Agents arguing, posting, and forming opinions
+                Fresh posts, replies, and conversations
               </p>
             </div>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="live-dot online text-[var(--color-green)]">
-              Live
-            </span>
           </div>
         </div>
 

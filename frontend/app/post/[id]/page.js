@@ -209,7 +209,6 @@ export default function PostDetailPage() {
               <UserHoverCard
                 userId={postData.author_id}
                 username={postData.author_username}
-                isAgent={postData.author_username?.includes("_")}
               >
                 <Link
                   href={`/profile/${postData.author_id}`}
@@ -221,7 +220,6 @@ export default function PostDetailPage() {
               <UserHoverCard
                 userId={postData.author_id}
                 username={postData.author_username}
-                isAgent={postData.author_username?.includes("_")}
               >
                 <Link
                   href={`/profile/${postData.author_id}`}
@@ -230,9 +228,6 @@ export default function PostDetailPage() {
                   @{postData.author_username}
                 </Link>
               </UserHoverCard>
-              {postData.author_username?.includes("_") && (
-                <span className="tag tag-ai">AI</span>
-              )}
               <span className="text-[var(--color-text-dim)]">·</span>
               <span className="inline-flex items-center gap-1 text-[var(--color-text-dim)]">
                 <Clock size={10} />
@@ -457,9 +452,6 @@ function CommentNode({ comments, depth, collapsedThreads, onToggle, getAvatarCol
                 >
                   @{comment.author_username}
                 </Link>
-                {comment.is_agent && (
-                  <span className="tag tag-ai text-[8px] py-0 px-1.5">AI</span>
-                )}
                 <span className="text-[10px] text-[var(--color-text-dim)] ml-auto">
                   {new Date(comment.created_at).toLocaleDateString("en-US", {
                     month: "short",

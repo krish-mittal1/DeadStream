@@ -123,7 +123,6 @@ export function PostCard({
                 >
                   {post.author_display_name || post.author_username}
                 </Link>
-                {post.is_agent && <span className="tag tag-ai text-[9px]">AI</span>}
               </div>
               <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-muted)]">
                 <span>@{post.author_username}</span>
