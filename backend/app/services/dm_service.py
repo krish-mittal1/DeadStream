@@ -180,6 +180,8 @@ class DMService:
             "Write one concise direct-message reply, 1-2 short sentences. "
             "If the latest message is a greeting, greet them back and ask a natural follow-up. "
             "If they correct or deny something, acknowledge it and ask what they meant. "
+            "If they invite you somewhere, respond to the invite specifically. "
+            "If they thank you, acknowledge it casually without restarting the conversation. "
             "Do not reply like a public feed comment."
         )
 
@@ -208,13 +210,60 @@ class DMService:
 
     def _contextual_dm_fallback(self, body: str) -> str:
         text = body.strip().lower()
-        if any(word in text for word in ("hey", "hi", "hello", "yo", "bro")):
-            return "hey, kya scene? bol na."
+        normalized = text.replace("yaar", "").replace("bhai", "").strip()
+        if any(word in text for word in ("shaadi", "wedding", "invite", "aajana", "aa jaana", "come", "party")):
+            return random.choice([
+                "arre wah, congrats! time aur location bhej de, try karta hu aane ka.",
+                "congrats yaar. kab aur kahan hai? details bhej.",
+                "nice bhai, happy for you. venue bata de."
+            ])
+        if any(word in text for word in ("thanks", "thank you", "shukriya", "dhanyawaad")):
+            return random.choice([
+                "arre chill, no worries.",
+                "haha anytime yaar.",
+                "koi scene nahi, happy to help."
+            ])
+        if any(word in text for word in ("haha", "lol", "lmao", "😂")):
+            return random.choice([
+                "sahi me, thoda funny tha.",
+                "haan woh toh hai lol.",
+                "bas wahi energy chahiye."
+            ])
+        if any(word in text for word in ("hey", "hi", "hello", "yo")):
+            return random.choice([
+                "hey, kya scene?",
+                "yo, bol kya chal raha hai?",
+                "hello hello, kaise ho?"
+            ])
         if any(word in text for word in ("nhi", "nahi", "no", "nah", "not really")):
-            return "achha, samjha. fir tu kya bol raha tha?"
+            return random.choice([
+                "achha, my bad. fir actual scene kya tha?",
+                "okay got it. tu kya kehna chahta tha?",
+                "samjha, I read it wrong. bata fir."
+            ])
+        if any(word in text for word in ("support", "supports", "help", "saath")):
+            return random.choice([
+                "haan support zaroori hota hai. kis cheez me support kar raha hai?",
+                "that's good yaar. aise log kaafi rare hote hain.",
+                "nice, at least koi toh properly saath de raha hai."
+            ])
         if "?" in body:
-            return "hmm, fair question. thoda context de, then I can answer properly."
-        return "haan, samjha. aur bata, what happened next?"
+            return random.choice([
+                "hmm, fair question. thoda aur context de.",
+                "depends yaar, exact scene kya hai?",
+                "honestly bataun toh context pe depend karta hai."
+            ])
+        if len(normalized) < 18:
+            return random.choice([
+                "haan bol, sun raha hu.",
+                "achha, aur?",
+                "hmm okay, continue kar."
+            ])
+        return random.choice([
+            "haan, got it. ye thoda interesting hai.",
+            "samjha. isme main point kya hai tere hisaab se?",
+            "fair enough yaar, makes sense."
+        ])
 
     async def list_dm_groups(
         self, session: AsyncSession, user_id: uuid.UUID, limit: int = 50

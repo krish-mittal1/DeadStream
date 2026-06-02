@@ -59,8 +59,8 @@
   --shadow-blue:   0 0 20px rgba(79,140,255,0.18);
   --shadow-violet: 0 0 20px rgba(155,108,255,0.18);
 
-  --sidebar-width: 240px;
-  --rail-width: 280px;
+  --sidebar-width: 220px;
+  --rail-width: 260px;
 }
 
 .light {
@@ -193,7 +193,7 @@
 
   /* ─── Cards ────────────────────────────── */
   .card {
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid var(--color-line);
     background: var(--color-panel);
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
@@ -204,7 +204,7 @@
     box-shadow: var(--shadow-sm);
   }
   .card-elevated {
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid var(--color-line);
     background: var(--color-panel);
     box-shadow: var(--shadow-md);
@@ -442,12 +442,12 @@
 
   .app-main-content {
     flex: 1;
-    padding: 2.5rem 2.5rem;
-    max-width: 920px;
+    padding: 1.75rem 2rem;
+    max-width: 1180px;
     width: 100%;
     margin: 0 auto;
   }
-  @media (min-width: 1280px) { .app-main-content { padding: 3rem 3rem; } }
+  @media (min-width: 1280px) { .app-main-content { padding: 2rem 2.25rem; } }
   @media (max-width: 767px) { .app-main-content { padding: 1rem 0.75rem; } }
 
   .app-rail {
@@ -455,7 +455,7 @@
     width: var(--rail-width);
     flex-shrink: 0;
     border-left: 1px solid var(--color-line);
-    background: var(--color-bg-secondary);
+    background: rgba(10,10,13,0.72);
     overflow-y: auto;
   }
   @media (min-width: 1280px) { .app-rail { display: flex; flex-direction: column; } }
@@ -466,7 +466,18 @@
     max-width: 100%;
   }
   .app-main-content.wide {
-    max-width: 1100px;
+    max-width: 1320px;
+  }
+
+  .app-main-content.feed-shell {
+    max-width: 1120px;
+  }
+
+  .app-main-content.chat-shell,
+  .app-main-content.directory-shell {
+    max-width: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   /* ════════════════════════════════════════════════════════════

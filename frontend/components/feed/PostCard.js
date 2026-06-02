@@ -94,19 +94,19 @@ export function PostCard({
         layout
         className={`
           relative z-10
-          rounded-2xl
+          rounded-xl
           border border-[var(--color-line)]
           bg-[var(--color-panel)]
           transition-all duration-200
-          ${isReply ? "mb-2" : "mb-3"}
+          ${isReply ? "mb-2" : "mb-2.5"}
           hover:border-[var(--color-line-light)]
           hover:bg-[var(--color-panel-hover)]
           hover:shadow-[var(--shadow-sm)]
         `}
       >
-        <div className={`${isReply ? "px-3.5 py-3 sm:px-4 sm:py-3" : "px-3.5 py-3 sm:px-5 sm:py-4"}`}>
+        <div className={`${isReply ? "px-3.5 py-3 sm:px-4 sm:py-3" : "px-4 py-3.5"}`}>
           {/* ─── Author header ─── */}
-          <div className="flex items-center gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
+          <div className="flex items-center gap-2.5 mb-2.5">
             <Link href={`/profile/${post.author_id}`} className="shrink-0">
               <div
                 className="avatar avatar-md"
@@ -135,7 +135,7 @@ export function PostCard({
           {/* ─── Title ─── */}
           {post.title && (
             <Link href={`/post/${post.id}`} className="block mb-1.5 sm:mb-2">
-              <h3 className="text-sm sm:text-base font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
+              <h3 className="text-[15px] font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
                 {post.title}
               </h3>
             </Link>
@@ -144,7 +144,7 @@ export function PostCard({
           {/* ─── Body ─── */}
           {post.body && (
             <Link href={`/post/${post.id}`}>
-              <p className="text-xs sm:text-sm text-[var(--color-text-secondary)] leading-relaxed mb-2.5 sm:mb-3">
+              <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed mb-2.5">
                 {post.body.length > 300 ? `${post.body.slice(0, 300)}…` : post.body}
               </p>
             </Link>

@@ -159,7 +159,7 @@ export default function CommunitiesPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="mx-auto max-w-6xl flex flex-col h-full min-h-0"
+      className="flex h-[calc(100vh-0px)] min-h-0 w-full flex-col overflow-hidden border-x border-[var(--color-line)] bg-[var(--color-bg)]"
     >
       {/* Header */}
       <div className="border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 md:px-6 h-11 flex items-center justify-between">
@@ -180,7 +180,7 @@ export default function CommunitiesPage() {
         </div>
       </div>
 
-      <div className="flex-1 grid md:grid-cols-[340px_1fr] min-h-0">
+      <div className="grid min-h-0 flex-1 md:grid-cols-[420px_minmax(0,1fr)]">
         {/* Community list - full width on mobile unless community selected */}
         <div className={`scrollbar-thin overflow-auto border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] p-3 space-y-2 ${selectedCommunity ? "hidden md:block" : ""}`}>
           {filtered.length === 0 && (

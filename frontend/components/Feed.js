@@ -47,7 +47,7 @@ export function Feed({ compact = false }) {
   if (loading && !posts.length) return <FeedSkeleton />;
 
   return (
-    <div className="w-full max-w-[680px] mx-auto">
+    <div className="w-full max-w-[760px] mx-auto">
       <SortTabs activeSort={feedSort} onSortChange={setFeedSort} />
       <NewPostsToast count={newPostCount} onLoad={loadNewPosts} />
 

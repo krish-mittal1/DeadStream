@@ -90,7 +90,7 @@ function DMMessage({ msg, isOwn }) {
         </div>
       )}
       <div
-        className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm ${
+        className={`max-w-[min(72%,560px)] rounded-2xl px-4 py-2.5 shadow-sm ${
           isOwn
             ? "bg-[var(--color-accent)] text-white rounded-br-md shadow-[0_2px_8px_rgba(255,69,0,0.2)]"
             : "bg-[var(--color-panel)] border border-[var(--color-line)] text-[var(--color-text)] rounded-bl-md"
@@ -254,7 +254,7 @@ export default function DMPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
-      className="mx-auto max-w-4xl flex flex-col h-full min-h-0"
+      className="flex h-[calc(100vh-0px)] min-h-0 w-full flex-col overflow-hidden border-x border-[var(--color-line)] bg-[var(--color-bg)]"
     >
       {/* Header */}
       <div className="border-b border-[var(--color-line)] glass-strong px-4 md:px-6 h-11 flex items-center justify-between shrink-0">
@@ -269,9 +269,9 @@ export default function DMPage() {
         )}
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar - full width on mobile, sidebar on desktop */}
-        <div className={`${activeDMGroup ? "hidden md:flex" : "flex"} w-full md:w-64 border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex-col`}>
+        <div className={`${activeDMGroup ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex-col`}>
           {/* Compose button */}
           <div className="p-3 border-b border-[var(--color-line)]">
             <button
@@ -349,7 +349,7 @@ export default function DMPage() {
         </div>
 
         {/* Chat area - full screen on mobile when active or composing */}
-        <div className={`${activeDMGroup || composing ? "flex" : "hidden md:flex"} flex-1 flex-col bg-[var(--color-bg)]`}>
+        <div className={`${activeDMGroup || composing ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col bg-[var(--color-bg)]`}>
           {composing ? (
             <div className="flex-1 flex flex-col">
               <div className="p-4 border-b border-[var(--color-line)]">
@@ -366,7 +366,7 @@ export default function DMPage() {
                   />
                 </div>
                 {sendingTo && (
-                  <div className="mt-4 rounded-2xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/10 p-3">
+                  <div className="mt-4 rounded-xl border border-[var(--color-accent)]/25 bg-[var(--color-accent)]/8 p-3">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-dim)]">
@@ -412,7 +412,7 @@ export default function DMPage() {
                   </div>
                 )}
               </div>
-              <div className="flex-1 overflow-auto p-3 space-y-2">
+              <div className="grid flex-1 grid-cols-1 gap-2 overflow-auto p-3 lg:grid-cols-2">
                 {filteredRecipients.length === 0 && (
                   <div className="p-6 text-center text-xs text-[var(--color-text-muted)]">
                     No people match that search.
@@ -474,7 +474,7 @@ export default function DMPage() {
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-auto p-4 space-y-3">
+              <div className="flex-1 overflow-auto px-5 py-4 md:px-8 lg:px-12 space-y-3">
                 {(dmMessages[activeDMGroup.id] || []).length === 0 && (
                   <div className="flex h-full items-center justify-center">
                     <div className="text-center">
@@ -493,7 +493,7 @@ export default function DMPage() {
               </div>
 
               {/* Input */}
-              <div className="border-t border-[var(--color-line)] p-3 sm:p-4 bg-[var(--color-panel)]">
+              <div className="border-t border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-3 md:px-8 lg:px-12">
                 {sendError && (
                   <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
                 )}

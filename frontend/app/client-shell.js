@@ -35,20 +35,7 @@ function CursorGlow() {
 }
 
 function AmbientOrbs() {
-  return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-      <div className="absolute top-[-400px] left-1/2 -translate-x-1/2 w-[1000px] h-[800px] opacity-[0.04]"
-        style={{ background: "radial-gradient(ellipse at center, var(--color-accent) 0%, transparent 70%)", animation: "breathe 8s ease-in-out infinite" }} />
-      <div className="absolute top-[30%] right-[-200px] w-[600px] h-[600px] opacity-[0.025]"
-        style={{ background: "radial-gradient(ellipse at center, var(--color-blue) 0%, transparent 70%)", animation: "float 12s ease-in-out infinite" }} />
-      <div className="absolute bottom-[10%] left-[-100px] w-[400px] h-[400px] opacity-[0.02]"
-        style={{ background: "radial-gradient(ellipse at center, var(--color-violet) 0%, transparent 70%)", animation: "float 10s ease-in-out infinite reverse" }} />
-      <div className="absolute top-[60%] left-[20%] w-[300px] h-[300px] opacity-[0.015]"
-        style={{ background: "radial-gradient(ellipse at center, var(--color-gold) 0%, transparent 70%)", animation: "float 14s ease-in-out infinite 2s" }} />
-      <div className="absolute inset-0 opacity-[0.02]"
-        style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "80px 80px" }} />
-    </div>
-  );
+  return null;
 }
 
 function PageTransition({ children }) {
@@ -171,11 +158,21 @@ function useFullWidth(pathname) {
   return false;
 }
 
+function useMainShellClass(pathname) {
+  if (!pathname) return "";
+  if (pathname.startsWith("/dm") || pathname.startsWith("/group-chats")) return " chat-shell";
+  if (pathname.startsWith("/communities") || pathname.startsWith("/trending")) return " directory-shell";
+  if (pathname.startsWith("/admin") || pathname === "/") return " full-width";
+  if (pathname.startsWith("/feed") || pathname.startsWith("/post") || pathname.startsWith("/profile")) return " feed-shell";
+  return "";
+}
+
 export function ClientShell({ children }) {
   const pathname = usePathname();
   const bootstrap = useSimulationStore((s) => s.bootstrap);
   const showRail = useShowRail(pathname);
   const fullWidth = useFullWidth(pathname);
+  const shellClass = useMainShellClass(pathname);
   const isAuthPage = pathname === "/login" || pathname === "/register";
   const isLanding = pathname === "/";
 
@@ -202,7 +199,7 @@ export function ClientShell({ children }) {
 
               {/* ─── Main Content Area ─── */}
               <div className="app-main">
-                <main className="app-main-content scrollbar-thin" data-scroll-container
+                <main className={`app-main-content scrollbar-thin${shellClass}`} data-scroll-container
                   style={fullWidth ? { maxWidth: "100%" } : isAuthPage || isLanding ? { maxWidth: "100%", display: "flex", alignItems: "center", justifyContent: "center" } : {}}>
                   <PageTransition>{children}</PageTransition>
                 </main>
