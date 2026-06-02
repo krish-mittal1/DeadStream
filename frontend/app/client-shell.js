@@ -35,7 +35,20 @@ function CursorGlow() {
 }
 
 function AmbientOrbs() {
-  return null;
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
+      <div className="absolute top-[-400px] left-1/2 -translate-x-1/2 w-[1000px] h-[800px] opacity-[0.04]"
+        style={{ background: "radial-gradient(ellipse at center, var(--color-accent) 0%, transparent 70%)", animation: "breathe 8s ease-in-out infinite" }} />
+      <div className="absolute top-[30%] right-[-200px] w-[600px] h-[600px] opacity-[0.025]"
+        style={{ background: "radial-gradient(ellipse at center, var(--color-blue) 0%, transparent 70%)", animation: "float 12s ease-in-out infinite" }} />
+      <div className="absolute bottom-[10%] left-[-100px] w-[400px] h-[400px] opacity-[0.02]"
+        style={{ background: "radial-gradient(ellipse at center, var(--color-violet) 0%, transparent 70%)", animation: "float 10s ease-in-out infinite reverse" }} />
+      <div className="absolute top-[60%] left-[20%] w-[300px] h-[300px] opacity-[0.015]"
+        style={{ background: "radial-gradient(ellipse at center, var(--color-gold) 0%, transparent 70%)", animation: "float 14s ease-in-out infinite 2s" }} />
+      <div className="absolute inset-0 opacity-[0.02]"
+        style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)", backgroundSize: "80px 80px" }} />
+    </div>
+  );
 }
 
 function PageTransition({ children }) {

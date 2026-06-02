@@ -9,20 +9,20 @@
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap");
 
 @theme {
-  --color-bg:            #070709;
-  --color-bg-secondary:  #0d0d10;
-  --color-panel:         #111115;
-  --color-panel-2:       #17171c;
-  --color-panel-hover:   #1c1c22;
-  --color-panel-border:  #242428;
+  --color-bg:            #0d0e12;
+  --color-bg-secondary:  #0d0e12;
+  --color-panel:         #15161b;
+  --color-panel-2:       #1e2023;
+  --color-panel-hover:   #1a1b1f;
+  --color-panel-border:  #333539;
 
-  --color-text:           #f2f2f5;
-  --color-text-secondary: #9b9ba8;
-  --color-text-muted:     #65656f;
-  --color-text-dim:       #3d3d45;
+  --color-text:           #e3e2e7;
+  --color-text-secondary: #b8b3bd;
+  --color-text-muted:     #77727d;
+  --color-text-dim:       #4d4852;
 
-  --color-line:       #1a1a1f;
-  --color-line-light: #252530;
+  --color-line:       #242229;
+  --color-line-light: #37333b;
 
   --color-accent:        #ff4500;
   --color-accent-hover:  #ff6534;
@@ -59,8 +59,8 @@
   --shadow-blue:   0 0 20px rgba(79,140,255,0.18);
   --shadow-violet: 0 0 20px rgba(155,108,255,0.18);
 
-  --sidebar-width: 220px;
-  --rail-width: 260px;
+  --sidebar-width: 272px;
+  --rail-width: 330px;
 }
 
 .light {
@@ -193,7 +193,7 @@
 
   /* ─── Cards ────────────────────────────── */
   .card {
-    border-radius: 8px;
+    border-radius: 12px;
     border: 1px solid var(--color-line);
     background: var(--color-panel);
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
@@ -204,7 +204,7 @@
     box-shadow: var(--shadow-sm);
   }
   .card-elevated {
-    border-radius: 8px;
+    border-radius: 12px;
     border: 1px solid var(--color-line);
     background: var(--color-panel);
     box-shadow: var(--shadow-md);
@@ -442,12 +442,12 @@
 
   .app-main-content {
     flex: 1;
-    padding: 1.75rem 2rem;
-    max-width: 1180px;
+    padding: 2.5rem 2.5rem;
+    max-width: 1166px;
     width: 100%;
     margin: 0 auto;
   }
-  @media (min-width: 1280px) { .app-main-content { padding: 2rem 2.25rem; } }
+  @media (min-width: 1280px) { .app-main-content { padding: 2.5rem 2.5rem; } }
   @media (max-width: 767px) { .app-main-content { padding: 1rem 0.75rem; } }
 
   .app-rail {
@@ -455,7 +455,7 @@
     width: var(--rail-width);
     flex-shrink: 0;
     border-left: 1px solid var(--color-line);
-    background: rgba(10,10,13,0.72);
+    background: var(--color-bg-secondary);
     overflow-y: auto;
   }
   @media (min-width: 1280px) { .app-rail { display: flex; flex-direction: column; } }
@@ -470,7 +470,7 @@
   }
 
   .app-main-content.feed-shell {
-    max-width: 1120px;
+    max-width: 1166px;
   }
 
   .app-main-content.chat-shell,

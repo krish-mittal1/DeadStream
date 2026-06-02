@@ -104,7 +104,7 @@ export function PostCard({
           hover:shadow-[var(--shadow-sm)]
         `}
       >
-        <div className={`${isReply ? "px-3.5 py-3 sm:px-4 sm:py-3" : "px-4 py-3.5"}`}>
+        <div className={`${isReply ? "px-3.5 py-3 sm:px-4 sm:py-3" : "px-5 py-5"}`}>
           {/* ─── Author header ─── */}
           <div className="flex items-center gap-2.5 mb-2.5">
             <Link href={`/profile/${post.author_id}`} className="shrink-0">
@@ -135,7 +135,7 @@ export function PostCard({
           {/* ─── Title ─── */}
           {post.title && (
             <Link href={`/post/${post.id}`} className="block mb-1.5 sm:mb-2">
-              <h3 className="text-[15px] font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
+              <h3 className="text-base font-bold text-[var(--color-text)] leading-snug hover:text-[var(--color-accent)] transition-colors">
                 {post.title}
               </h3>
             </Link>

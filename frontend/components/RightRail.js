@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useSimulationStore } from "../store/useSimulationStore";
 
-const SECTION = "border-b border-[var(--color-line)] px-4 py-4";
+const SECTION = "border-b border-[var(--color-line)] px-5 py-5";
 
 function SectionHeader({ icon, label, extra }) {
   return (
@@ -50,7 +50,7 @@ export function RightRail() {
           <motion.section
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className={SECTION}
+            className={SECTION + " bg-gradient-to-b from-red-950/10 to-transparent"}
           >
             <SectionHeader
               icon={<Swords size={12} />}
@@ -71,7 +71,7 @@ export function RightRail() {
                     animate={{ opacity: 1, x: 0, scale: 1 }}
                     exit={{ opacity: 0, x: 8, scale: 0.96 }}
                     transition={{ delay: i * 0.04, type: "spring", stiffness: 420, damping: 32 }}
-                    className="group rounded-lg border border-red-500/10 bg-red-500/[0.025] p-3 transition-all duration-200 hover:border-red-500/20 hover:bg-red-500/[0.05]"
+                    className="group rounded-xl border border-red-500/10 bg-red-500/[0.04] p-3 transition-all duration-200 hover:border-red-500/20 hover:bg-red-500/8"
                   >
                     <div className="flex items-start gap-2">
                       <span className="mt-0.5 shrink-0 text-red-400/80">

@@ -53,7 +53,7 @@ export function Composer() {
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto w-full max-w-[760px] border border-[var(--color-line)] bg-[var(--color-panel)]">
+    <form onSubmit={submit} className="mx-auto w-full max-w-[1060px] border-b border-[var(--color-line)] bg-[var(--color-panel)]">
       <AnimatePresence>
         {selectedPost && (
           <motion.div
@@ -89,10 +89,10 @@ export function Composer() {
         )}
       </AnimatePresence>
 
-      <div className="px-3 py-3 sm:px-4">
+      <div className="px-3 py-3 sm:px-6">
         <div className="flex gap-2 sm:gap-3">
           {user && (
-            <div className="avatar avatar-md hidden sm:flex bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
+            <div className="avatar avatar-lg hidden sm:flex bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
               {user.username[0].toUpperCase()}
             </div>
           )}
