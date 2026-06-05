@@ -8,11 +8,9 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.store import event_store
-from app.schemas import CreatePostRequest
 from app.schemas import DisruptionEventResponse
 from app.models.disruption import DisruptionEvent, TrollFaction
 from app.models.user import User
-from app.services.feed import feed_service
 
 TROLL_NAMES = [
     "troll_raju", "spam_wala", "hate_boi", "trigger_king", "bhoot_ka_sach",
