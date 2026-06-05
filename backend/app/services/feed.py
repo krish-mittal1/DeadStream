@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from typing import Optional
 
@@ -162,14 +162,14 @@ class FeedService:
             else:  # hot (default)
                 stmt = stmt.order_by(desc(Post.virality_score), desc(Post.created_at))
 
-            stmt = stmt.limit(min(limit, 100))
-
             if cursor:
                 try:
                     cursor_dt = datetime.fromisoformat(cursor)
                     stmt = stmt.where(Post.created_at < cursor_dt)
                 except ValueError:
                     pass
+
+            stmt = stmt.limit(min(limit, 100))
 
             posts = (await session.execute(stmt)).scalars().all()
             if not posts:
@@ -300,7 +300,7 @@ class FeedService:
         async def _fetch() -> list[dict[str, str | float]]:
             rows = await session.execute(
                 select(Post.title, Post.body, Post.virality_score, Post.controversy_score)
-                .where(Post.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0))
+                .where(Post.created_at >= datetime.now(timezone.utc) - timedelta(hours=24))
                 .order_by(desc(Post.virality_score + Post.controversy_score))
                 .limit(15)
             )

@@ -120,7 +120,7 @@ async def search(
                 "title": post.title or post.body[:60],
                 "body": post.body[:200],
                 "author_username": user.username,
-                "like_count": int(like_count),
+                "like_count": like_count,
             })
 
     if category in ("all", "agents"):
@@ -166,8 +166,8 @@ async def search(
                 "id": str(c.id),
                 "name": c.name,
                 "slug": c.slug,
-                "member_count": int(member_count),
-                "post_count": int(post_count),
+                "member_count": member_count,
+                "post_count": post_count,
             })
 
     return results
@@ -654,21 +654,23 @@ async def get_group_chat(
     chat = next((c for c in chats if c.id == group_chat_id), None)
     if not chat:
         # Fallback: try to get directly
-        from app.models.dm import GroupChat
+        from app.models.dm import GroupChat, GroupChatParticipant
         gc = await session.get(GroupChat, group_chat_id)
         if not gc:
             raise HTTPException(status_code=404, detail="group_chat_not_found")
-        from app.models.dm import GroupChatParticipant
+        # FIX #1: Use func.count() for proper integer membership check (was selecting ORM object)
         p_count = await session.scalar(
-            select(GroupChatParticipant).where(
+            select(func.count()).select_from(GroupChatParticipant).where(
                 GroupChatParticipant.group_chat_id == gc.id,
                 GroupChatParticipant.user_id == user.id,
             )
-        )
+        ) or 0
         if not p_count:
             raise HTTPException(status_code=403, detail="not_a_participant")
         p_count_total = await session.scalar(
-            select(func.count()).select_from(GroupChatParticipant).where(GroupChatParticipant.group_chat_id == gc.id)
+            select(func.count()).select_from(GroupChatParticipant).where(
+                GroupChatParticipant.group_chat_id == gc.id
+            )
         ) or 0
         return GroupChatResponse(
             id=gc.id,
@@ -676,7 +678,7 @@ async def get_group_chat(
             topic=gc.topic,
             created_by=gc.created_by,
             is_active=gc.is_active,
-            participant_count=int(p_count_total),
+            participant_count=p_count_total,
             last_message_at=gc.last_message_at,
             created_at=gc.created_at,
         )
@@ -717,9 +719,11 @@ async def get_group_participants(
 
 # ── 6. COMMUNITY ELECTIONS ──────────────────────────────────────────
 
+# FIX #4: start_election now requires authentication
 @api_router.post("/communities/{community_id}/elections/start")
 async def start_election(
     community_id: uuid.UUID,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
     election = await election_service.start_election(session, community_id)
@@ -757,7 +761,7 @@ async def get_active_election(
 async def end_election(
     election_id: uuid.UUID,
     session: AsyncSession = Depends(get_session),
-) -> dict[str, str | None]:
+) -> dict[str, Optional[str]]:
     election = await election_service.end_election(session, election_id)
     if not election:
         raise HTTPException(status_code=404, detail="election_not_found")

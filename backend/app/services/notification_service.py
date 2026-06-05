@@ -73,13 +73,13 @@ class NotificationService:
 
     async def mark_read(self, session: AsyncSession, notification_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """Mark a single notification as read."""
-        await session.execute(
+        result = await session.execute(
             update(Notification)
             .where(Notification.id == notification_id, Notification.user_id == user_id)
             .values(read=True)
         )
-        cnt = await session.scalar(select(func.count()).select_from(Notification).where(Notification.id == notification_id, Notification.user_id == user_id)) or 0
-        return int(cnt) > 0
+        await session.commit()
+        return getattr(result, "rowcount", 0) > 0
 
     async def mark_all_read(self, session: AsyncSession, user_id: uuid.UUID) -> None:
         """Mark all notifications as read."""
@@ -88,6 +88,7 @@ class NotificationService:
             .where(Notification.user_id == user_id, Notification.read == False)  # noqa: E712
             .values(read=True)
         )
+        await session.commit()
 
 
 notification_service = NotificationService()

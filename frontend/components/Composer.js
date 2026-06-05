@@ -21,7 +21,7 @@ export function Composer() {
   const clearSelectedPost = useSimulationStore((s) => s.clearSelectedPost);
 
   const charCount = body.length;
-  const maxChars = 1200;
+  const maxChars = 3200;
   const isNearLimit = charCount > maxChars * 0.85;
   const isAtLimit = charCount >= maxChars;
 

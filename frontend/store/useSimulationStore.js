@@ -55,6 +55,8 @@ export const useSimulationStore = create((set, get) => ({
   activeElections: {},
 
   async bootstrap() {
+    get().initAuth();
+    get().initTheme();
     set({ loading: true });
 
     // 1. Fetch CRITICAL path first — feed + events — unblock UI instantly
@@ -63,7 +65,7 @@ export const useSimulationStore = create((set, get) => ({
         api.feed(get().feedSort),
         api.events(),
       ]);
-      set({ posts, events, loading: false });
+      set({ posts, events, loading: false, feedCursor: posts.length > 0 ? posts[posts.length - 1].created_at : null });
     } catch (err) {
       set({ loading: false, panelError: "Failed to load simulation feed" });
     }
@@ -85,7 +87,7 @@ export const useSimulationStore = create((set, get) => ({
 
   connectSocket() {
     if (get().socket) return;
-    const socket = io(SOCKET_URL, { transports: ["websocket"], reconnection: true });
+    const socket = io(SOCKET_URL, { transports: ["websocket", "polling"], reconnection: true });
     socket.on("connect", () => set({ connected: true }));
     socket.on("disconnect", () => set({ connected: false }));
     socket.on("event", (event) => {
@@ -271,10 +273,15 @@ export const useSimulationStore = create((set, get) => ({
             p.id === postId ? { ...p, like_count: res.like_count } : p
           ),
         }));
-      }
-    } catch {
+      }    } catch {
       set((state) => ({
         posts: state.posts.map((p) =>
+          p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
+        ),
+        communityPosts: state.communityPosts.map((p) =>
+          p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
+        ),
+        threadReplies: state.threadReplies.map((p) =>
           p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
         ),
       }));

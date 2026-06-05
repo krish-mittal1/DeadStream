@@ -106,19 +106,20 @@ class DisruptionService:
             session.add(faction)
             created_count += 1
 
-            # Post a troll message immediately
+            # FIX #7: Create troll post directly instead of calling feed_service.create_post()
+            # which commits inside the loop causing partial transaction commits.
             troll_body = random.choice(TROLL_POST_TEMPLATES)
             if random.random() < 0.3:
                 troll_body += f" {title[:100]}"
-            try:
-                await feed_service.create_post(
-                    session,
-                    troll_user,
-                    CreatePostRequest(body=troll_body),
-                )
-                faction.posts_made += 1
-            except ValueError:
-                pass  # Moderation blocked
+            from app.models.social import Post as PostModel
+            troll_post = PostModel(
+                author_id=troll_user.id,
+                body=troll_body,
+                virality_score=0.1,
+                controversy_score=0.5,
+            )
+            session.add(troll_post)
+            faction.posts_made += 1
 
         disruption.infected_count = created_count
         await event_store.append(session, "troll_farm_spawned", None, disruption.id, {
