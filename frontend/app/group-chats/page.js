@@ -111,7 +111,7 @@ export default function GroupChatsPage() {
 
   const handleCreate = useCallback(async () => {
     if (!chatName.trim()) return;
-    const participantIds = selectedAgents.map(a => a.id);
+    const participantIds = selectedAgents.map(a => a.user_id || a.id);
     if (user) participantIds.push(user.id);
     await createGroupChat(chatName.trim(), chatTopic.trim(), participantIds);
     setShowCreate(false);
@@ -150,7 +150,7 @@ export default function GroupChatsPage() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex flex-col">
+        <div className={`w-64 border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex flex-col ${activeGroupChat ? "hidden md:flex" : "flex"}`}>
           <div className="p-3 border-b border-[var(--color-line)])">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-dim)]">
               Active Roundtables
@@ -282,6 +282,12 @@ export default function GroupChatsPage() {
             <>
               {/* Chat header */}
               <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 flex items-center gap-3">
+                <button
+                  onClick={() => setActiveGroupChat(null)}
+                  className="btn-icon md:hidden shrink-0"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <Sparkles size={16} className="text-[var(--color-gold)]" />
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[var(--color-text)]">{activeGroupChat.name}</p>

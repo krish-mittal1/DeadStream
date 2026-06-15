@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence } from "framer-motion";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 import { FeedSkeleton } from "./LoadingSkeleton";
 import { useKeyboardShortcuts } from "./useKeyboardShortcuts";
@@ -23,8 +23,25 @@ export function Feed({ compact = false }) {
   const bookmarkedIds = useSimulationStore((s) => s.bookmarkedIds);
   const newPostCount = useSimulationStore((s) => s.newPostCount);
   const loadNewPosts = useSimulationStore((s) => s.loadNewPosts);
+  const loadMore = useSimulationStore((s) => s.loadMore);
+  const feedCursor = useSimulationStore((s) => s.feedCursor);
 
   useKeyboardShortcuts(posts);
+
+  const sentinelRef = useRef(null);
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && feedCursor && !loading) {
+          loadMore();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [feedCursor, loading, loadMore]);
 
   const [copiedId, setCopiedId] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
@@ -71,6 +88,12 @@ export function Feed({ compact = false }) {
               />
             ))}
           </AnimatePresence>
+          <div ref={sentinelRef} className="h-10" />
+          {loading && posts.length > 0 && (
+            <div className="flex justify-center py-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent" />
+            </div>
+          )}
         </div>
       )}
 

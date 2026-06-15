@@ -695,7 +695,8 @@ async def send_group_message(
     try:
         return await dm_service.send_group_message(session, group_chat_id, user.id, request.body)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        status_code = 403 if str(exc) == "not_a_participant" else 400
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @api_router.get("/group-chats/{group_chat_id}/messages", response_model=list[GroupChatMessageResponse])
@@ -706,14 +707,24 @@ async def get_group_messages(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[GroupChatMessageResponse]:
-    return await dm_service.get_group_chat_messages(session, group_chat_id, limit, before_id)
+    return await dm_service.get_group_chat_messages(session, group_chat_id, user.id, limit, before_id)
 
 
 @api_router.get("/group-chats/{group_chat_id}/participants", response_model=list[GroupChatParticipantResponse])
 async def get_group_participants(
     group_chat_id: uuid.UUID,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[GroupChatParticipantResponse]:
+    from app.models.dm import GroupChatParticipant
+    is_participant = await session.scalar(
+        select(func.count()).select_from(GroupChatParticipant).where(
+            GroupChatParticipant.group_chat_id == group_chat_id,
+            GroupChatParticipant.user_id == user.id,
+        )
+    ) or 0
+    if not is_participant:
+        raise HTTPException(status_code=403, detail="not_a_participant")
     return await dm_service.get_group_participants(session, group_chat_id)
 
 
@@ -760,6 +771,7 @@ async def get_active_election(
 @api_router.post("/elections/{election_id}/end")
 async def end_election(
     election_id: uuid.UUID,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Optional[str]]:
     election = await election_service.end_election(session, election_id)

@@ -5,6 +5,7 @@ import {
   Bell,
   Heart,
   MessageCircle,
+  Swords,
   UserPlus,
   CheckCheck,
   Loader2,
@@ -20,12 +21,14 @@ const notifIcons = {
   reply: MessageCircle,
   like: Heart,
   follow: UserPlus,
+  beef: Swords,
 };
 
 const notifColors = {
   reply: "var(--color-blue)",
   like: "var(--color-upvote)",
   follow: "var(--color-gold)",
+  beef: "var(--color-red, #ef4444)",
 };
 
 const floatingIcons = [
@@ -226,7 +229,9 @@ export default function NotificationsPage() {
                         ? "replied to your post"
                         : notif.type === "like"
                           ? "liked your post"
-                          : "followed you"}
+                          : notif.type === "beef"
+                            ? "called you out!"
+                            : "followed you"}
                     </p>
                     <p className="mt-0.5 text-xs text-[var(--color-text-dim)]">
                       {new Date(notif.created_at).toLocaleDateString("en-US", {

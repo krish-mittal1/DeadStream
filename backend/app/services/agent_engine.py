@@ -96,7 +96,7 @@ class AgentEngine:
                 "note": f"{user.username} is getting heated!",
             })
 
-        recent_posts = (await session.execute(select(Post).order_by(desc(Post.created_at)).limit(25))).scalars().all()
+        recent_posts = (await session.execute(select(Post).where(Post.parent_id.is_(None)).order_by(desc(Post.created_at)).limit(25))).scalars().all()
         topic = self._choose_topic(agent, recent_posts)
         memories = await memory_service.retrieve(session, agent.id, topic)
         action = self._decide_action(agent, recent_posts)
@@ -198,6 +198,10 @@ class AgentEngine:
                     await relationship_service.update_after_interaction(
                         session, agent.id, target.author_id, "like", intensity=0.1
                     )
+                    target_author = await session.get(User, target.author_id)
+                    if target_author and not target_author.is_agent:
+                        from app.services.notification_service import notification_service as notif_svc
+                        await notif_svc.create(session, user_id=target.author_id, actor_id=user.id, type="like", entity_id=target.id)
                     AGENT_ACTIONS.labels(action="like").inc()
 
         elif action == "follow":
@@ -384,6 +388,10 @@ class AgentEngine:
     # -----------------------------------------------------------------------
 
     async def _pick_target_smart(self, session: AsyncSession, agent: Agent, posts: Sequence[Post]) -> Post:
+        top_level = [p for p in posts if p.parent_id is None]
+        if not top_level:
+            top_level = list(posts)
+
         rivals = await relationship_service.get_rivals(session, agent.id, limit=8)
         rival_ids = {r.target_user_id for r in rivals}
         rival_map = {r.target_user_id: r.rivalry for r in rivals}
@@ -396,7 +404,6 @@ class AgentEngine:
 
         def weight(post: Post) -> float:
             score = post.controversy_score + post.virality_score * 0.3 + random.random() * 0.2
-            # Huge boost for rivals when aggression is high
             if post.author_id in rival_ids:
                 rivalry_score = rival_map.get(post.author_id, 0.5)
                 score += agitation * 0.8 + aggression * 0.6 + rivalry_score * 0.5
@@ -404,8 +411,7 @@ class AgentEngine:
                 score += 0.15
             return score
 
-        weighted = sorted(posts, key=weight, reverse=True)
-        # Pick from top 3 when highly agitated, otherwise top 6
+        weighted = sorted(top_level, key=weight, reverse=True)
         top_n = 3 if agitation > 0.6 else 6
         return random.choice(weighted[:top_n])
 
@@ -422,6 +428,8 @@ class AgentEngine:
         return random.choice(non_self) if non_self else None
 
     async def _maybe_follow(self, session: AsyncSession, agent: Agent, user: User) -> None:
+        from app.services.notification_service import notification_service as notif_svc
+
         allies = await relationship_service.get_allies(session, agent.id, limit=10)
         for rel in allies:
             existing = await session.scalar(
@@ -430,6 +438,9 @@ class AgentEngine:
             if existing is None:
                 session.add(Follow(follower_id=user.id, followee_id=rel.target_user_id, strength=rel.affinity))
                 await event_store.append(session, "agent_followed_user", user.id, rel.target_user_id, {})
+                target = await session.get(User, rel.target_user_id)
+                if target and not target.is_agent:
+                    await notif_svc.create(session, user_id=rel.target_user_id, actor_id=user.id, type="follow")
                 AGENT_ACTIONS.labels(action="follow").inc()
                 return
 
@@ -447,6 +458,8 @@ class AgentEngine:
             if existing is None:
                 session.add(Follow(follower_id=user.id, followee_id=target_user.id, strength=0.12))
                 await event_store.append(session, "agent_followed_user", user.id, target_user.id, {})
+                if not target_user.is_agent:
+                    await notif_svc.create(session, user_id=target_user.id, actor_id=user.id, type="follow")
                 AGENT_ACTIONS.labels(action="follow").inc()
 
     async def _get_relation_label(
@@ -472,15 +485,22 @@ class AgentEngine:
         if not communities:
             return None
         interests = {interest.lower() for interest in agent.interests}
-        ranked = sorted(
-            communities,
-            key=lambda c: (
-                1 if c.slug.lower() in interests or c.name.lower() in interests else 0,
-                c.conflict_score * float(agent.emotional_state.get("agitation", 0.3)),
-                random.random(),
-            ),
-            reverse=True,
-        )
+
+        def _community_relevance(c: Community) -> float:
+            name_lower = c.name.lower()
+            slug_lower = c.slug.lower()
+            interest_match = any(
+                i in name_lower or i in slug_lower or name_lower in i or slug_lower in i
+                for i in interests
+            )
+            score = 10.0 if interest_match else 0.0
+            score += c.conflict_score * float(agent.emotional_state.get("agitation", 0.3)) * 0.3
+            score += random.random() * 0.5
+            return score
+
+        ranked = sorted(communities, key=_community_relevance, reverse=True)
+        if ranked[0] and _community_relevance(ranked[0]) < 1.0:
+            return None
         community = ranked[0]
         existing = await session.scalar(
             select(CommunityMembership).where(

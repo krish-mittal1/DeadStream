@@ -453,6 +453,16 @@ class DMService:
         if not chat or not chat.is_active:
             raise ValueError("group_chat_not_found_or_inactive")
 
+        # Check membership
+        is_participant = await session.scalar(
+            select(func.count()).select_from(GroupChatParticipant).where(
+                GroupChatParticipant.group_chat_id == group_chat_id,
+                GroupChatParticipant.user_id == sender_id,
+            )
+        ) or 0
+        if not is_participant:
+            raise ValueError("not_a_participant")
+
         msg = GroupChatMessage(
             group_chat_id=group_chat_id,
             sender_id=sender_id,
@@ -522,10 +532,21 @@ class DMService:
         self,
         session: AsyncSession,
         group_chat_id: uuid.UUID,
+        user_id: uuid.UUID,
         limit: int = 100,
         before_id: Optional[uuid.UUID] = None,
     ) -> list[GroupChatMessageResponse]:
         """Get messages from a group chat."""
+        # Check membership
+        is_participant = await session.scalar(
+            select(func.count()).select_from(GroupChatParticipant).where(
+                GroupChatParticipant.group_chat_id == group_chat_id,
+                GroupChatParticipant.user_id == user_id,
+            )
+        ) or 0
+        if not is_participant:
+            return []
+
         stmt = (
             select(GroupChatMessage)
             .where(GroupChatMessage.group_chat_id == group_chat_id)
@@ -599,7 +620,7 @@ class DMService:
             return None
 
         # Read recent messages for context
-        recent_msgs = await self.get_group_chat_messages(session, group_chat_id, limit=10)
+        recent_msgs = await self.get_group_chat_messages(session, group_chat_id, user.id, limit=10)
 
         provider = get_provider()
         context = "\n".join(

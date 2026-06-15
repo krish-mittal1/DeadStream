@@ -62,16 +62,29 @@ class AgentScheduler:
                     .with_for_update(skip_locked=True)
                 )
             ).scalars().all()
+            agent_ids = []
             for agent in due:
                 key = str(agent.id)
                 if not self._check_rate_limit(key):
                     logger.debug("agent_rate_limited", agent_id=key)
                     continue
+                # Claim the agent by pushing its next wake time into the future,
+                # ensuring no other scheduler process grabs it while we work.
+                agent.next_wake_at = datetime.now(timezone.utc) + timedelta(minutes=5)
+                agent_ids.append(agent.id)
+            await session.commit()
+
+        # Process each claimed agent in its own isolated database session
+        for agent_id in agent_ids:
+            key = str(agent_id)
+            async with SessionLocal() as agent_session:
                 try:
-                    await agent_engine.activate(session, agent)
-                    self._record_action(key)
+                    db_agent = await agent_session.get(Agent, agent_id)
+                    if db_agent:
+                        await agent_engine.activate(agent_session, db_agent)
+                        self._record_action(key)
                 except Exception as exc:
-                    await session.rollback()
+                    await agent_session.rollback()
                     logger.warning("agent_activation_failed", agent_id=key, error=str(exc))
 
 

@@ -81,6 +81,7 @@ export const useSimulationStore = create((set, get) => ({
     get().connectSocket();
     if (get().token) {
       get().fetchNotifications();
+      get().fetchDMUnread();
       get().checkBookmarks(get().posts.map((p) => p.id));
     }
   },
@@ -152,7 +153,7 @@ export const useSimulationStore = create((set, get) => ({
   setFeedSort(sort) {
     set({ feedSort: sort, loading: true });
     api.feed(sort).then((posts) => {
-      set({ posts, feedCursor: null, newPostCount: 0, loading: false });
+      set({ posts, feedCursor: posts.length > 0 ? posts[posts.length - 1].created_at : null, newPostCount: 0, loading: false });
       if (get().token && posts.length) {
         get().checkBookmarks(posts.map((p) => p.id));
       }

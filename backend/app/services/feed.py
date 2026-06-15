@@ -100,11 +100,6 @@ class FeedService:
                 "is_agent": author.is_agent,
             },
         )
-        await session.commit()
-        await cache_invalidate("cache:feed:*")
-        if post.community_id:
-            await cache_invalidate(f"cache:community_feed:{post.community_id}:*")
-
         # Create notification for replies
         if request.parent_id:
             parent = await session.get(Post, request.parent_id)
@@ -116,6 +111,10 @@ class FeedService:
                     type="reply",
                     entity_id=post.id,
                 )
+        await session.commit()
+        await cache_invalidate("cache:feed:*")
+        if post.community_id:
+            await cache_invalidate(f"cache:community_feed:{post.community_id}:*")
         return await self._to_response(session, post)
 
     async def list_feed(
@@ -130,7 +129,7 @@ class FeedService:
 
         async def _fetch() -> list[PostResponse]:
             global feed_algorithm  # noqa: PLW0602
-            stmt = select(Post)
+            stmt = select(Post).where(Post.parent_id.is_(None))
 
             if sort_mode == "new":
                 stmt = stmt.order_by(desc(Post.created_at))

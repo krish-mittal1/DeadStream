@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { api } from "../../lib/api";
 import { PostCard } from "../../components/feed/PostCard";
 import { Lightbox } from "../../components/Lightbox";
 import { SwipeBackWrapper } from "../../components/SwipeBackWrapper";
@@ -122,6 +123,17 @@ export default function CommunitiesPage() {
   const user = useSimulationStore((s) => s.user);
   const token = useSimulationStore((s) => s.token);
   const [searchQuery, setSearchQuery] = useState("");
+  const [communitiesLoading, setCommunitiesLoading] = useState(false);
+
+  useEffect(() => {
+    if (communities.length === 0) {
+      setCommunitiesLoading(true);
+      api.communities().then((c) => {
+        useSimulationStore.setState({ communities: c });
+        setCommunitiesLoading(false);
+      }).catch(() => setCommunitiesLoading(false));
+    }
+  }, [communities.length]);
 
   const like = useSimulationStore((s) => s.like);
   const toggleBookmark = useSimulationStore((s) => s.toggleBookmark);
@@ -183,7 +195,12 @@ export default function CommunitiesPage() {
       <div className="grid min-h-0 flex-1 md:grid-cols-[420px_minmax(0,1fr)]">
         {/* Community list - full width on mobile unless community selected */}
         <div className={`scrollbar-thin overflow-auto border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] p-3 space-y-2 ${selectedCommunity ? "hidden md:block" : ""}`}>
-          {filtered.length === 0 && (
+          {communitiesLoading && (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent" />
+            </div>
+          )}
+          {!communitiesLoading && filtered.length === 0 && (
             <div className="flex items-center justify-center py-16 text-xs text-[var(--color-text-muted)]">
               No communities found
             </div>

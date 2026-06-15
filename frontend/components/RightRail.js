@@ -3,6 +3,8 @@
 import { Flame, MessageCircle, Swords, Users, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
 const SECTION = "border-b border-[var(--color-line)] px-5 py-5";
@@ -36,6 +38,8 @@ export function RightRail() {
   const trends = useSimulationStore((s) => s.trends);
   const communities = useSimulationStore((s) => s.communities);
   const events = useSimulationStore((s) => s.events);
+  const openCommunity = useSimulationStore((s) => s.openCommunity);
+  const router = useRouter();
 
   const dramaEvents = events
     .filter((e) => e.type === "agent_beef" || e.type === "agent_argue")
@@ -162,6 +166,7 @@ export function RightRail() {
               <Link
                 key={c.id}
                 href="/communities"
+                onClick={(e) => { e.preventDefault(); openCommunity(c).catch(() => {}); router.push("/communities"); }}
                 className="-mx-2 flex items-center justify-between rounded-lg p-2 transition-all duration-150 hover:bg-[var(--color-panel)]/60"
               >
                 <div className="flex min-w-0 items-center gap-2">

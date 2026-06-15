@@ -135,6 +135,7 @@ export default function DMPage() {
   const [recipientQuery, setRecipientQuery] = useState("");
   const [sendError, setSendError] = useState("");
   const [sending, setSending] = useState(false);
+  const [typing, setTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const composeInputRef = useRef(null);
 
@@ -217,6 +218,11 @@ export default function DMPage() {
           if (msg) {
             await fetchDMMessages(activeDMGroup.id);
             fetchDMGroups();
+            setTyping(true);
+            setTimeout(() => {
+              setTyping(false);
+              fetchDMMessages(activeDMGroup.id);
+            }, 3000);
           } else {
             setSendError("Message failed. Try again.");
           }
@@ -489,6 +495,7 @@ export default function DMPage() {
                     <DMMessage key={msg.id} msg={msg} isOwn={msg.sender_id === user?.id} />
                   ))}
                 </AnimatePresence>
+                <TypingIndicator visible={typing} />
                 <div ref={messagesEndRef} />
               </div>
 

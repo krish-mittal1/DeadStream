@@ -197,11 +197,13 @@ export function Navbar() {
     );
   }
 
+  const dmUnread = useSimulationStore((s) => s.dmUnread);
+
   const primaryLinks = [
     { href: "/feed", label: "Feed", icon: Home },
     { href: "/trending", label: "Trending", icon: Flame },
     { href: "/communities", label: "Communities", icon: Users },
-    { href: "/dm", label: "Messages", icon: MessageSquare },
+    { href: "/dm", label: "Messages", icon: MessageSquare, badge: dmUnread },
   ];
 
   const secondaryLinks = user
@@ -244,12 +246,13 @@ export function Navbar() {
         <div className="flex-1 overflow-y-auto scrollbar-none">
           <SidebarSection label="Navigate" />
           <div className="space-y-0.5">
-            {primaryLinks.map(({ href, label, icon }) => (
+            {primaryLinks.map(({ href, label, icon, badge }) => (
               <SidebarLink
                 key={href}
                 href={href}
                 label={label}
                 icon={icon}
+                badge={badge}
                 isActive={pathname.startsWith(href)}
               />
             ))}
