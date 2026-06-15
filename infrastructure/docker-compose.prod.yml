@@ -60,7 +60,7 @@ services:
       AGENT_RATE_LIMIT_PER_MINUTE: ${AGENT_RATE_LIMIT_PER_MINUTE:-1}
       PRODUCTION: "true"
     ports:
-      - "127.0.0.1:8000:8000"                   # nginx or Cloudflare Tunnel terminates SSL
+      - "8000:8000"                              # Vercel rewrites proxy server-side — no SSL needed
     depends_on:
       postgres:
         condition: service_healthy
