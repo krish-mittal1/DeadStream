@@ -27,30 +27,61 @@ from app.services.cognitive_drift_service import cognitive_drift_service
 # ─── Desi / Indian trending topic bank ───────────────────────────────
 
 TRENDING_TOPIC_BANK = [
+    # Cricket & Sports
     "IPL 2026 mega auction results",
-    "New education policy announcement",
     "T20 World Cup squad selection drama",
+    "Indian cricket team vs Pakistan in finals",
+    "Indian gamers winning international tournaments",
+    "Virat Kohli retirement debate",
+    "Kabaddi Pro League viewership boom",
+    "Olympics 2028 India qualification",
+    # Movies & Entertainment
     "Pushpa 3 announcement hype",
-    "Delhi pollution levels hitting 500 AQI",
-    "Bengaluru water crisis getting real",
-    "Stock market crash and recovery analysis",
+    "New OTT series that everyone is talking about",
+    "Bollywood vs South Indian films debate",
+    "Netflix India cancelling good shows",
+    "Deepfake AI videos going viral",
+    "Instagram vs YouTube shorts debate",
+    "Korean drama addiction in India",
+    # Tech & Economy
     "Startup layoffs in 2026",
     "AI taking over BPO jobs",
-    "Indian cricket team vs Pakistan in finals",
-    "New OTT series that everyone is talking about",
+    "Stock market crash and recovery analysis",
+    "Cryptocurrency regulation bill update",
+    "Work from home vs office debate",
+    "Freshers salary package disappointment",
+    "FAANG layoffs hitting Indian engineers",
+    "UPI going international finally",
+    # Environment & Civic
+    "Delhi pollution levels hitting 500 AQI",
+    "Bengaluru water crisis getting real",
+    "Metro phase 4 construction chaos",
+    "Vande Bharat train routes expansion",
+    "Kolkata flyover collapse scare",
+    "Mumbai locals and monsoon chaos",
+    # Policy & Politics
     "GST council meeting new tax slabs",
     "Farm laws back in news",
-    "Metro phase 4 construction chaos",
-    "Instagram vs YouTube shorts debate",
-    "Deepfake AI videos going viral",
-    "Chandrayaan-4 mission updates",
-    "Zomato vs Swiggy delivery fee war",
+    "New education policy announcement",
     "Budget 2026: middle class expectations",
-    "Kolkata versus Mumbai style war",
     "NEET PG 2026 controversy",
-    "Indian gamers winning international tournaments",
-    "Cryptocurrency regulation bill update",
-    "Vande Bharat train routes expansion",
+    "Chandrayaan-4 mission updates",
+    # Lifestyle & Culture
+    "Zomato vs Swiggy delivery fee war",
+    "Kolkata versus Mumbai style war",
+    "Arranged marriage vs love marriage debate",
+    "Gen Z vs Millennials work culture clash",
+    "Rising cost of living in Indian metros",
+    "Indian parents and career pressure",
+    "Long distance relationship in India",
+    "Hostel life vs PG accommodation",
+    "Indian wedding costs out of control",
+    "Side hustle culture taking over",
+    "Sunday boredom and what Indians do",
+    "Traffic in Bengaluru getting unbearable",
+    "Food delivery addiction among urban youth",
+    "Power cuts in summer and AC bills",
+    "Joint family vs nuclear family",
 ]
 
 
@@ -331,28 +362,49 @@ class AgentEngine:
     # Topic selection
     # -----------------------------------------------------------------------
 
+    def _extract_topic_theme(self, text: str) -> str:
+        “””Convert raw post text into a clean topic theme phrase.”””
+        import re
+        text = text.strip()
+        # Use title if it's short and meaningful
+        words = text.split()
+        if not words:
+            return “daily life”
+        # Strip leading meta-words that would make bad topics
+        _bad_starts = {“topic”, “hot”, “take”, “story”, “true”, “unpopular”, “opinion”, “rant”, “psa”, “tldr”, “update”}
+        _punct = '#.,!?””:;[]\'()-–—'
+        first_word = words[0].strip(_punct).lower()
+        if first_word in _bad_starts and len(words) > 3:
+            words = words[1:]
+        # Extract a short meaningful phrase (5-8 words max)
+        phrase = “ “.join(words[:7]).strip(_punct)
+        # If it's still too long or sentence-like, strip to key noun phrase
+        if len(phrase) > 60:
+            phrase = “ “.join(words[:5]).strip(_punct)
+        # Remove trailing punctuation
+        phrase = re.sub(r'[.,!?;:]+$', '', phrase).strip()
+        return phrase if phrase else “current events”
+
     def _choose_topic(self, agent: Agent, posts: Sequence[Post]) -> str:
-        """Pick a topic: trending, from posts, or from agent interests."""
+        “””Pick a topic: trending, from posts, or from agent interests.”””
         # 25% chance: pick from trending topics
         if random.random() < 0.25:
             return random.choice(TRENDING_TOPIC_BANK)
 
-        # 60% chance: pick from recent posts (but filter junk)
-        if posts and random.random() < 0.60:
+        # 50% chance: pick from recent posts — extract THEME, not raw snippet
+        if posts and random.random() < 0.50:
             weighted = sorted(posts, key=lambda p: p.controversy_score + p.virality_score, reverse=True)
-            top = weighted[:5]
+            # Sample from top 8 to avoid always picking the same post
+            top = weighted[:8]
             chosen = random.choice(top)
-            snippet = (chosen.title or chosen.body or "")[:120]
-            # Filter out snippet that looks like it starts with topic-like words
-            _punct = '#.,!?“”:;[]\'"'
-            first_word = snippet.split()[0].strip(_punct).lower() if snippet.split() else ""
-            if first_word in ("topic", "hot", "take", "story", "true", "unpopular", "opinion"):
-                # Fallback to a proper topic instead
-                return random.choice(agent.interests or TRENDING_TOPIC_BANK[:5])
-            return snippet
+            # Prefer the title if available (cleaner topic), else use body start
+            raw = chosen.title or (chosen.body or “”)[:80]
+            theme = self._extract_topic_theme(raw)
+            return theme
 
-        # Fallback: agent's interests
-        return random.choice(agent.interests or TRENDING_TOPIC_BANK[:5])
+        # Fallback: agent's interests (weighted randomly for variety)
+        interests = agent.interests or TRENDING_TOPIC_BANK[:8]
+        return random.choice(interests)
 
     # -----------------------------------------------------------------------
     # Action decision
@@ -826,17 +878,28 @@ class AgentEngine:
                 "If your persona has humor, use sarcasm and wit to eviscerate them."
             )
         else:
+            # Pick a random angle to force variety across agents posting on the same theme
+            angles = [
+                "Share a personal experience or story related to this theme.",
+                "Give your HOT TAKE or unpopular opinion on this topic.",
+                "Ask the community a question about this — something you genuinely want to know.",
+                "Rant about something frustrating related to this theme.",
+                "Share a funny or weird observation about this topic.",
+                "Give advice or a life lesson you learned related to this theme.",
+                "Describe how this topic affects YOUR daily life specifically.",
+            ]
+            angle = random.choice(angles)
             prompt = (
-                f"Topic you're thinking about: {topic}\n"
-                f"Your stance: {stance_label}\n"
+                f"Theme/topic to write about: {topic}\n"
+                f"Your stance on it: {stance_label}\n"
                 f"Your relevant memories:\n{memory_context}\n"
-                "Write an original Reddit-style post from your perspective. Start with a SHORT CATCHY TITLE on first line, "
-                "then a blank line, then the body (2-5 paragraphs). "
-                "Make it sound like something a REAL PERSON would post on Reddit — not a generic blog post. "
-                "Share your thoughts, experiences, opinions, or ask for advice. Be authentic. "
-                "Use personal anecdotes, specific details, relatable situations. "
-                "If there's a trending topic relevant to this theme, mention it naturally. "
-                "Don't sound like you're writing an article. Sound like you're TYPING on Reddit while sitting at your desk or phone."
+                f"YOUR ANGLE FOR THIS POST: {angle}\n\n"
+                "IMPORTANT: Write from YOUR OWN ORIGINAL PERSPECTIVE. Do NOT repeat or paraphrase what others have posted. "
+                "Give YOUR personal take, YOUR experiences, YOUR life. "
+                "Start with a SHORT CATCHY TITLE on the first line, then a blank line, then 2-4 paragraphs. "
+                "Be specific — use real details, real places, real situations from your persona's life. "
+                "Sound like a real Reddit user typing on their phone, not a journalist or blogger. "
+                "Be opinionated, self-aware, and a little messy."
             )
 
         text = (await provider.complete(system, prompt)).strip()
