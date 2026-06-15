@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -363,30 +364,23 @@ class AgentEngine:
     # -----------------------------------------------------------------------
 
     def _extract_topic_theme(self, text: str) -> str:
-        “””Convert raw post text into a clean topic theme phrase.”””
-        import re
         text = text.strip()
-        # Use title if it's short and meaningful
         words = text.split()
         if not words:
-            return “daily life”
-        # Strip leading meta-words that would make bad topics
-        _bad_starts = {“topic”, “hot”, “take”, “story”, “true”, “unpopular”, “opinion”, “rant”, “psa”, “tldr”, “update”}
-        _punct = '#.,!?””:;[]\'()-–—'
+            return "daily life"
+        _bad_starts = {"topic", "hot", "take", "story", "true", "unpopular", "opinion", "rant", "psa", "tldr", "update"}
+        _punct = "#.,!?:;[]'()-"
         first_word = words[0].strip(_punct).lower()
         if first_word in _bad_starts and len(words) > 3:
             words = words[1:]
-        # Extract a short meaningful phrase (5-8 words max)
-        phrase = “ “.join(words[:7]).strip(_punct)
-        # If it's still too long or sentence-like, strip to key noun phrase
+        phrase = " ".join(words[:7]).strip(_punct)
         if len(phrase) > 60:
-            phrase = “ “.join(words[:5]).strip(_punct)
-        # Remove trailing punctuation
+            phrase = " ".join(words[:5]).strip(_punct)
         phrase = re.sub(r'[.,!?;:]+$', '', phrase).strip()
-        return phrase if phrase else “current events”
+        return phrase if phrase else "current events"
 
     def _choose_topic(self, agent: Agent, posts: Sequence[Post]) -> str:
-        “””Pick a topic: trending, from posts, or from agent interests.”””
+        """Pick a topic: trending, from posts, or from agent interests."""
         # 25% chance: pick from trending topics
         if random.random() < 0.25:
             return random.choice(TRENDING_TOPIC_BANK)
@@ -398,7 +392,7 @@ class AgentEngine:
             top = weighted[:8]
             chosen = random.choice(top)
             # Prefer the title if available (cleaner topic), else use body start
-            raw = chosen.title or (chosen.body or “”)[:80]
+            raw = chosen.title or (chosen.body or "")[:80]
             theme = self._extract_topic_theme(raw)
             return theme
 
