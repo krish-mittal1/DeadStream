@@ -29,7 +29,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-vectors = ["sentence-transformers>=3.0", "numpy>=1.26"]
+vectors = ["sentence-transformers>=5.5.1", "numpy>=1.26"]
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.24",
