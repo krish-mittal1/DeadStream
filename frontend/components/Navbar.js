@@ -149,6 +149,7 @@ export function Navbar() {
   const pathname = usePathname();
   const user = useSimulationStore((s) => s.user);
   const unreadCount = useSimulationStore((s) => s.unreadCount);
+  const dmUnread = useSimulationStore((s) => s.dmUnread);
   const theme = useSimulationStore((s) => s.theme);
   const toggleTheme = useSimulationStore((s) => s.toggleTheme);
   const logout = useSimulationStore((s) => s.logout);
@@ -196,8 +197,6 @@ export function Navbar() {
       </>
     );
   }
-
-  const dmUnread = useSimulationStore((s) => s.dmUnread);
 
   const primaryLinks = [
     { href: "/feed", label: "Feed", icon: Home },
