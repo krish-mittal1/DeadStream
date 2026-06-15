@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const BACKEND = process.env.BACKEND_URL || "http://3.107.10.252:8000";
+const BACKEND = "http://3.107.10.252:8000";
 
 const nextConfig = {
   output: "standalone",
