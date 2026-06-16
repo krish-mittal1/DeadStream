@@ -32,6 +32,7 @@ export const api = {
   trends: () => request("/trends"),
   agents: () => request("/agents"),
   agentDetail: (agentId) => request(`/agents/${agentId}`),
+  userAgentDetail: (userId) => request(`/users/${userId}/agent`),
   events: () => request("/events?limit=120"),
   influenceGraph: () => request("/admin/influence-graph"),
   followRecommendations: () => request("/recommendations/follow"),

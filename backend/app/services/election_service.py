@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.store import event_store
@@ -94,7 +95,11 @@ class ElectionService:
         )
         session.add(vote)
         election.total_votes += 1
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            return False
 
         await event_store.append(session, "election_vote_cast", voter_id, candidate_id, {
             "election_id": str(election_id),

@@ -209,14 +209,15 @@ export default function DMPage() {
       } else if (activeDMGroup) {
         const other = getOtherParticipant(activeDMGroup, user?.id);
         if (other) {
+          const groupId = activeDMGroup.id;
           const msg = await sendDM(other.id, input.trim());
           setInput("");
-          await fetchDMMessages(activeDMGroup.id);
+          await fetchDMMessages(groupId);
           fetchDMGroups();
           setTyping(true);
           setTimeout(() => {
             setTyping(false);
-            fetchDMMessages(activeDMGroup.id);
+            fetchDMMessages(groupId);
           }, 3000);
         }
       }

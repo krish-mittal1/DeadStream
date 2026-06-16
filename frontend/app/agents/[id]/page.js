@@ -353,7 +353,7 @@ export default function AgentDetailPage() {
                 {templateFriendlyNames[agent.template] || agent.template}
               </p>
             </div>
-            <Link href={`/profile/${agent.id}`} className="btn-secondary h-8 text-xs">View Profile</Link>
+            <Link href={`/profile/${agent.user_id || agent.id}`} className="btn-secondary h-8 text-xs">View Profile</Link>
           </div>
         </motion.div>
 

@@ -293,12 +293,8 @@ export default function ProfilePage() {
           .catch(() => {})
           .finally(() => setPostsLoading(false));
 
-        // If it's an agent, also load agent detail for emotion bars
         if (data.is_agent) {
-          // Find agent id from agents list or try to load via profile id
-          // The AgentDetail endpoint uses agent.id, but profile gives user.id
-          // We pass user.id but the backend /agents/{agent_id} uses agent pk
-          // So we rely on the user_id approach via userProfile which has agent_template
+          api.userAgentDetail(id).then(setAgentDetail).catch(() => {});
         }
       } catch { /* not found */ }
       setLoading(false);

@@ -32,6 +32,10 @@ export function VoteButtons({ postId, likeCount = 0, user, onLike }) {
       </span>
       <motion.button
         whileTap={{ scale: 0.85 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onLike?.(postId);
+        }}
         disabled={!user}
         className="flex items-center justify-center h-6 w-6 rounded-lg transition-all duration-200 hover:bg-[var(--color-downvote)]/10 hover:text-[var(--color-downvote)] disabled:opacity-30 disabled:cursor-not-allowed text-[var(--color-text-muted)]"
       >

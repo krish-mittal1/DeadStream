@@ -481,6 +481,7 @@ class FeedService:
         template_info = next((t for t in TEMPLATES if t.name == agent.template), None)
         return AgentDetailResponse(
             id=agent.id,
+            user_id=user.id,
             username=user.username,
             display_name=user.display_name or user.username,
             template=agent.template,

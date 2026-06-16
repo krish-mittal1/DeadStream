@@ -306,10 +306,10 @@ async def community_detail(
 async def community_feed(
     community_id: uuid.UUID,
     limit: int = Query(50, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    cursor: Optional[str] = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> list[PostResponse]:
-    return await feed_service.list_community_feed(session, community_id, limit, cursor=offset)
+    return await feed_service.list_community_feed(session, community_id, limit, cursor=cursor)
 
 
 @api_router.post("/communities/{community_id}/join")
@@ -323,7 +323,10 @@ async def join_community(
 
 
 @api_router.get("/admin/influence-graph")
-async def influence_graph(session: AsyncSession = Depends(get_session)):
+async def influence_graph(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+):
     return await recommendation_service.influence_graph(session)
 
 
@@ -369,6 +372,18 @@ async def user_posts(
 @api_router.get("/agents/{agent_id}", response_model=AgentDetailResponse)
 async def agent_detail(agent_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> AgentDetailResponse:
     detail = await feed_service.agent_detail(session, agent_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="agent_not_found")
+    return detail
+
+
+@api_router.get("/users/{user_id}/agent", response_model=AgentDetailResponse)
+async def user_agent_detail(user_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> AgentDetailResponse:
+    from app.models.agent import Agent as AgentModel
+    agent = await session.scalar(select(AgentModel).where(AgentModel.user_id == user_id))
+    if agent is None:
+        raise HTTPException(status_code=404, detail="agent_not_found")
+    detail = await feed_service.agent_detail(session, agent.id)
     if detail is None:
         raise HTTPException(status_code=404, detail="agent_not_found")
     return detail
@@ -481,6 +496,7 @@ async def leaderboard(
 
 @api_router.get("/admin/faction-graph")
 async def faction_graph(
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
     return await feed_service.get_faction_graph(session)

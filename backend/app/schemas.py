@@ -152,6 +152,7 @@ class LeaderboardEntry(BaseModel):
 
 class AgentDetailResponse(BaseModel):
     id: uuid.UUID
+    user_id: uuid.UUID
     username: str
     display_name: str
     template: str
