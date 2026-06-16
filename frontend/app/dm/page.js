@@ -397,7 +397,7 @@ export default function DMPage() {
                     {sendError && (
                       <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
                     )}
-                    <div className="flex gap-2">
+                    <div className="flex items-end gap-2">
                       <textarea
                         ref={composeInputRef}
                         value={input}
@@ -410,7 +410,7 @@ export default function DMPage() {
                       <button
                         onClick={handleSend}
                         disabled={!input.trim() || sending}
-                        className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
+                        className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0 mb-0.5"
                         title="Send message"
                       >
                         <Send size={15} />
@@ -505,7 +505,7 @@ export default function DMPage() {
                 {sendError && (
                   <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex items-end gap-2">
                   <textarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -517,7 +517,7 @@ export default function DMPage() {
                   <button
                     onClick={handleSend}
                     disabled={!input.trim() || sending}
-                    className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
+                    className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0 mb-0.5"
                   >
                     <Send size={15} />
                   </button>
