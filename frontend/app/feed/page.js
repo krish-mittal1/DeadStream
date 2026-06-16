@@ -1,8 +1,7 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { Radio } from "lucide-react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 import { useCallback, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { Composer } from "../../components/Composer";
@@ -30,23 +29,17 @@ export default function FeedPage() {
     >
       <div>
         {/* ─── Sub-header ─── */}
-        <div className="flex items-center justify-between border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-xl px-4 md:px-6 h-11 shrink-0">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="btn-icon"
-            >
-              <ArrowLeft size={14} />
-            </Link>
-            <div>
-              <h1 className="text-sm font-bold text-[var(--color-text)]">
-                Global Feed
-              </h1>
-              <p className="text-[11px] text-[var(--color-text-dim)] hidden sm:block">
-                Fresh posts, replies, and conversations
-              </p>
-            </div>
+        <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/90 backdrop-blur-xl px-4 md:px-6 h-12 shrink-0">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--color-accent)] opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--color-accent)]" />
+            </span>
+            <h1 className="text-[13px] font-bold text-[var(--color-text)] tracking-tight">
+              Live Feed
+            </h1>
           </div>
+          <span className="text-[11px] text-[var(--color-text-dim)] hidden sm:block">· posts, replies, and conversations in real time</span>
         </div>
 
         {/* Composer */}

@@ -31,17 +31,17 @@ function SidebarLink({ href, label, icon: Icon, badge, isActive, onClick }) {
     <Link
       href={href}
       onClick={onClick}
-      className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 group ${
+      className={`relative flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-200 group ${
         isActive
-          ? "text-white"
-          : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+          ? "text-[var(--color-text)]"
+          : "text-[var(--color-text-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-panel)]"
       }`}
     >
       <span className="relative z-10 flex items-center gap-3">
         <span className={`flex items-center justify-center w-5 h-5 transition-all duration-200 ${
-          isActive ? "text-[var(--color-accent)]" : ""
+          isActive ? "text-[var(--color-accent)]" : "group-hover:text-[var(--color-text-secondary)]"
         }`}>
-          <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} />
+          <Icon size={17} strokeWidth={isActive ? 2.5 : 1.8} />
         </span>
         <span>{label}</span>
       </span>
@@ -57,7 +57,7 @@ function SidebarLink({ href, label, icon: Icon, badge, isActive, onClick }) {
       {isActive && (
         <motion.div
           layoutId="sidebar-pill"
-          className="absolute inset-0 rounded-xl bg-gradient-to-r from-[rgba(255,69,0,0.12)] to-[rgba(255,69,0,0.04)] border border-[rgba(255,69,0,0.10)]"
+          className="absolute inset-0 rounded-xl bg-gradient-to-r from-[rgba(255,69,0,0.10)] to-transparent border border-[rgba(255,69,0,0.12)]"
           transition={{ type: "spring", stiffness: 500, damping: 38 }}
         />
       )}
@@ -67,8 +67,8 @@ function SidebarLink({ href, label, icon: Icon, badge, isActive, onClick }) {
 
 function SidebarSection({ label }) {
   return (
-    <div className="px-3 pt-5 pb-1.5">
-      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--color-text-dim)]">
+    <div className="px-3 pt-5 pb-1">
+      <span className="text-[9px] font-black uppercase tracking-[0.12em] text-[var(--color-text-dim)] select-none">
         {label}
       </span>
     </div>
@@ -312,10 +312,10 @@ export function Navbar() {
                   {user.username?.[0]?.toUpperCase()}
                 </div>
                 <div className="flex flex-col items-start min-w-0">
-                  <span className="text-sm font-semibold text-[var(--color-text)] truncate max-w-[140px]">
-                    {user.username}
+                  <span className="text-[13px] font-semibold text-[var(--color-text)] truncate max-w-[140px] leading-tight">
+                    {user.display_name || user.username}
                   </span>
-                  <span className="text-[10px] text-[var(--color-text-muted)]">Member</span>
+                  <span className="text-[10px] text-[var(--color-text-muted)] leading-tight">@{user.username}</span>
                 </div>
               </motion.button>
 

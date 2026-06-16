@@ -7,12 +7,12 @@ import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
-const SECTION = "border-b border-[var(--color-line)] px-5 py-5";
+const SECTION = "border-b border-[var(--color-line)] px-4 py-4";
 
 function SectionHeader({ icon, label, extra }) {
   return (
-    <div className="mb-4 flex items-center justify-between">
-      <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--color-text-muted)]">
+    <div className="mb-3 flex items-center justify-between">
+      <h3 className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-[var(--color-text-dim)]">
         <span className="text-[var(--color-text-dim)]">{icon}</span>
         {label}
       </h3>
@@ -57,10 +57,10 @@ export function RightRail() {
             className={SECTION + " bg-gradient-to-b from-red-950/10 to-transparent"}
           >
             <SectionHeader
-              icon={<Swords size={12} />}
-              label={<span className="text-red-400">Drama Feed</span>}
+              icon={<Swords size={11} />}
+              label={<span className="text-red-400/80">Drama Feed</span>}
               extra={
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-red-400">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-red-400">
                   <Zap size={8} /> Hot
                 </span>
               }
@@ -104,17 +104,17 @@ export function RightRail() {
 
       <section className={SECTION}>
         <SectionHeader
-          icon={<Flame size={12} />}
+          icon={<Flame size={11} />}
           label="Trending"
           extra={
             <Link href="/trending" className="text-[10px] font-bold text-[var(--color-accent)] transition-colors hover:text-[var(--color-accent-hover)]">
-              View all
+              See all
             </Link>
           }
         />
-        <div className="space-y-4">
+        <div className="space-y-3">
           {trends.length === 0 && (
-            <p className="text-xs italic text-[var(--color-text-muted)]">Warming up...</p>
+            <p className="text-xs italic text-[var(--color-text-dim)]">Warming up...</p>
           )}
           {trends.slice(0, 5).map((trend, i) => (
             <motion.div
@@ -124,24 +124,20 @@ export function RightRail() {
               transition={{ delay: i * 0.05 }}
               className="group cursor-default"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className={`shrink-0 tabular-nums text-[10px] font-black ${
+                  <span className={`shrink-0 tabular-nums text-[10px] font-black w-4 ${
                     i === 0 ? "text-[var(--color-gold)]" : i < 3 ? "text-[var(--color-accent)]" : "text-[var(--color-text-dim)]"
                   }`}>
-                    #{i + 1}
+                    {i + 1}
                   </span>
-                  <span className="truncate text-sm font-bold text-[var(--color-text)] transition-colors group-hover:text-[var(--color-accent)]">
+                  <span className="truncate text-[12px] font-semibold text-[var(--color-text-secondary)] transition-colors group-hover:text-[var(--color-text)]">
                     {trend.topic}
                   </span>
                 </div>
-                <motion.span
-                  animate={{ scale: [1, 1.06, 1] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                  className="shrink-0 tabular-nums text-[10px] font-bold text-[var(--color-text-muted)]"
-                >
-                  {Number(trend.score).toFixed(1)}
-                </motion.span>
+                <span className="shrink-0 tabular-nums text-[9px] font-bold text-[var(--color-text-dim)]">
+                  {Number(trend.score).toFixed(0)}
+                </span>
               </div>
               <TrendBar score={Number(trend.score)} max={maxTrendScore} />
             </motion.div>
@@ -151,7 +147,7 @@ export function RightRail() {
 
       <section className={SECTION}>
         <SectionHeader
-          icon={<Users size={12} />}
+          icon={<Users size={11} />}
           label="Communities"
           extra={
             <Link href="/communities" className="text-[10px] font-bold text-[var(--color-accent)] transition-colors hover:text-[var(--color-accent-hover)]">
@@ -159,29 +155,42 @@ export function RightRail() {
             </Link>
           }
         />
-        <div className="space-y-1">
-          {communities.slice(0, 6).map((c) => {
-            const hue = Math.round((1 - Number(c.conflict_score)) * 120);
+        <div className="space-y-0.5">
+          {communities.slice(0, 6).map((c, i) => {
+            const conflict = Number(c.conflict_score);
+            const hue = Math.round((1 - conflict) * 120);
+            const isHot = conflict > 0.7;
             return (
               <Link
                 key={c.id}
                 href="/communities"
                 onClick={(e) => { e.preventDefault(); openCommunity(c).catch(() => {}); router.push("/communities"); }}
-                className="-mx-2 flex items-center justify-between rounded-lg p-2 transition-all duration-150 hover:bg-[var(--color-panel)]/60"
+                className="flex items-center gap-2.5 rounded-lg px-2 py-2 transition-all duration-150 hover:bg-[var(--color-panel)] group"
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <div
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-black text-white"
-                    style={{ background: `hsl(${hue}, 70%, 45%)` }}
-                  >
-                    {c.name?.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="truncate text-sm font-medium text-[var(--color-text)] transition-colors hover:text-[var(--color-accent)]">
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[11px] font-black text-white shadow-sm"
+                  style={{
+                    background: `linear-gradient(135deg, hsl(${hue},65%,42%), hsl(${hue + 20},70%,52%))`,
+                  }}
+                >
+                  {c.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="block truncate text-[12px] font-medium text-[var(--color-text-secondary)] group-hover:text-[var(--color-text)] transition-colors">
                     {c.name}
                   </span>
+                  <span className="text-[10px] text-[var(--color-text-dim)]">
+                    {c.member_count ?? 0} members
+                  </span>
                 </div>
-                <span className="shrink-0 tabular-nums text-[10px] font-bold" style={{ color: `hsl(${hue}, 75%, 58%)` }}>
-                  {Number(c.conflict_score).toFixed(1)}
+                <span
+                  className="shrink-0 text-[9px] font-black tabular-nums px-1.5 py-0.5 rounded-md"
+                  style={{
+                    color: `hsl(${hue}, 80%, 60%)`,
+                    background: `hsla(${hue}, 80%, 60%, 0.1)`,
+                  }}
+                >
+                  {conflict.toFixed(1)}
                 </span>
               </Link>
             );

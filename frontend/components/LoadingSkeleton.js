@@ -4,52 +4,36 @@ import { motion } from "framer-motion";
 
 export function FeedSkeleton() {
   return (
-    <div role="status" aria-label="Loading feed" className="divide-y divide-[var(--color-line)]">
+    <div role="status" aria-label="Loading feed" className="px-4 py-4 space-y-0 md:px-6">
       {[1, 2, 3, 4, 5].map((i) => (
         <motion.div
           key={i}
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.08, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="flex gap-3 bg-[var(--color-bg-secondary)] px-4 py-5 md:px-6"
+          transition={{ delay: i * 0.07, duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="rounded-xl border border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-4 mb-2"
         >
-          {/* Vote skeleton */}
-          <div className="flex flex-col items-center gap-1.5 w-10 shrink-0 pt-0.5">
-            <motion.div
-              animate={{ opacity: [0.4, 0.8, 0.4] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
-              className="h-6 w-6 rounded-lg shimmer"
-            />
-            <motion.div
-              animate={{ opacity: [0.3, 0.7, 0.3] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 + 0.2 }}
-              className="h-4 w-6 rounded shimmer"
-            />
-            <motion.div
-              animate={{ opacity: [0.4, 0.8, 0.4] }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 + 0.4 }}
-              className="h-6 w-6 rounded-lg shimmer"
-            />
-          </div>
           {/* Content skeleton */}
           <div className="flex-1 space-y-3 min-w-0">
             {/* Author row */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-3">
               <motion.div
                 animate={{ opacity: [0.4, 0.9, 0.4] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
-                className="h-6 w-6 rounded-full shimmer shrink-0"
+                className="h-8 w-8 rounded-full shimmer shrink-0 mt-0.5"
               />
-              <motion.div
-                animate={{ opacity: [0.3, 0.8, 0.3] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 + 0.15 }}
-                className="h-3 w-20 rounded shimmer"
-              />
-              <motion.div
-                animate={{ opacity: [0.25, 0.6, 0.25] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 + 0.3 }}
-                className="h-2.5 w-10 rounded shimmer"
-              />
+              <div className="space-y-1.5 flex-1">
+                <motion.div
+                  animate={{ opacity: [0.3, 0.8, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 + 0.15 }}
+                  className="h-3 w-24 rounded shimmer"
+                />
+                <motion.div
+                  animate={{ opacity: [0.25, 0.6, 0.25] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 + 0.3 }}
+                  className="h-2.5 w-32 rounded shimmer"
+                />
+              </div>
             </div>
             {/* Title */}
             <div className="space-y-1.5">
@@ -83,8 +67,8 @@ export function FeedSkeleton() {
               />
             </div>
             {/* Action bar */}
-            <div className="flex gap-4 pt-1">
-              {[1, 2, 3].map((j) => (
+            <div className="flex gap-2 pt-2 border-t border-[var(--color-line)]/50">
+              {[28, 20, 20, 20].map((w, j) => (
                 <motion.div
                   key={j}
                   animate={{ opacity: [0.2, 0.55, 0.2] }}
@@ -92,9 +76,10 @@ export function FeedSkeleton() {
                     duration: 1.5,
                     repeat: Infinity,
                     ease: "easeInOut",
-                    delay: i * 0.1 + j * 0.15,
+                    delay: i * 0.1 + j * 0.12,
                   }}
-                  className="h-3 w-12 rounded shimmer"
+                  className={`h-5 rounded-lg shimmer`}
+                  style={{ width: `${w * 2}px` }}
                 />
               ))}
             </div>
