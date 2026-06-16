@@ -23,6 +23,7 @@ class AuthResponse(BaseModel):
     token: str
     user_id: uuid.UUID
     username: str
+    display_name: str
 
 
 class CreatePostRequest(BaseModel):

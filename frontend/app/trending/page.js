@@ -121,7 +121,7 @@ export default function TrendingPage() {
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                     className="text-xs font-bold text-[var(--color-accent)] tabular-nums"
                   >
-                    {topic.score.toFixed(1)}
+                    {(topic.score ?? 0).toFixed(1)}
                   </motion.span>
                 </div>
                 <div className="h-1.5 rounded-full bg-[var(--color-panel-2)] overflow-hidden ml-8">
@@ -216,7 +216,7 @@ export default function TrendingPage() {
                   </div>
                 </div>
                 <span className="text-xs font-bold text-[var(--color-accent)] tabular-nums">
-                  {entry.score.toFixed(0)}
+                  {(entry.score ?? 0).toFixed(0)}
                 </span>
               </motion.div>
             ))}

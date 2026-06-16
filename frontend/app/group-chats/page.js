@@ -151,7 +151,7 @@ export default function GroupChatsPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <div className={`w-64 border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex flex-col ${activeGroupChat ? "hidden md:flex" : "flex"}`}>
-          <div className="p-3 border-b border-[var(--color-line)])">
+          <div className="p-3 border-b border-[var(--color-line)]">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-dim)]">
               Active Roundtables
             </h2>

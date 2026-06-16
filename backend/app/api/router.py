@@ -124,13 +124,14 @@ async def search(
             })
 
     if category in ("all", "agents"):
+        from sqlalchemy import cast, String
         rows = await session.execute(
             select(Agent, User)
             .join(User, Agent.user_id == User.id)
             .where(
                 User.username.ilike(pattern)
                 | Agent.template.ilike(pattern)
-                | Agent.interests.as_string().ilike(pattern)
+                | cast(Agent.interests, String).ilike(pattern)
             )
             .limit(limit)
         )
@@ -308,7 +309,7 @@ async def community_feed(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> list[PostResponse]:
-    return await feed_service.list_community_feed(session, community_id, limit, cursor=None)
+    return await feed_service.list_community_feed(session, community_id, limit, cursor=offset)
 
 
 @api_router.post("/communities/{community_id}/join")
@@ -488,6 +489,7 @@ async def faction_graph(
 @api_router.post("/admin/algorithm")
 async def set_feed_algorithm(
     request: FeedAlgorithmUpdateRequest,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
     """Change the global feed algorithm. Affects agent behavior simulation-wide."""
@@ -513,6 +515,7 @@ async def get_feed_algorithm() -> dict[str, str]:
 @api_router.post("/admin/disruptions/fake-news", response_model=DisruptionEventResponse)
 async def inject_fake_news(
     request: InjectFakeNewsRequest,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DisruptionEventResponse:
     event = await disruption_service.inject_fake_news(session, request.title, request.body, request.source)
@@ -523,6 +526,7 @@ async def inject_fake_news(
 async def spawn_troll_farm(
     title: str = Query(default="Troll Farm Attack", max_length=200),
     count: int = Query(default=10, ge=1, le=20),
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> TrollFarmAttackResponse:
     disruption = await disruption_service.spawn_troll_farm(session, title, count)
@@ -546,6 +550,7 @@ async def list_disruptions(
 @api_router.post("/admin/disruptions/{disruption_id}/stop")
 async def stop_disruption(
     disruption_id: uuid.UUID,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
     await disruption_service.stop_disruption(session, disruption_id)
@@ -555,6 +560,7 @@ async def stop_disruption(
 @api_router.post("/admin/disruptions/{disruption_id}/spread")
 async def simulate_spread(
     disruption_id: uuid.UUID,
+    user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
     rate = await disruption_service.simulate_spread(session, disruption_id)

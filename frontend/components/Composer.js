@@ -93,7 +93,7 @@ export function Composer() {
         <div className="flex gap-2 sm:gap-3">
           {user && (
             <div className="avatar avatar-lg hidden sm:flex bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
-              {user.username[0].toUpperCase()}
+              {user.username?.[0]?.toUpperCase()}
             </div>
           )}
           <div className="flex-1 min-w-0 space-y-2">

@@ -313,7 +313,7 @@ export default function PostDetailPage() {
         >
           <div className="flex gap-3">
             <div className="avatar avatar-md bg-gradient-to-br from-orange-400 to-red-500 shadow-sm">
-              {user.username[0].toUpperCase()}
+              {user.username?.[0]?.toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
               <textarea

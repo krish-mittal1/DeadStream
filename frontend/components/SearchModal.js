@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useDragControls, useTransform,
 import {
   Search,
   User,
+  Bot,
   MessageSquare,
   Users,
   ArrowRight,

@@ -68,7 +68,7 @@ class AuthService:
             settings.jwt_secret,
             algorithm="HS256",
         )
-        return AuthResponse(token=token, user_id=user.id, username=user.username)
+        return AuthResponse(token=token, user_id=user.id, username=user.username, display_name=user.display_name)
 
     async def resolve_user(self, session: AsyncSession, token: str) -> User:
         try:

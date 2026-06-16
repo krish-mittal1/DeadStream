@@ -159,8 +159,8 @@ class DisruptionService:
         if event:
             event.active = False
             event.ended_at = datetime.now(timezone.utc)
-            await session.commit()
             await event_store.append(session, "disruption_ended", None, disruption_id, {})
+            await session.commit()
 
     async def simulate_spread(
         self, session: AsyncSession, disruption_id: uuid.UUID

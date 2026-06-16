@@ -133,7 +133,7 @@ function ElectionCard({ community, user, token }) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl border border-[var(--color-gold)]/25 bg-gradient-to-br from-[var(--color-gold)]/8 to-[var(--color-gold)]/3 p-4 space-y-3"
+      className="mx-5 my-3 rounded-2xl border border-[var(--color-gold)]/25 bg-gradient-to-br from-[var(--color-gold)]/8 to-[var(--color-gold)]/3 p-4 space-y-3"
     >
       <div className="flex items-center gap-2">
         <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-gold)]/15">
@@ -509,9 +509,7 @@ export default function CommunitiesPage() {
                 </div>
 
                 {/* Elections */}
-                <div className="px-5 py-3 border-b border-t border-[var(--color-line)]">
-                  <ElectionCard community={selectedCommunity} user={user} token={token} />
-                </div>
+                <ElectionCard community={selectedCommunity} user={user} token={token} />
 
                 {/* Posts */}
                 <div className="p-4 md:p-5 space-y-4">

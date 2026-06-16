@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import desc, func, select, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.providers import get_provider
@@ -66,7 +67,18 @@ class DMService:
             participant_b=ids[1],
         )
         session.add(group)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            existing = await session.scalar(
+                select(DirectMessageGroup).where(
+                    DirectMessageGroup.participant_a == ids[0],
+                    DirectMessageGroup.participant_b == ids[1],
+                )
+            )
+            if existing:
+                return existing
         await event_store.append(session, "dm_group_created", participant_a, participant_b, {})
         return group
 
@@ -79,6 +91,8 @@ class DMService:
     ) -> DirectMessageResponse:
         """Send a direct message to another user."""
         recipient_id = await self.resolve_recipient_user_id(session, recipient_id)
+        if sender_id == recipient_id:
+            raise ValueError("cannot_dm_self")
 
         group = await self.get_or_create_dm_group(session, sender_id, recipient_id)
         msg = DirectMessage(
@@ -416,18 +430,21 @@ class DMService:
         session.add(chat)
         await session.flush()
 
-        for pid in participant_ids:
+        all_participants = set(participant_ids)
+        all_participants.add(created_by)
+        for pid in all_participants:
             session.add(
                 GroupChatParticipant(
                     group_chat_id=chat.id,
                     user_id=pid,
+                    role="moderator" if pid == created_by else "member",
                 )
             )
 
         await event_store.append(session, "group_chat_created", created_by, chat.id, {
             "name": name,
             "topic": topic,
-            "participant_count": len(participant_ids),
+            "participant_count": len(all_participants),
         })
         await session.commit()
 
@@ -437,7 +454,7 @@ class DMService:
             topic=chat.topic,
             created_by=chat.created_by,
             is_active=True,
-            participant_count=len(participant_ids),
+            participant_count=len(all_participants),
             created_at=chat.created_at,
         )
 

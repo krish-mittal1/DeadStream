@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import cache_invalidate, get_or_compute
@@ -250,35 +251,47 @@ class FeedService:
 
     async def like_post(self, session: AsyncSession, user: User, post_id: uuid.UUID) -> int:
         """Like a post. Returns the updated like_count."""
+        post = await session.get(Post, post_id)
+        if post is None:
+            like_count = await session.scalar(select(func.count()).select_from(Like).where(Like.post_id == post_id)) or 0
+            return int(like_count)
         existing = await session.scalar(select(Like).where(Like.user_id == user.id, Like.post_id == post_id))
         if existing is None:
             session.add(Like(user_id=user.id, post_id=post_id))
-            post = await session.get(Post, post_id)
-            if post is not None:
-                post.virality_score += 0.08
-                # Notify post author if they are not the liker
-                if post.author_id != user.id:
-                    await notification_service.create(
-                        session,
-                        user_id=post.author_id,
-                        actor_id=user.id,
-                        type="like",
-                        entity_id=post_id,
-                    )
+            post.virality_score += 0.08
+            if post.author_id != user.id:
+                await notification_service.create(
+                    session,
+                    user_id=post.author_id,
+                    actor_id=user.id,
+                    type="like",
+                    entity_id=post_id,
+                )
             await event_store.append(session, "user_liked", user.id, post_id, {})
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
             await cache_invalidate("cache:feed:*")
         like_count = await session.scalar(select(func.count()).select_from(Like).where(Like.post_id == post_id)) or 0
         return int(like_count)
 
     async def follow(self, session: AsyncSession, follower: User, followee_id: uuid.UUID) -> None:
+        if follower.id == followee_id:
+            return
+        followee = await session.get(User, followee_id)
+        if followee is None:
+            return
         existing = await session.scalar(
             select(Follow).where(Follow.follower_id == follower.id, Follow.followee_id == followee_id)
         )
         if existing is None:
             session.add(Follow(follower_id=follower.id, followee_id=followee_id, strength=0.15))
             await event_store.append(session, "user_followed_user", follower.id, followee_id, {})
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
 
     async def join_community(self, session: AsyncSession, user: User, community_id: uuid.UUID) -> None:
         existing = await session.scalar(
@@ -290,7 +303,10 @@ class FeedService:
         if existing is None:
             session.add(CommunityMembership(user_id=user.id, community_id=community_id))
             await event_store.append(session, "community_joined", user.id, community_id, {})
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError:
+                await session.rollback()
             await cache_invalidate("cache:communities:*")
 
     async def trending(self, session: AsyncSession) -> list[dict[str, str | float]]:
@@ -508,8 +524,16 @@ class FeedService:
             return BookmarkResponse(id=existing.id, post_id=existing.post_id, created_at=existing.created_at)
         bookmark = Bookmark(user_id=user_id, post_id=post_id)
         session.add(bookmark)
-        await session.flush()
-        await session.commit()
+        try:
+            await session.flush()
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            existing = await session.scalar(
+                select(Bookmark).where(Bookmark.user_id == user_id, Bookmark.post_id == post_id)
+            )
+            if existing:
+                return BookmarkResponse(id=existing.id, post_id=existing.post_id, created_at=existing.created_at)
         await cache_invalidate("cache:bookmarks:*")
         return BookmarkResponse(id=bookmark.id, post_id=bookmark.post_id, created_at=bookmark.created_at)
 
