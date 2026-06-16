@@ -194,39 +194,40 @@ export default function DMPage() {
       if (composing && sendingTo) {
         const msg = await sendDM(sendingTo, input.trim());
         setInput("");
-        if (msg) {
-          const groups = await fetchDMGroups();
-          const group = groups?.find((item) => item.id === msg.dm_group_id) || {
-            id: msg.dm_group_id,
-            participant_a_id: user?.id,
-            participant_a_username: user?.username,
-            participant_b_id: getRecipientUserId(selectedRecipient) || sendingTo,
-            participant_b_username: selectedRecipient?.username || "Chat",
-          };
-          setActiveDMGroup(group);
-          setComposing(false);
-          setSendingTo(null);
-          await fetchDMMessages(msg.dm_group_id);
-        } else {
-          setSendError("Message failed. Try again.");
-        }
+        const groups = await fetchDMGroups();
+        const group = groups?.find((item) => item.id === msg.dm_group_id) || {
+          id: msg.dm_group_id,
+          participant_a_id: user?.id,
+          participant_a_username: user?.username,
+          participant_b_id: getRecipientUserId(selectedRecipient) || sendingTo,
+          participant_b_username: selectedRecipient?.username || "Chat",
+        };
+        setActiveDMGroup(group);
+        setComposing(false);
+        setSendingTo(null);
+        await fetchDMMessages(msg.dm_group_id);
       } else if (activeDMGroup) {
         const other = getOtherParticipant(activeDMGroup, user?.id);
         if (other) {
           const msg = await sendDM(other.id, input.trim());
           setInput("");
-          if (msg) {
-            await fetchDMMessages(activeDMGroup.id);
-            fetchDMGroups();
-            setTyping(true);
-            setTimeout(() => {
-              setTyping(false);
-              fetchDMMessages(activeDMGroup.id);
-            }, 3000);
-          } else {
-            setSendError("Message failed. Try again.");
-          }
+          await fetchDMMessages(activeDMGroup.id);
+          fetchDMGroups();
+          setTyping(true);
+          setTimeout(() => {
+            setTyping(false);
+            fetchDMMessages(activeDMGroup.id);
+          }, 3000);
         }
+      }
+    } catch (err) {
+      const raw = err?.message || "";
+      if (raw.includes("invalid_token") || raw.includes("logged in")) {
+        setSendError("Session expired — please log out and log back in.");
+      } else if (raw.includes("invalid_credentials") || raw.includes("401")) {
+        setSendError("Authentication failed — please log out and log back in.");
+      } else {
+        setSendError(raw || "Message failed. Try again.");
       }
     } finally {
       setSending(false);

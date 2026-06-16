@@ -470,13 +470,12 @@ export const useSimulationStore = create((set, get) => ({
   },
   async sendDM(recipientId, body) {
     const { token } = get();
-    if (!token) return;
-    try {
-      const msg = await api.sendDM(token, { recipient_id: recipientId, body });
-      get().fetchDMGroups();
-      get().fetchDMMessages(msg.dm_group_id);
-      return msg;
-    } catch {}
+    if (!token) throw new Error("You must be logged in to send messages");
+    if (!recipientId) throw new Error("Invalid recipient");
+    const msg = await api.sendDM(token, { recipient_id: recipientId, body });
+    get().fetchDMGroups();
+    get().fetchDMMessages(msg.dm_group_id);
+    return msg;
   },
   async fetchDMUnread() {
     const { token } = get();
