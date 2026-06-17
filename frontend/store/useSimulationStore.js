@@ -88,7 +88,7 @@ export const useSimulationStore = create((set, get) => ({
 
   connectSocket() {
     if (get().socket) return;
-    const socket = io(SOCKET_URL, { transports: ["websocket", "polling"], reconnection: true });
+    const socket = io(SOCKET_URL, { transports: ["polling", "websocket"], reconnection: true });
     socket.on("connect", () => set({ connected: true }));
     socket.on("disconnect", () => set({ connected: false }));
     socket.on("event", (event) => {

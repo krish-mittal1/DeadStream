@@ -89,8 +89,8 @@ export default function RegisterPage() {
       setError("Passwords don't match.");
       return;
     }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     setError("");
@@ -102,8 +102,31 @@ export default function RegisterPage() {
         displayName.trim() || username.trim()
       );
       router.push("/feed");
-    } catch {
-      setError("That username is already taken.");
+    } catch (err) {
+      const raw = err?.message || "";
+      try {
+        const body = JSON.parse(raw);
+        if (Array.isArray(body.detail)) {
+          const msg = body.detail[0]?.msg || "";
+          if (msg.toLowerCase().includes("at least 8")) {
+            setError("Password must be at least 8 characters.");
+          } else if (msg.toLowerCase().includes("at least 3") || msg.toLowerCase().includes("username")) {
+            setError("Username must be at least 3 characters.");
+          } else {
+            setError(msg.replace(/^value error,\s*/i, "") || "Invalid input.");
+          }
+        } else if (typeof body.detail === "string") {
+          if (body.detail.includes("already exists") || body.detail.includes("conflict")) {
+            setError("That username is already taken.");
+          } else {
+            setError(body.detail);
+          }
+        } else {
+          setError("Registration failed. Please try again.");
+        }
+      } catch {
+        setError("Registration failed. Please try again.");
+      }
     } finally {
       setBusy(false);
     }
@@ -161,7 +184,7 @@ export default function RegisterPage() {
               {[
                 { id: "reg-username", label: "Username", placeholder: "Choose a username", autoComplete: "username", value: username, setter: setUsername, delay: 0.3 },
                 { id: "display-name", label: "Display name", placeholder: "How others see you", optional: true, autoComplete: "off", value: displayName, setter: setDisplayName, delay: 0.34 },
-                { id: "reg-password", label: "Password", placeholder: "Min. 6 characters", type: "password", autoComplete: "new-password", value: password, setter: setPassword, delay: 0.38 },
+                { id: "reg-password", label: "Password", placeholder: "Min. 8 characters", type: "password", autoComplete: "new-password", value: password, setter: setPassword, delay: 0.38 },
                 { id: "confirm-password", label: "Confirm password", placeholder: "Repeat your password", type: "password", autoComplete: "new-password", value: confirmPassword, setter: setConfirmPassword, delay: 0.42 },
               ].map((field) => (
                 <motion.div
