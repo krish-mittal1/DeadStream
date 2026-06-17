@@ -5,6 +5,8 @@ import {
   MessageSquare,
   Send,
   Search,
+  Bot,
+  Plus,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -24,19 +26,38 @@ const avatarGradients = [
 ];
 
 function getAvatarGradient(username) {
-  const i = (username || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const i = (username || "")
+    .split("")
+    .reduce((a, c) => a + c.charCodeAt(0), 0);
   return avatarGradients[i % avatarGradients.length];
 }
 
 function getOtherParticipant(group, userId) {
   if (group.participant_a_id === userId) {
-    return { id: group.participant_b_id, username: group.participant_b_username };
+    return {
+      id: group.participant_b_id,
+      username: group.participant_b_username,
+    };
   }
-  return { id: group.participant_a_id, username: group.participant_a_username };
+  return {
+    id: group.participant_a_id,
+    username: group.participant_a_username,
+  };
 }
 
 function getRecipientUserId(agent) {
   return agent?.user_id || agent?.id;
+}
+
+function formatRelativeTime(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return "now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 /* ─── Typing Indicator ──────────────────────────────────── */
@@ -53,11 +74,8 @@ function TypingIndicator({ visible = false }) {
         {[0, 1, 2].map((i) => (
           <motion.span
             key={i}
-            className="w-[6px] h-[6px] rounded-full bg-[var(--color-text-dim)]"
-            animate={{
-              y: [0, -4, 0],
-              opacity: [0.3, 0.8, 0.3],
-            }}
+            className="w-[5px] h-[5px] rounded-full bg-[var(--color-text-dim)]"
+            animate={{ y: [0, -4, 0], opacity: [0.3, 0.8, 0.3] }}
             transition={{
               duration: 1.2,
               repeat: Infinity,
@@ -67,20 +85,22 @@ function TypingIndicator({ visible = false }) {
           />
         ))}
       </div>
-      <span className="text-[10px] text-[var(--color-text-dim)]">typing...</span>
+      <span className="text-[10px] text-[var(--color-text-dim)]">
+        typing…
+      </span>
     </motion.div>
   );
 }
 
+/* ─── Message bubble ─────────────────────────────────────── */
 function DMMessage({ msg, isOwn }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10, scale: 0.94 }}
+      initial={{ opacity: 0, y: 8, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 400, damping: 28 }}
-      className={`flex gap-2 ${isOwn ? "flex-row-reverse" : ""}`}
+      className={`flex gap-2.5 ${isOwn ? "flex-row-reverse" : ""}`}
     >
-      {/* Avatar for incoming messages */}
       {!isOwn && (
         <div
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white mt-1"
@@ -90,30 +110,85 @@ function DMMessage({ msg, isOwn }) {
         </div>
       )}
       <div
-        className={`max-w-[min(72%,560px)] rounded-2xl px-4 py-2.5 shadow-sm ${
+        className={`max-w-[min(72%,560px)] ${
           isOwn
-            ? "bg-[var(--color-accent)] text-white rounded-br-md shadow-[0_2px_8px_rgba(255,69,0,0.2)]"
-            : "bg-[var(--color-panel)] border border-[var(--color-line)] text-[var(--color-text)] rounded-bl-md"
-        }`}
+            ? "rounded-2xl rounded-br-sm bg-[var(--color-accent)] text-white shadow-[0_2px_12px_rgba(255,69,0,0.25)]"
+            : "rounded-2xl rounded-bl-sm bg-[var(--color-panel)] border border-[var(--color-line)] text-[var(--color-text)]"
+        } px-3.5 py-2.5`}
       >
         {!isOwn && (
-          <p className="text-[10px] font-semibold text-[var(--color-accent)] mb-1">
+          <p className="text-[10px] font-bold text-[var(--color-accent)] mb-1 flex items-center gap-1">
+            <Bot size={9} />
             {msg.sender_username}
           </p>
         )}
         <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">
           {msg.body}
         </p>
-        <p className={`text-[10px] mt-1 tabular-nums ${
-          isOwn ? "text-white/50" : "text-[var(--color-text-dim)]"
-        }`}>
-          {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        <p
+          className={`text-[10px] mt-1.5 tabular-nums ${
+            isOwn ? "text-white/50" : "text-[var(--color-text-dim)]"
+          }`}
+        >
+          {new Date(msg.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </p>
       </div>
     </motion.div>
   );
 }
 
+/* ─── Conversation sidebar item ─────────────────────────── */
+function ConversationItem({ group, isActive, onClick, currentUserId }) {
+  const other = getOtherParticipant(group, currentUserId);
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full rounded-xl p-3 text-left transition-all duration-200 ${
+        isActive
+          ? "bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30"
+          : "hover:bg-[var(--color-bg)] border border-transparent"
+      }`}
+    >
+      <div className="flex items-center gap-2.5">
+        <div className="relative shrink-0">
+          <div
+            className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
+            style={{
+              background: getAvatarGradient(other?.username || "unknown"),
+            }}
+          >
+            {other?.username?.charAt(0)?.toUpperCase() || "?"}
+          </div>
+          <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--color-panel)] border border-[var(--color-line)]">
+            <Bot size={7} className="text-[var(--color-accent)]" />
+          </div>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1 justify-between">
+            <span className="text-[12px] font-semibold text-[var(--color-text)] truncate">
+              {other?.username || "Unknown"}
+            </span>
+            {group.last_message_at && (
+              <span className="text-[10px] text-[var(--color-text-dim)] shrink-0 ml-1">
+                {formatRelativeTime(group.last_message_at)}
+              </span>
+            )}
+          </div>
+          {group.last_message && (
+            <p className="text-[11px] text-[var(--color-text-dim)] truncate mt-0.5">
+              {group.last_message?.slice(0, 55)}
+            </p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+/* ─── Main page ─────────────────────────────────────────── */
 export default function DMPage() {
   const user = useSimulationStore((s) => s.user);
   const token = useSimulationStore((s) => s.token);
@@ -137,10 +212,32 @@ export default function DMPage() {
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const messagesEndRef = useRef(null);
-  const composeInputRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const otherParticipant = useMemo(
+    () =>
+      activeDMGroup ? getOtherParticipant(activeDMGroup, user?.id) : null,
+    [activeDMGroup, user?.id]
+  );
+
+  const otherAgent = useMemo(
+    () =>
+      otherParticipant
+        ? agents.find(
+            (a) =>
+              a.username === otherParticipant.username ||
+              getRecipientUserId(a) === otherParticipant.id
+          )
+        : null,
+    [agents, otherParticipant]
+  );
 
   const selectedRecipient = useMemo(
-    () => agents.find((agent) => getRecipientUserId(agent) === sendingTo || agent.id === sendingTo),
+    () =>
+      agents.find(
+        (agent) =>
+          getRecipientUserId(agent) === sendingTo || agent.id === sendingTo
+      ),
     [agents, sendingTo]
   );
 
@@ -181,10 +278,10 @@ export default function DMPage() {
   }, [dmMessages]);
 
   useEffect(() => {
-    if (sendingTo) {
-      composeInputRef.current?.focus();
+    if (activeDMGroup || composing) {
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [sendingTo]);
+  }, [activeDMGroup, composing]);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || sending) return;
@@ -199,7 +296,8 @@ export default function DMPage() {
           id: msg.dm_group_id,
           participant_a_id: user?.id,
           participant_a_username: user?.username,
-          participant_b_id: getRecipientUserId(selectedRecipient) || sendingTo,
+          participant_b_id:
+            getRecipientUserId(selectedRecipient) || sendingTo,
           participant_b_username: selectedRecipient?.username || "Chat",
         };
         setActiveDMGroup(group);
@@ -210,7 +308,7 @@ export default function DMPage() {
         const other = getOtherParticipant(activeDMGroup, user?.id);
         if (other) {
           const groupId = activeDMGroup.id;
-          const msg = await sendDM(other.id, input.trim());
+          await sendDM(other.id, input.trim());
           setInput("");
           await fetchDMMessages(groupId);
           fetchDMGroups();
@@ -225,7 +323,10 @@ export default function DMPage() {
       const raw = err?.message || "";
       if (raw.includes("invalid_token") || raw.includes("logged in")) {
         setSendError("Session expired — please log out and log back in.");
-      } else if (raw.includes("invalid_credentials") || raw.includes("401")) {
+      } else if (
+        raw.includes("invalid_credentials") ||
+        raw.includes("401")
+      ) {
         setSendError("Authentication failed — please log out and log back in.");
       } else {
         setSendError(raw || "Message failed. Try again.");
@@ -233,29 +334,50 @@ export default function DMPage() {
     } finally {
       setSending(false);
     }
-  }, [input, sending, composing, sendingTo, sendDM, activeDMGroup, user, selectedRecipient, fetchDMMessages, setActiveDMGroup, fetchDMGroups]);
+  }, [
+    input,
+    sending,
+    composing,
+    sendingTo,
+    sendDM,
+    activeDMGroup,
+    user,
+    selectedRecipient,
+    fetchDMMessages,
+    setActiveDMGroup,
+    fetchDMGroups,
+  ]);
 
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }, [handleSend]);
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    [handleSend]
+  );
 
-  const startNewChat = useCallback((agent) => {
-    setSendingTo(getRecipientUserId(agent));
-    setComposing(true);
-    setActiveDMGroup(null);
-    setSendError("");
-  }, [setActiveDMGroup]);
+  const startNewChat = useCallback(
+    (agent) => {
+      setSendingTo(getRecipientUserId(agent));
+      setComposing(true);
+      setActiveDMGroup(null);
+      setSendError("");
+    },
+    [setActiveDMGroup]
+  );
 
-  const handleSelectGroup = useCallback((group) => {
-    setActiveDMGroup(group);
-    setComposing(false);
-    setSendingTo(null);
-    setSendError("");
-    fetchDMMessages(group.id);
-  }, [setActiveDMGroup, fetchDMMessages]);
+  const handleSelectGroup = useCallback(
+    (group) => {
+      setActiveDMGroup(group);
+      setComposing(false);
+      setSendingTo(null);
+      setSendError("");
+      fetchDMMessages(group.id);
+    },
+    [setActiveDMGroup, fetchDMMessages]
+  );
 
   return (
     <motion.div
@@ -264,13 +386,15 @@ export default function DMPage() {
       transition={{ duration: 0.2 }}
       className="flex h-[calc(100vh-0px)] min-h-0 w-full flex-col overflow-hidden border-x border-[var(--color-line)] bg-[var(--color-bg)]"
     >
-      {/* Header */}
-      <div className="border-b border-[var(--color-line)] glass-strong px-4 md:px-6 h-11 flex items-center justify-between shrink-0">
+      {/* ─── Top header ─── */}
+      <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)]/80 backdrop-blur-xl px-4 md:px-5 h-11 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <Link href="/feed" className="btn-icon">
             <ArrowLeft size={14} />
           </Link>
-          <h1 className="text-sm font-bold text-[var(--color-text)]">Direct Messages</h1>
+          <h1 className="text-[13px] font-bold text-[var(--color-text)] tracking-tight">
+            Messages
+          </h1>
         </div>
         {dmUnread > 0 && (
           <span className="badge">{dmUnread} unread</span>
@@ -278,38 +402,68 @@ export default function DMPage() {
       </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Sidebar - full width on mobile, sidebar on desktop */}
-        <div className={`${activeDMGroup ? "hidden md:flex" : "flex"} w-full md:w-[320px] border-r border-[var(--color-line)] bg-[var(--color-bg-secondary)] flex-col`}>
-          {/* Compose button */}
-          <div className="p-3 border-b border-[var(--color-line)]">
+        {/* ─── Conversation sidebar ─── */}
+        <div
+          className={`${
+            activeDMGroup || composing ? "hidden md:flex" : "flex"
+          } w-full md:w-[300px] border-r border-[var(--color-line)] bg-[var(--color-panel)] flex-col shrink-0`}
+        >
+          {/* Search + New */}
+          <div className="p-3 border-b border-[var(--color-line)] space-y-2">
             <button
-              onClick={() => { setComposing(true); setActiveDMGroup(null); setSendingTo(null); }}
-              className={`w-full btn-secondary h-9 text-xs ${composing ? "bg-[var(--color-accent)]/10 border-[var(--color-accent)]/30 text-[var(--color-accent)]" : ""}`}
+              onClick={() => {
+                setComposing(true);
+                setActiveDMGroup(null);
+                setSendingTo(null);
+                setRecipientQuery("");
+              }}
+              className={`w-full h-9 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
+                composing
+                  ? "bg-[var(--color-accent)]/12 border-[var(--color-accent)]/35 text-[var(--color-accent)]"
+                  : "border-[var(--color-line)] text-[var(--color-text-secondary)] hover:border-[var(--color-accent)]/30 hover:text-[var(--color-accent)] hover:bg-[var(--color-accent)]/5"
+              }`}
             >
-              <MessageSquare size={14} /> New Message
+              <Plus size={13} /> New Message
             </button>
-            <div className="relative mt-2">
-              <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-dim)]" />
+            <div className="relative">
+              <Search
+                size={12}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-dim)]"
+              />
               <input
                 value={conversationQuery}
                 onChange={(e) => setConversationQuery(e.target.value)}
-                placeholder="Search chats..."
-                className="input-premium h-9 w-full pl-8 text-xs"
+                placeholder="Search conversations…"
+                className="input-premium h-8 w-full pl-7 text-xs"
               />
             </div>
           </div>
 
-          {/* Conversations */}
-          <div className="flex-1 overflow-auto p-2 space-y-1">
+          {/* Conversations list */}
+          <div className="flex-1 overflow-auto p-2 space-y-0.5">
             {!user && (
-              <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
-                Log in to message people
+              <div className="p-6 text-center">
+                <MessageSquare
+                  size={22}
+                  className="mx-auto mb-2 text-[var(--color-text-dim)]"
+                />
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  Log in to message AI agents
+                </p>
               </div>
             )}
             {user && dmGroups.length === 0 && !composing && (
-              <div className="p-4 text-center text-xs text-[var(--color-text-muted)]">
-                No conversations yet.<br />
-                Start one with someone!
+              <div className="p-6 text-center">
+                <Bot
+                  size={22}
+                  className="mx-auto mb-2 text-[var(--color-text-dim)]"
+                />
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  No conversations yet
+                </p>
+                <p className="text-[10px] text-[var(--color-text-dim)] mt-1">
+                  Start chatting with an AI agent
+                </p>
               </div>
             )}
             {user && dmGroups.length > 0 && filteredGroups.length === 0 && (
@@ -317,72 +471,143 @@ export default function DMPage() {
                 No chats match that search.
               </div>
             )}
-            {filteredGroups.map((group) => {
-              const other = getOtherParticipant(group, user?.id);
-              const lastMsg = group.last_message;
-              return (
-                <button
-                  key={group.id}
-                  onClick={() => handleSelectGroup(group)}
-                  className={`w-full rounded-xl p-3 text-left transition-all duration-200 ${
-                    activeDMGroup?.id === group.id
-                      ? "bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30"
-                      : "hover:bg-[var(--color-panel)] border border-transparent"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                      style={{ background: getAvatarGradient(other?.username || "unknown") }}
-                    >
-                      {other?.username?.charAt(0)?.toUpperCase() || "?"}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-[var(--color-text)] truncate">
-                          {other?.username || "Unknown"}
-                        </span>
-                      </div>
-                      {lastMsg && (
-                        <p className="text-[10px] text-[var(--color-text-dim)] truncate mt-0.5">
-                          {lastMsg?.slice(0, 60)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+            {filteredGroups.map((group) => (
+              <ConversationItem
+                key={group.id}
+                group={group}
+                isActive={activeDMGroup?.id === group.id}
+                onClick={() => handleSelectGroup(group)}
+                currentUserId={user?.id}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Chat area - full screen on mobile when active or composing */}
-        <div className={`${activeDMGroup || composing ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col bg-[var(--color-bg)]`}>
+        {/* ─── Chat area ─── */}
+        <div
+          className={`${
+            activeDMGroup || composing ? "flex" : "hidden md:flex"
+          } min-w-0 flex-1 flex-col bg-[var(--color-bg)]`}
+        >
           {composing ? (
-            <div className="flex-1 flex flex-col">
-              <div className="p-4 border-b border-[var(--color-line)]">
-                <h2 className="text-sm font-bold text-[var(--color-text)]">New Message</h2>
-                <p className="text-xs text-[var(--color-text-dim)] mt-1">Select a person to message</p>
-                <div className="relative mt-3">
-                  <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-dim)]" />
+            /* ─── Compose: recipient selection ─── */
+            <div className="flex-1 flex flex-col min-h-0">
+              {/* Compose header */}
+              <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2.5 flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => {
+                    setComposing(false);
+                    setSendingTo(null);
+                  }}
+                  className="btn-icon md:hidden shrink-0"
+                >
+                  <ArrowLeft size={15} />
+                </button>
+                <div>
+                  <p className="text-[13px] font-bold text-[var(--color-text)]">
+                    New Message
+                  </p>
+                  <p className="text-[10px] text-[var(--color-text-dim)]">
+                    Choose an AI agent to chat with
+                  </p>
+                </div>
+              </div>
+
+              {/* Recipient search */}
+              <div className="px-4 py-3 border-b border-[var(--color-line)] shrink-0">
+                <div className="relative">
+                  <Search
+                    size={13}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-dim)]"
+                  />
                   <input
                     value={recipientQuery}
                     onChange={(e) => setRecipientQuery(e.target.value)}
-                    placeholder="Search people..."
-                    className="input-premium h-10 w-full pl-9 text-sm"
+                    placeholder="Search agents…"
+                    className="input-premium h-9 w-full pl-8 text-[13px]"
                     autoFocus
                   />
                 </div>
-                {sendingTo && (
-                  <div className="mt-4 rounded-xl border border-[var(--color-accent)]/25 bg-[var(--color-accent)]/8 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-3">
+              </div>
+
+              {/* Recipient grid */}
+              <div className="flex-1 overflow-auto p-3">
+                {filteredRecipients.length === 0 && (
+                  <div className="p-8 text-center text-xs text-[var(--color-text-muted)]">
+                    No agents match that search.
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {filteredRecipients.map((agent) => (
+                    <button
+                      key={agent.id}
+                      onClick={() => startNewChat(agent)}
+                      className={`rounded-xl p-3 text-left transition-all duration-200 flex items-center gap-3 ${
+                        sendingTo === getRecipientUserId(agent)
+                          ? "bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/35"
+                          : "card hover:border-[var(--color-line-light)]"
+                      }`}
+                    >
+                      <div className="relative shrink-0">
+                        <div
+                          className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+                          style={{
+                            background: getAvatarGradient(agent.username),
+                          }}
+                        >
+                          {agent.username?.charAt(0)?.toUpperCase()}
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--color-panel)] border border-[var(--color-line)]">
+                          <Bot
+                            size={8}
+                            className="text-[var(--color-accent)]"
+                          />
+                        </div>
+                      </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-text-dim)]">
-                          Message
-                        </p>
-                        <p className="truncate text-sm font-bold text-[var(--color-text)]">
-                          @{selectedRecipient?.username}
-                        </p>
+                        <span className="block text-[13px] font-semibold text-[var(--color-text)] truncate">
+                          {agent.username}
+                        </span>
+                        <span className="block text-[10px] text-[var(--color-text-dim)] truncate capitalize">
+                          {agent.template?.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Compose input (shows when recipient is selected) */}
+              <AnimatePresence>
+                {sendingTo && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="border-t border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 shrink-0"
+                  >
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                          style={{
+                            background: getAvatarGradient(
+                              selectedRecipient?.username || ""
+                            ),
+                          }}
+                        >
+                          {selectedRecipient?.username
+                            ?.charAt(0)
+                            ?.toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold text-[var(--color-text)] truncate">
+                            @{selectedRecipient?.username}
+                          </p>
+                          <p className="text-[9px] text-[var(--color-text-dim)] flex items-center gap-0.5">
+                            <Bot size={8} /> AI Agent
+                          </p>
+                        </div>
                       </div>
                       <button
                         onClick={() => {
@@ -390,155 +615,185 @@ export default function DMPage() {
                           setInput("");
                           setSendError("");
                         }}
-                        className="text-xs font-semibold text-[var(--color-text-dim)] hover:text-[var(--color-text)]"
+                        className="text-[11px] font-semibold text-[var(--color-text-dim)] hover:text-[var(--color-text)] px-2 py-1 rounded-lg hover:bg-[var(--color-bg)] transition-colors"
                       >
                         Change
                       </button>
                     </div>
                     {sendError && (
-                      <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
+                      <p className="mb-2 text-xs font-semibold text-red-400">
+                        {sendError}
+                      </p>
                     )}
                     <div className="flex items-end gap-2">
                       <textarea
-                        ref={composeInputRef}
+                        ref={inputRef}
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Type your message..."
+                        placeholder={`Message @${selectedRecipient?.username}…`}
                         rows={2}
-                        className="input-premium flex-1 resize-none text-sm"
+                        className="input-premium flex-1 resize-none text-[13px]"
                       />
                       <button
                         onClick={handleSend}
                         disabled={!input.trim() || sending}
-                        className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0 mb-0.5"
-                        title="Send message"
+                        className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
                       >
-                        <Send size={15} />
+                        <Send size={14} />
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 )}
-              </div>
-              <div className="grid flex-1 grid-cols-1 gap-2 overflow-auto p-3 lg:grid-cols-2">
-                {filteredRecipients.length === 0 && (
-                  <div className="p-6 text-center text-xs text-[var(--color-text-muted)]">
-                    No people match that search.
-                  </div>
-                )}
-                {filteredRecipients.map((agent) => (
-                  <button
-                      key={agent.id}
-                      onClick={() => startNewChat(agent)}
-                      className={`w-full rounded-xl p-3 text-left transition-all duration-200 flex items-center gap-3 ${
-                      sendingTo === getRecipientUserId(agent)
-                        ? "bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/30"
-                        : "card hover:border-[var(--color-line-light)]"
-                    }`}
-                  >
-                    <div
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                      style={{ background: getAvatarGradient(agent.username) }}
-                    >
-                      {agent.username?.charAt(0)?.toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-[var(--color-text)]">
-                          {agent.username}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[var(--color-text-dim)]">
-                        {agent.template?.replace(/_/g, " ")}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              </AnimatePresence>
             </div>
           ) : activeDMGroup ? (
-            <SwipeBackWrapper onSwipeBack={() => setActiveDMGroup(null)} className="flex-1 flex flex-col">
+            /* ─── Active conversation ─── */
+            <SwipeBackWrapper
+              onSwipeBack={() => setActiveDMGroup(null)}
+              className="flex-1 flex flex-col min-h-0"
+            >
               {/* Chat header */}
-              <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-3 sm:px-4 py-3 flex items-center gap-2 sm:gap-3">
+              <div className="border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-2.5 flex items-center gap-3 shrink-0">
                 <button
                   onClick={() => setActiveDMGroup(null)}
                   className="btn-icon md:hidden shrink-0"
-                  title="Back to conversations"
                 >
-                  <ArrowLeft size={16} />
+                  <ArrowLeft size={15} />
                 </button>
-                <div
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
-                  style={{ background: getAvatarGradient(getOtherParticipant(activeDMGroup, user?.id)?.username || "unknown") }}
-                >
-                  {getOtherParticipant(activeDMGroup, user?.id)?.username?.charAt(0)?.toUpperCase() || "?"}
+                <div className="relative shrink-0">
+                  <div
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{
+                      background: getAvatarGradient(
+                        otherParticipant?.username || "unknown"
+                      ),
+                    }}
+                  >
+                    {otherParticipant?.username?.charAt(0)?.toUpperCase() ||
+                      "?"}
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--color-panel)] border border-[var(--color-line)]">
+                    <Bot size={7} className="text-[var(--color-accent)]" />
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-[var(--color-text)]">
-                    {getOtherParticipant(activeDMGroup, user?.id)?.username || "Chat"}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold text-[var(--color-text)] leading-tight truncate">
+                    {otherParticipant?.username || "Chat"}
                   </p>
-                  <p className="text-[10px] text-[var(--color-text-dim)]">Messages</p>
+                  <p className="text-[10px] text-[var(--color-text-dim)] flex items-center gap-1 leading-tight">
+                    <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-[rgba(255,69,0,0.08)] border border-[rgba(255,69,0,0.15)] text-[var(--color-accent)] font-semibold text-[8px] uppercase tracking-wide">
+                      <Bot size={7} /> AI
+                    </span>
+                    {otherAgent?.template
+                      ? otherAgent.template.replace(/_/g, " ")
+                      : "Agent"}
+                  </p>
                 </div>
               </div>
 
               {/* Messages */}
-              <div className="flex-1 overflow-auto px-5 py-4 md:px-8 lg:px-12 space-y-3">
+              <div className="flex-1 overflow-auto px-4 py-4 md:px-8 lg:px-16 space-y-3">
                 {(dmMessages[activeDMGroup.id] || []).length === 0 && (
                   <div className="flex h-full items-center justify-center">
-                    <div className="text-center">
-                      <MessageSquare size={24} className="mx-auto mb-2 text-[var(--color-text-dim)]" />
-                      <p className="text-xs text-[var(--color-text-muted)]">No messages yet</p>
-                      <p className="text-[10px] text-[var(--color-text-dim)] mt-1">Send a message to start the conversation</p>
-                    </div>
+                    <motion.div
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.4, ease: "backOut" }}
+                      className="text-center px-6"
+                    >
+                      <div
+                        className="mx-auto mb-4 h-14 w-14 rounded-2xl flex items-center justify-center"
+                        style={{
+                          background: getAvatarGradient(
+                            otherParticipant?.username || ""
+                          ),
+                        }}
+                      >
+                        <span className="text-lg font-bold text-white">
+                          {otherParticipant?.username
+                            ?.charAt(0)
+                            ?.toUpperCase() || "?"}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                        Chat with {otherParticipant?.username}
+                      </p>
+                      <p className="text-xs text-[var(--color-text-dim)] mt-1">
+                        Send a message to start the conversation
+                      </p>
+                    </motion.div>
                   </div>
                 )}
                 <AnimatePresence>
                   {(dmMessages[activeDMGroup.id] || []).map((msg) => (
-                    <DMMessage key={msg.id} msg={msg} isOwn={msg.sender_id === user?.id} />
+                    <DMMessage
+                      key={msg.id}
+                      msg={msg}
+                      isOwn={msg.sender_id === user?.id}
+                    />
                   ))}
                 </AnimatePresence>
-                <TypingIndicator visible={typing} />
+                <AnimatePresence>
+                  {typing && <TypingIndicator visible />}
+                </AnimatePresence>
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
-              <div className="border-t border-[var(--color-line)] bg-[var(--color-panel)] px-5 py-3 md:px-8 lg:px-12">
+              {/* Input bar */}
+              <div className="border-t border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-3 md:px-8 lg:px-16 shrink-0">
                 {sendError && (
-                  <p className="mb-2 text-xs font-semibold text-red-400">{sendError}</p>
+                  <p className="mb-2 text-xs font-semibold text-red-400">
+                    {sendError}
+                  </p>
                 )}
                 <div className="flex items-end gap-2">
                   <textarea
+                    ref={inputRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type a message..."
-                    rows={2}
-                    className="input-premium flex-1 resize-none text-sm"
+                    placeholder={`Message ${otherParticipant?.username || "…"}`}
+                    rows={1}
+                    className="input-premium flex-1 resize-none text-[13px] leading-relaxed"
+                    style={{ maxHeight: "120px" }}
                   />
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.93 }}
                     onClick={handleSend}
                     disabled={!input.trim() || sending}
-                    className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0 mb-0.5"
+                    className="btn-primary h-9 w-9 p-0 flex items-center justify-center shrink-0"
                   >
-                    <Send size={15} />
-                  </button>
+                    <Send size={14} />
+                  </motion.button>
                 </div>
+                <p className="text-[10px] text-[var(--color-text-dim)] mt-1.5">
+                  Enter to send · Shift+Enter for new line
+                </p>
               </div>
             </SwipeBackWrapper>
           ) : (
+            /* ─── Empty state ─── */
             <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.4, ease: "backOut" }}
-                  className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl border border-[var(--color-line)] bg-[var(--color-panel)]"
-                >
-                  <MessageSquare size={32} className="text-[var(--color-text-muted)]" />
-                </motion.div>
-                <p className="text-sm text-[var(--color-text-muted)]">Select a conversation</p>
-                <p className="text-xs text-[var(--color-text-dim)] mt-1">Or start a new conversation</p>
-              </div>
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.4, ease: "backOut" }}
+                className="text-center px-8"
+              >
+                <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[rgba(255,69,0,0.08)] border border-[rgba(255,69,0,0.15)]">
+                  <MessageSquare
+                    size={26}
+                    className="text-[var(--color-accent)]"
+                  />
+                </div>
+                <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                  Select a conversation
+                </p>
+                <p className="text-xs text-[var(--color-text-dim)] mt-1">
+                  Or start a new chat with an AI agent
+                </p>
+              </motion.div>
             </div>
           )}
         </div>
