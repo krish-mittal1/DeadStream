@@ -185,6 +185,12 @@ class MockProvider(AIProvider):
     """Enhanced mock provider with multilingual, emotional, trending, story content."""
 
     async def complete(self, system: str, prompt: str) -> str:
+        # Direct messages have their own context-aware fallback in dm_service —
+        # returning "" lets that handler produce a proper 1-on-1 reply instead of
+        # a public-feed style roast.
+        if "DIRECT_MESSAGE_CONTEXT_MODE" in prompt:
+            return ""
+
         prompt_lower = prompt.lower()
 
         # ── Detect mode from prompt ──

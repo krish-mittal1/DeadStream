@@ -213,6 +213,7 @@ export default function DMPage() {
   const [typing, setTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const otherParticipant = useMemo(
     () =>
@@ -283,6 +284,35 @@ export default function DMPage() {
     }
   }, [activeDMGroup, composing]);
 
+  // ── Live polling ──
+  // Agents reply a few seconds after you send. Poll the open conversation so
+  // new messages appear automatically without a manual refresh, regardless of
+  // socket connectivity.
+  useEffect(() => {
+    if (!activeDMGroup?.id || !token) return;
+    const groupId = activeDMGroup.id;
+    const interval = setInterval(() => {
+      fetchDMMessages(groupId);
+      fetchDMGroups();
+      fetchDMUnread();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeDMGroup?.id, token, fetchDMMessages, fetchDMGroups, fetchDMUnread]);
+
+  // Clear the typing indicator as soon as the agent's reply lands.
+  useEffect(() => {
+    if (!activeDMGroup?.id) return;
+    const msgs = dmMessages[activeDMGroup.id] || [];
+    const last = msgs[msgs.length - 1];
+    if (last && last.sender_id !== user?.id) {
+      setTyping(false);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+    }
+  }, [dmMessages, activeDMGroup?.id, user?.id]);
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || sending) return;
     setSending(true);
@@ -312,11 +342,11 @@ export default function DMPage() {
           setInput("");
           await fetchDMMessages(groupId);
           fetchDMGroups();
+          // Agent replies after a few seconds — show typing; the live poll
+          // below will surface the reply and clear this indicator.
           setTyping(true);
-          setTimeout(() => {
-            setTyping(false);
-            fetchDMMessages(groupId);
-          }, 3000);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setTyping(false), 14000);
         }
       }
     } catch (err) {

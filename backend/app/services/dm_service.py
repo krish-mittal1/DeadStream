@@ -22,6 +22,7 @@ from app.models.dm import (
     GroupChatMessage,
     GroupChatParticipant,
 )
+from app.models.social import Post
 from app.models.user import User
 from app.schemas import (
     DirectMessageGroupResponse,
@@ -30,6 +31,8 @@ from app.schemas import (
     GroupChatParticipantResponse,
     GroupChatResponse,
 )
+from app.services.memory import memory_service
+from app.services.relationship_service import relationship_service
 
 logger = get_logger(__name__)
 
@@ -130,7 +133,7 @@ class DMService:
         recipient_id: uuid.UUID,
         body: str,
     ) -> None:
-        await asyncio.sleep(random.uniform(5.0, 18.0))
+        await asyncio.sleep(random.uniform(3.0, 8.0))
         async with SessionLocal() as session:
             try:
                 recipient_id = await self.resolve_recipient_user_id(session, recipient_id)
@@ -161,12 +164,13 @@ class DMService:
         if not agent:
             return
 
+        # ── Conversation history (last 14 messages for real continuity) ──
         recent_rows = (
             await session.execute(
                 select(DirectMessage)
                 .where(DirectMessage.dm_group_id == dm_group_id)
                 .order_by(desc(DirectMessage.created_at))
-                .limit(8)
+                .limit(14)
             )
         ).scalars().all()
         recent = list(reversed(recent_rows))
@@ -175,36 +179,80 @@ class DMService:
             if message.sender_id not in names:
                 user = await session.get(User, message.sender_id)
                 names[message.sender_id] = user.username if user else "unknown"
+        context = "\n".join(
+            f"@{names.get(message.sender_id, 'unknown')}: {message.body}" for message in recent
+        )
+        # The agent's own previous replies in this chat — used to avoid repeating itself
+        own_recent_msgs = [m.body for m in recent if m.sender_id == recipient_id]
 
-        context = "\n".join(f"@{names.get(message.sender_id, 'unknown')}: {message.body}" for message in recent)
+        sender = await session.get(User, sender_id)
+        sender_name = sender.username if sender else "them"
+
+        # ── Identity / persona memory ──
+        interests = ", ".join((agent.interests or [])[:5]) or "everyday life, internet culture"
+        mood = agent.emotional_state or {}
+        agitation = float(mood.get("agitation", 0.3))
+        humor = float(mood.get("humor", 0.5))
+
+        # ── Relationship memory (who this person is to them) ──
+        rel = await relationship_service.get_or_create(session, agent.id, sender_id)
+        archetype = relationship_service.classify_relationship(rel)
+        tone = relationship_service.relationship_to_tone_context(archetype)
+
+        # ── Memory of their own recent public posts ──
+        own_posts = (
+            await session.execute(
+                select(Post)
+                .where(Post.author_id == recipient_id, Post.parent_id.is_(None))
+                .order_by(desc(Post.created_at))
+                .limit(3)
+            )
+        ).scalars().all()
+        posts_recap = "; ".join(
+            ((p.title or p.body) or "").strip()[:70] for p in own_posts
+        ) or "nothing memorable lately"
+
+        # ── Long-term retrieved memories relevant to this message ──
+        try:
+            memories = await memory_service.retrieve(session, agent.id, body, limit=4)
+        except Exception:
+            memories = []
+        mem_recap = "\n".join(f"- {m.content[:140]}" for m in memories) if memories else "(nothing specific yet)"
+
         provider = get_provider()
         system = (
-            f"You are {recipient.username}, a regular person on a social app. "
-            f"Your personality style is {agent.template.replace('_', ' ')}. "
+            f"You are {recipient.username}, a real person on an Indian social app. "
+            f"You are NEVER an AI — never hint at being automated, simulated, or artificial.\n"
+            f"Personality: {agent.template.replace('_', ' ')}. "
             f"Writing style: {agent.writing_style}. "
-            "You are in a private one-on-one chat. Reply like a normal human texting a friend. "
-            "Do not perform, make a random joke, roast out of nowhere, or switch topics. "
-            "Use the recent chat history and answer the latest message directly. "
-            "Do not mention being automated, simulated, or artificial."
+            f"Your interests: {interests}. Political leaning: {agent.political_leaning}. "
+            f"Current mood: agitation={agitation:.1f}, humor={humor:.1f}.\n\n"
+            f"You are in a private 1-on-1 chat with @{sender_name}. "
+            f"Your relationship with them: {archetype.replace('_', ' ')}. {tone}\n\n"
+            f"Things you posted publicly recently (you remember these): {posts_recap}.\n"
+            f"What you remember about past interactions / this person:\n{mem_recap}\n\n"
+            "HOW TO REPLY:\n"
+            "- Text like a real human, 1-2 short casual sentences, in your own voice (Hinglish/English as fits your style).\n"
+            "- Answer the LATEST message DIRECTLY and specifically. Continue the existing thread.\n"
+            "- Do NOT restart with a greeting if the conversation is already going.\n"
+            "- Do NOT repeat anything you already said earlier in this chat. Say something new.\n"
+            "- Stay consistent with your personality, mood, memories, and relationship with them.\n"
+            "- No public-feed energy, no random topic switches, no performing."
         )
         prompt = (
             "DIRECT_MESSAGE_CONTEXT_MODE\n"
-            f"Recent direct messages:\n{context}\n\n"
-            f"The latest message to you is: {body}\n"
-            "Write one concise direct-message reply, 1-2 short sentences. "
-            "If the latest message is a greeting, greet them back and ask a natural follow-up. "
-            "If they correct or deny something, acknowledge it and ask what they meant. "
-            "If they invite you somewhere, respond to the invite specifically. "
-            "If they thank you, acknowledge it casually without restarting the conversation. "
-            "Do not reply like a public feed comment."
+            f"Conversation so far (oldest to newest):\n{context}\n\n"
+            f"The latest message from @{sender_name} is: \"{body}\"\n"
+            "Write ONLY your next reply — no name prefix, no quotes, no explanation."
         )
 
         try:
             reply_body = (await provider.complete(system, prompt)).strip().strip('"').strip()[:600]
         except Exception:
-            reply_body = self._contextual_dm_fallback(body)
-        if not reply_body:
-            reply_body = self._contextual_dm_fallback(body)
+            reply_body = ""
+        # Reject empty or self-repeating replies → contextual fallback
+        if not reply_body or reply_body in own_recent_msgs:
+            reply_body = self._contextual_dm_fallback(body, own_recent_msgs, recent)
 
         reply = DirectMessage(
             dm_group_id=dm_group_id,
@@ -220,64 +268,134 @@ class DMService:
             "body": reply_body[:200],
             "dm_group_id": str(dm_group_id),
         })
+        # Persist the reply immediately so it's delivered regardless of what
+        # happens during the best-effort memory step below.
         await session.commit()
 
-    def _contextual_dm_fallback(self, body: str) -> str:
+        # ── Best-effort: remember this exchange + drift the relationship ──
+        # Never let embedding/relationship failures affect the delivered reply.
+        try:
+            await memory_service.remember(
+                session,
+                agent.id,
+                f"DM with @{sender_name}: they said '{body[:120]}' and I replied '{reply_body[:120]}'.",
+                kind="dm",
+                emotional_intensity=min(0.6, 0.2 + agitation * 0.3),
+                metadata={"with": sender_name, "dm_group_id": str(dm_group_id)},
+            )
+            await relationship_service.update_after_interaction(
+                session, agent.id, sender_id, self._classify_dm_sentiment(body), intensity=0.08
+            )
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            logger.warning("dm_memory_update_failed", error=str(exc))
+
+    def _classify_dm_sentiment(self, body: str) -> str:
+        """Cheap sentiment classifier to drift the agent↔user relationship after a DM."""
+        text = body.lower()
+        negative = ("hate", "stupid", "idiot", "shut up", "bakwas", "chutiya", "loser", "wrong", "trash", "noob")
+        positive = ("thanks", "love", "great", "nice", "good", "agree", "bro", "dost", "yaar", "haha", "lol", "sahi", "badhiya")
+        if any(w in text for w in negative):
+            return "argue_reply"
+        if any(w in text for w in positive):
+            return "agree_reply"
+        return "like"
+
+    def _contextual_dm_fallback(self, body: str, own_recent_msgs=None, recent=None) -> str:
+        """Context-aware reply used when the LLM is unavailable.
+
+        Picks a category from the latest message, then a candidate that the agent
+        has NOT already said in this conversation, so it never loops on the same line.
+        """
+        own_recent_msgs = own_recent_msgs or []
         text = body.strip().lower()
         normalized = text.replace("yaar", "").replace("bhai", "").strip()
-        if any(word in text for word in ("shaadi", "wedding", "invite", "aajana", "aa jaana", "come", "party")):
-            return random.choice([
+
+        # Is the conversation already underway? (avoid greeting mid-chat)
+        convo_started = bool(own_recent_msgs)
+
+        if any(word in text for word in ("shaadi", "wedding", "invite", "aajana", "aa jaana", "party")):
+            candidates = [
                 "arre wah, congrats! time aur location bhej de, try karta hu aane ka.",
                 "congrats yaar. kab aur kahan hai? details bhej.",
-                "nice bhai, happy for you. venue bata de."
-            ])
-        if any(word in text for word in ("thanks", "thank you", "shukriya", "dhanyawaad")):
-            return random.choice([
+                "nice bhai, happy for you. venue bata de.",
+            ]
+        elif any(word in text for word in ("thanks", "thank you", "shukriya", "dhanyawaad")):
+            candidates = [
                 "arre chill, no worries.",
                 "haha anytime yaar.",
-                "koi scene nahi, happy to help."
-            ])
-        if any(word in text for word in ("haha", "lol", "lmao", "😂")):
-            return random.choice([
+                "koi scene nahi, jab chahe bata dena.",
+            ]
+        elif any(word in text for word in ("how are you", "kaise ho", "kya haal", "kya scene", "kaisa hai", "kaisi ho", "what about you", "wbu", "and you", "tu suna")):
+            candidates = [
+                "bas mast, chill chal raha hai. tera bata?",
+                "sab badhiya yaar, normal din. tu suna?",
+                "thik thak, kaam-vaam me busy. tu kaisa hai?",
+                "all good bro, bas thoda thaka hua hu. tere side kya scene?",
+            ]
+        elif any(word in text for word in ("i'm good", "im good", "good", "badhiya", "mast", "sahi", "thik", "theek", "fine", "great")):
+            candidates = [
+                "nice nice, sun ke acha laga. aur kya chal raha hai?",
+                "badhiya bro. weekend ka koi plan hai?",
+                "great yaar. waise aaj kuch interesting hua kya?",
+                "solid. bas yahi chahiye life me, thodi peace.",
+            ]
+        elif any(word in text for word in ("haha", "lol", "lmao", "😂", "🤣")):
+            candidates = [
                 "sahi me, thoda funny tha.",
                 "haan woh toh hai lol.",
-                "bas wahi energy chahiye."
-            ])
-        if any(word in text for word in ("hey", "hi", "hello", "yo")):
-            return random.choice([
-                "hey, kya scene?",
-                "yo, bol kya chal raha hai?",
-                "hello hello, kaise ho?"
-            ])
-        if any(word in text for word in ("nhi", "nahi", "no", "nah", "not really")):
-            return random.choice([
+                "bas wahi energy chahiye scene me.",
+            ]
+        elif any(word in text for word in ("nhi", "nahi", "no", "nah", "not really")):
+            candidates = [
                 "achha, my bad. fir actual scene kya tha?",
                 "okay got it. tu kya kehna chahta tha?",
-                "samjha, I read it wrong. bata fir."
-            ])
-        if any(word in text for word in ("support", "supports", "help", "saath")):
-            return random.choice([
-                "haan support zaroori hota hai. kis cheez me support kar raha hai?",
-                "that's good yaar. aise log kaafi rare hote hain.",
-                "nice, at least koi toh properly saath de raha hai."
-            ])
-        if "?" in body:
-            return random.choice([
+                "samjha, galat samajh gaya tha. bata fir.",
+            ]
+        elif any(word in text for word in ("support", "help", "saath", "problem", "tension", "pareshan")):
+            candidates = [
+                "haan bol, kya hua? sun raha hu properly.",
+                "tension mat le, bata kya scene hai.",
+                "main hu na, detail me bata kya chal raha hai.",
+            ]
+        elif "?" in body:
+            candidates = [
                 "hmm, fair question. thoda aur context de.",
                 "depends yaar, exact scene kya hai?",
-                "honestly bataun toh context pe depend karta hai."
-            ])
-        if len(normalized) < 18:
-            return random.choice([
+                "honestly bataun toh situation pe depend karta hai. elaborate kar.",
+            ]
+        elif any(word in text for word in ("hey", "hi", "hello", "yo", "namaste", "sup")):
+            # Only greet if the conversation hasn't started yet
+            if convo_started:
+                candidates = [
+                    "haan bol, kya chal raha hai?",
+                    "ya sun raha hu, bata.",
+                    "yep yep, aage bol.",
+                ]
+            else:
+                candidates = [
+                    "hey, kya scene?",
+                    "yo, bol kya chal raha hai?",
+                    "hello hello, kaise ho?",
+                ]
+        elif len(normalized) < 12:
+            candidates = [
                 "haan bol, sun raha hu.",
-                "achha, aur?",
-                "hmm okay, continue kar."
-            ])
-        return random.choice([
-            "haan, got it. ye thoda interesting hai.",
-            "samjha. isme main point kya hai tere hisaab se?",
-            "fair enough yaar, makes sense."
-        ])
+                "achha, aur bata?",
+                "hmm okay, continue kar.",
+            ]
+        else:
+            candidates = [
+                "haan samjha, ye thoda interesting hai actually.",
+                "achha. tere hisaab se isme main baat kya hai?",
+                "fair enough yaar, makes sense. aur bata.",
+                "interesting point. main bhi kuch aisa hi soch raha tha.",
+            ]
+
+        # Prefer a candidate the agent hasn't already used in this chat
+        fresh = [c for c in candidates if c not in own_recent_msgs]
+        return random.choice(fresh or candidates)
 
     async def list_dm_groups(
         self, session: AsyncSession, user_id: uuid.UUID, limit: int = 50
