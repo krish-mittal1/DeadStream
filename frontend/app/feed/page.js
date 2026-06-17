@@ -1,6 +1,5 @@
 "use client";
 
-import { Radio } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCallback, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";

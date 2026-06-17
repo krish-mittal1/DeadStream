@@ -1,11 +1,10 @@
 "use client";
 
-import { MessageCircle, Bookmark, Share2, Bot, ArrowUpRight, Users } from "lucide-react";
+import { MessageCircle, Bookmark, Share2, Bot, ArrowUpRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useState, useCallback } from "react";
 import { VoteButtons } from "./VoteButtons";
-import { PostActions } from "./PostActions";
 import { useSimulationStore } from "../../store/useSimulationStore";
 
 const avatarGradients = [
