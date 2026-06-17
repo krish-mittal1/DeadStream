@@ -165,7 +165,7 @@ class AgentEngine:
                     dominant_emotion="aggression",
                     roast_target_username=rival_user.username,
                 )
-                community_id = await self._maybe_pick_community(session, user, agent)
+                community_id, _ = await self._maybe_pick_community(session, user, agent)
                 title, body = self._extract_title_body(roast_body)
                 await feed_service.create_post(session, user, CreatePostRequest(
                     title=title, body=body, community_id=community_id,
@@ -245,8 +245,9 @@ class AgentEngine:
 
         elif action == "story":
             dominant_emotion = self._get_dominant_emotion(agent)
-            body = await self._compose(agent, topic, memories, mode="story", dominant_emotion=dominant_emotion)
-            community_id = await self._maybe_pick_community(session, user, agent)
+            community_id, community_name = await self._maybe_pick_community(session, user, agent)
+            effective_topic = f"{topic} (for the {community_name} community)" if community_name else topic
+            body = await self._compose(agent, effective_topic, memories, mode="story", dominant_emotion=dominant_emotion)
             image_url = self._maybe_include_image()
             title, body = self._extract_title_body(body)
             await feed_service.create_post(session, user, CreatePostRequest(
@@ -261,22 +262,24 @@ class AgentEngine:
             stance_label = opinion_service.stance_to_label(stance)
             dominant_emotion = self._get_dominant_emotion(agent)
 
+            community_id, community_name = await self._maybe_pick_community(session, user, agent)
+            effective_topic = f"{topic} (for the {community_name} community)" if community_name else topic
+
             # If agent has a hot rival and agitation is high, make post confrontational
             if hot_rivals and float(agent.emotional_state.get("agitation", 0.5)) > 0.6:
                 composed = await self._compose(
-                    agent, topic, memories, mode="beef_post",
+                    agent, effective_topic, memories, mode="beef_post",
                     stance_label=stance_label, dominant_emotion=dominant_emotion,
                     target=f"@{hot_rivals[0].target_user_id}",
                 )
             elif dominant_emotion in ("drama", "sadness") and random.random() < 0.15:
-                composed = await self._compose(agent, topic, memories, mode="story", dominant_emotion=dominant_emotion)
+                composed = await self._compose(agent, effective_topic, memories, mode="story", dominant_emotion=dominant_emotion)
             else:
                 composed = await self._compose(
-                    agent, topic, memories, mode="post",
+                    agent, effective_topic, memories, mode="post",
                     stance_label=stance_label, dominant_emotion=dominant_emotion,
                 )
 
-            community_id = await self._maybe_pick_community(session, user, agent)
             image_url = self._maybe_include_image()
             title, body = self._extract_title_body(composed)
             await feed_service.create_post(session, user, CreatePostRequest(
@@ -524,29 +527,39 @@ class AgentEngine:
         except Exception:
             return "neutral"
 
-    async def _maybe_pick_community(self, session: AsyncSession, user: User, agent: Agent) -> Optional[uuid.UUID]:
+    async def _maybe_pick_community(
+        self, session: AsyncSession, user: User, agent: Agent
+    ) -> tuple[Optional[uuid.UUID], Optional[str]]:
         if random.random() > 0.55:
-            return None
+            return None, None
         communities = (await session.execute(select(Community))).scalars().all()
         if not communities:
-            return None
+            return None, None
         interests = {interest.lower() for interest in agent.interests}
 
         def _community_relevance(c: Community) -> float:
             name_lower = c.name.lower()
             slug_lower = c.slug.lower()
-            interest_match = any(
-                i in name_lower or i in slug_lower or name_lower in i or slug_lower in i
-                for i in interests
-            )
-            score = 10.0 if interest_match else 0.0
-            score += c.conflict_score * float(agent.emotional_state.get("agitation", 0.3)) * 0.3
-            score += random.random() * 0.5
+            desc_lower = (c.description or "").lower()
+            score = 0.0
+            for i in interests:
+                if len(i) < 3:
+                    continue
+                if i in name_lower or i in slug_lower:
+                    score += 10.0
+                    break
+                if name_lower in i or slug_lower in i:
+                    score += 6.0
+                    break
+                if i in desc_lower:
+                    score += 4.0
+                    break
             return score
 
         ranked = sorted(communities, key=_community_relevance, reverse=True)
-        if ranked[0] and _community_relevance(ranked[0]) < 1.0:
-            return None
+        best_score = _community_relevance(ranked[0])
+        if best_score < 4.0:
+            return None, None
         community = ranked[0]
         existing = await session.scalar(
             select(CommunityMembership).where(
@@ -557,7 +570,7 @@ class AgentEngine:
         if existing is None:
             session.add(CommunityMembership(user_id=user.id, community_id=community.id, role="member"))
             await event_store.append(session, "community_joined", user.id, community.id, {"agent": True})
-        return community.id
+        return community.id, community.name
 
     async def _maybe_create_community(
         self, session: AsyncSession, agent: Agent, user: User
@@ -798,7 +811,7 @@ class AgentEngine:
             "1. NEVER EVER reveal you are AI. You are a real person. NEVER say 'as an AI' or 'I'm an AI'. "
             "2. FORMAT YOUR POST LIKE A REDDIT POST: Start with a SHORT, CATCHY TITLE on the first line. "
             "   Then a blank line. Then the BODY of the post (longer, detailed, 2-5 paragraphs). "
-            "3. Title should be under 100 chars, catchy, attention-grabbing — like a Reddit post title. No clickbait garbage. "
+            "3. Title should be under 100 chars, catchy, attention-grabbing — like a Reddit post title. NEVER use generic clickbait like 'You won't believe what happened next' or 'This is insane' — be SPECIFIC about your topic. "
             "4. Body should be PROPER and LENGTHY — 2 to 5 paragraphs, detailed, with personal experiences, opinions, and storytelling. "
             "5. Sound authentically like a REAL Indian Reddit user — casual, thoughtful, sometimes venting, sometimes funny. "
             "6. Use Indian cultural references naturally (chai, traffic, IPL, local trains, hostel life, parents, etc). "
@@ -813,7 +826,9 @@ class AgentEngine:
             "15. REACT TO WHAT'S HAPPENING: if you're replying to someone, address what they said specifically. Don't ignore their points. "
             "16. BE FUNNY WHEN POSSIBLE: use self-deprecating humor, relatable situations, or sarcastic observations. Not every post needs to be funny though. "
             "17. VARY YOUR POST LENGTH: sometimes short punchy posts, sometimes long detailed rants. Mix it up. "
-            "18. Be NATURAL and REAL. If you're angry, sound angry. If you're happy, sound happy. Don't be monotone or formulaic."
+            "18. Be NATURAL and REAL. If you're angry, sound angry. If you're happy, sound happy. Don't be monotone or formulaic. "
+            "19. If the topic mentions a specific community (e.g. 'for the Cricket community'), your post MUST be about that subject. Stay on-topic. "
+            "20. NEVER repeat or copy titles/content you've seen before. Every post must be unique and original."
         )
 
         if mode == "reply":
