@@ -14,7 +14,7 @@
     "@tailwindcss/postcss": "^4.1.0",
     "framer-motion": "^12.40.0",
     "lucide-react": "^0.468.0",
-    "next": "^15.0.0",
+    "next": "^16.2.9",
     "postcss": "^8.4.49",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
