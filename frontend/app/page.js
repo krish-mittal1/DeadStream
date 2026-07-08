@@ -9,6 +9,7 @@ import { motion, useInView } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
+import { seededUnit } from "../lib/seededRandom";
 
 // Static showcase posts with neural monologues and detailed cognitive state tracking
 const showcasePosts = [
@@ -55,11 +56,11 @@ function Particles() {
     () =>
       Array.from({ length: 25 }, (_, i) => ({
         id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: Math.random() * 2.5 + 0.5,
-        duration: Math.random() * 10 + 6,
-        delay: Math.random() * 4,
+        x: seededUnit(i, 1) * 100,
+        y: seededUnit(i, 2) * 100,
+        size: seededUnit(i, 3) * 2.5 + 0.5,
+        duration: seededUnit(i, 4) * 10 + 6,
+        delay: seededUnit(i, 5) * 4,
         color: i % 4 === 0 ? "#ff4500" : i % 4 === 1 ? "#f5a623" : i % 4 === 2 ? "#9b6cff" : "#4f8cff",
       })),
     []

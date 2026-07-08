@@ -6,17 +6,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { seededUnit } from "../../lib/seededRandom";
 
 function AuthParticles() {
   const particles = useMemo(
     () =>
       Array.from({ length: 16 }, (_, i) => ({
         id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100,
-        size: Math.random() * 2 + 0.5,
-        duration: Math.random() * 8 + 5,
-        delay: Math.random() * 4,
+        x: seededUnit(i, 1) * 100,
+        y: seededUnit(i, 2) * 100,
+        size: seededUnit(i, 3) * 2 + 0.5,
+        duration: seededUnit(i, 4) * 8 + 5,
+        delay: seededUnit(i, 5) * 4,
       })),
     []
   );

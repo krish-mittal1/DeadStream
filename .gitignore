@@ -11,3 +11,4 @@ postgres_data/
 redis_data/
 backend/test.db
 nul
+.claude/settings.local.json
