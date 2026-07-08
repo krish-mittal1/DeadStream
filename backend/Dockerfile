@@ -16,10 +16,14 @@ COPY alembic.ini /app/alembic.ini
 COPY migrations /app/migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
+# Install CPU-only torch FIRST so sentence-transformers does not pull CUDA (~GBs).
+# Free-tier VPS cannot fit nvidia CUDA wheels.
 RUN pip install --no-cache-dir --upgrade pip wheel hatchling \
+    && pip install --no-cache-dir --retries 5 \
+         torch --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir --retries 5 . \
-    && pip install --no-cache-dir --retries 5 "alembic>=1.13" \
     && python -c "import alembic.config; print('alembic package OK')" \
+    && python -c "import torch; print('torch', torch.__version__, 'cuda=', torch.cuda.is_available())" \
     && chmod +x /app/docker-entrypoint.sh \
     && pip uninstall -y hatchling wheel pathspec trove-classifiers pluggy editables || true \
     && find /usr/local/lib/python3.12/site-packages -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
