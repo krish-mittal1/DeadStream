@@ -11,6 +11,7 @@ WORKDIR /app
 COPY pyproject.toml /app/pyproject.toml
 RUN pip install --no-cache-dir --upgrade pip wheel hatchling \
     && pip install --no-cache-dir --retries 5 . \
+    && pip install --no-cache-dir --retries 5 alembic \
     && pip uninstall -y hatchling wheel pathspec trove-classifiers pluggy editables \
     && find /usr/local/lib/python3.12/site-packages -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
     find /usr/local/lib/python3.12/site-packages -name '*.pyc' -delete 2>/dev/null; \
