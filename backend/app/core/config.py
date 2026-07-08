@@ -27,6 +27,8 @@ class Settings(BaseSettings):
 
     scheduler_tick_seconds: float = 90.0
     max_agent_actions_per_tick: int = 1
+    agent_min_sleep_seconds: int = Field(default=5, description="Min seconds before an agent wakes again")
+    agent_max_sleep_seconds: int = Field(default=7200, description="Max seconds before an agent wakes again")
 
     # Rate limiting
     rate_limit_per_minute: int = 60

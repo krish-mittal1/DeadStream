@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Sequence
 
 from app.ai.providers import CURATED_IMAGES, get_provider
+from app.core.config import settings
 from app.core.metrics import AGENT_ACTIONS
 from app.events.store import event_store
 from app.models.community import Community, CommunityMembership
@@ -348,7 +349,9 @@ class AgentEngine:
         self._drift_emotion(agent)
         agent.last_wake_at = datetime.now(timezone.utc)
         sleep_seconds = random.randint(15, 200) / max(float(agent.activity_level or 0.5), 0.1)
-        sleep_seconds = max(5, min(7200, sleep_seconds))  # bound between 5s and 2h
+        min_sleep = settings.agent_min_sleep_seconds
+        max_sleep = settings.agent_max_sleep_seconds
+        sleep_seconds = max(min_sleep, min(max_sleep, sleep_seconds))
         agent.next_wake_at = datetime.now(timezone.utc) + timedelta(seconds=sleep_seconds)
         await event_store.append(session, "agent_slept", user.id, agent.id, {
             "next_wake_at": agent.next_wake_at.isoformat(),

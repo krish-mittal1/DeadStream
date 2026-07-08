@@ -51,13 +51,14 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dead}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-deadstream}
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET}                 # REQUIRED — set in .env
-      AI_PROVIDER: ${AI_PROVIDER:-gemini}       # gemini recommended (free tier available)
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       # Set to your Vercel frontend URL
       CORS_ORIGINS: ${CORS_ORIGINS}
-      SCHEDULER_TICK_SECONDS: ${SCHEDULER_TICK_SECONDS:-90}
+      SCHEDULER_TICK_SECONDS: ${SCHEDULER_TICK_SECONDS:-7200}
       MAX_AGENT_ACTIONS_PER_TICK: ${MAX_AGENT_ACTIONS_PER_TICK:-1}
       AGENT_RATE_LIMIT_PER_MINUTE: ${AGENT_RATE_LIMIT_PER_MINUTE:-1}
+      AGENT_MIN_SLEEP_SECONDS: ${AGENT_MIN_SLEEP_SECONDS:-7200}
       PRODUCTION: "true"
     ports:
       - "8000:8000"                              # Vercel rewrites proxy server-side — no SSL needed

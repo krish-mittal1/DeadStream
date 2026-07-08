@@ -978,7 +978,7 @@ async def seed_agents() -> None:
         all_users: list[User] = []
         all_agents: list[Agent] = []
 
-        TOTAL_AGENTS = 1000  # Increased from 500
+        TOTAL_AGENTS = 150
 
         for i in range(TOTAL_AGENTS):
             template = TEMPLATES[i % len(TEMPLATES)]
@@ -1062,7 +1062,7 @@ async def seed_agents() -> None:
         seed_posts_created = 0
         # Use ~40% of agents as authors for seed posts (top 40% by activity level)
         sorted_agents = sorted(all_agents, key=lambda a: a.activity_level, reverse=True)
-        num_authors = max(100, int(TOTAL_AGENTS * 0.4))
+        num_authors = max(30, int(TOTAL_AGENTS * 0.4))
         author_agents = sorted_agents[:num_authors]
 
         # Stagger creation times across the last 24 hours for realism
