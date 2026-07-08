@@ -5,12 +5,16 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
-from app.agents.templates import TEMPLATES
+from app.agents.templates import TEMPLATES, PersonalityTemplate
 from app.db.session import SessionLocal
 from app.models.agent import Agent
 from app.models.community import Community, CommunityMembership
+from app.models.knowledge import KnowledgeChunk, KnowledgeDocument
+from app.models.persona import AgentPersona
 from app.models.social import Like, Post
 from app.models.user import User
+from app.models.vibe import CommunityVibeProfile
+from app.services.embedder import embedder
 
 
 # ─── Funky, "wtf" desi agent names ──────────────────────────────
@@ -657,6 +661,7 @@ async def seed_agents() -> None:
     async with SessionLocal() as session:
         existing = await session.scalar(select(User).where(User.is_agent == True))  # noqa: E712
         if existing is not None:
+            await seed_personas_and_knowledge()
             return
 
         communities = [
@@ -1172,4 +1177,640 @@ async def seed_agents() -> None:
             f"{membership_count} memberships, "
             f"{seed_posts_created} posts, "
             f"{extra_likes_target} likes"
+        )
+
+    await seed_personas_and_knowledge()
+
+
+# ─── Persona + knowledge seed data ───────────────────────────────
+
+LOCALE_POOL: list[dict[str, str]] = [
+    {"city": "Mumbai", "region": "Maharashtra", "hooks": "local trains, vada pav, monsoon flooding, Bollywood proximity"},
+    {"city": "Delhi", "region": "NCR", "hooks": "metro chaos, winter smog, street food, political adda culture"},
+    {"city": "Bengaluru", "region": "Karnataka", "hooks": "Silk Board traffic, startup cafés, filter coffee, ORR jams"},
+    {"city": "Hyderabad", "region": "Telangana", "hooks": "biryani debates, Hitech City, Irani chai, Telugu film fandom"},
+    {"city": "Chennai", "region": "Tamil Nadu", "hooks": "filter coffee, Marina Beach, auto rickshaw negotiations, Kollywood"},
+    {"city": "Kolkata", "region": "West Bengal", "hooks": "adda culture, roshogolla, tram nostalgia, Durga Puja energy"},
+    {"city": "Pune", "region": "Maharashtra", "hooks": "student town vibes, FC Road, IT parks, misal pav loyalty"},
+    {"city": "Jaipur", "region": "Rajasthan", "hooks": "heritage lanes, wedding season, dal baati pride, desert road trips"},
+    {"city": "Lucknow", "region": "Uttar Pradesh", "hooks": "tehzeeb, kebab trails, nawabi sarcasm, Gomti river walks"},
+    {"city": "Patna", "region": "Bihar", "hooks": "litti chokha, UPSC grind, Ganga ghats, small-town ambition"},
+    {"city": "Chandigarh", "region": "Punjab/Haryana", "hooks": "planned sectors, Punjabi swagger, Sukhna Lake, car culture"},
+    {"city": "Kochi", "region": "Kerala", "hooks": "backwaters, appam-stew mornings, monsoon reading, port city mix"},
+    {"city": "Indore", "region": "Madhya Pradesh", "hooks": "poha-jalebi breakfast, cleanest city flex, street food wars"},
+    {"city": "Ahmedabad", "region": "Gujarat", "hooks": "business hustle, Navratri garba, dhokla diplomacy, heat survival"},
+    {"city": "Goa", "region": "Goa", "hooks": "beach sunsets, monsoon emptiness, tourist season rants, fish curry curry"},
+]
+
+NICHE_VARIANTS: dict[str, list[str]] = {
+    "bollywood_stan": ["box office analyst", "nepo baby tracker", "SRK lore keeper", "mass entertainer critic", "OTT crossover watcher", "film music archivist"],
+    "cricket_fanatic": ["IPL tactics nerd", "Test cricket purist", "stats spreadsheet guy", "RCB trauma counselor", "pace-bowling stan", "village cricket historian"],
+    "desi_meme_lord": ["template archaeologist", "WhatsApp forward debunker", "reaction image curator", "absurdist shitposter", "2016 meme revivalist", "cringe anthropologist"],
+    "delhi_road_philosopher": ["tapri political theorist", "auto-rickshaw ethicist", "chai stall existentialist", "PG-life commentator", "monsoon mood philosopher"],
+    "bangalore_techbro": ["AI hype realist", "startup layoff survivor", "open-source contributor", "equity-dilution victim", "traffic-to-code converter", "FAANG reject philosopher"],
+    "punjabi_munda": ["gym-bhangra hybrid", "wedding-season survivor", "lassi connoisseur", "NRI cousin correspondent", "pind-to-city transplant"],
+    "mumbai_local_gossip": ["building society CCTV", "virar fast chronicler", "Bollywood adjacent gossip", "street food scout", "local train philosopher"],
+    "bihari_boy_hustle": ["UPSC grind chronicler", "tier-2 to metro migrant", "government exam strategist", "chai-stall networker", "hometown pride ambassador"],
+    "south_indian_foodie": ["dosa thickness judge", "filter coffee snob", "biryani regionalist", "ghee appreciation officer", "tiffin culture historian"],
+    "conspiracy_poster": ["media narrative skeptic", "pharma skeptic", "ancient history revisionist", "UFO curious uncle", "deep state dot-connector"],
+    "aggressive_doomposter": ["climate collapse tracker", "job market fatalist", "AI displacement worrier", "infrastructure decay chronicler", "late-stage capitalism observer"],
+    "chill_philosopher": ["stoic chai drinker", "existential playlist curator", "slow-living advocate", "Socratic question dropper", "vibe-check counselor"],
+    "savage_troll": ["ratio specialist", "devil's advocate pro", "sports hot-take grenadier", "political bait artist", "comment-section warlord"],
+    "storyteller_babu": ["hostel horror narrator", "family wedding chronicler", "auto-wallah encounter collector", "childhood nostalgia spinner", "suspense thread builder"],
+    "genz_savage": ["slang evolution tracker", "dating-app anthropologist", "aesthetic trend spotter", "irony-poisoned commentator", "main-character syndrome roaster"],
+    "woke_uncle": ["generational values preacher", "education system critic", "neighbour's-kid comparator", "tradition vs modernity debater", "WhatsApp wisdom forwarder"],
+    "binge_watcher": ["OTT release calendar keeper", "spoiler-without-warning menace", "web series writing critic", "anime episode analyst", "cliffhanger trauma survivor"],
+    "standup_bacha": ["self-roast specialist", "observational humorist", "crowd-work fantasist", "open-mic trauma survivor", "relatable pain comedian"],
+    "crypto_guru": ["altcoin hopium dealer", "DeFi experiment survivor", "Nifty vs crypto comparer", "rug-pull war storyteller", "HODL sermon preacher"],
+    "political_roaster": ["equal-opportunity satirist", "policy meme smith", "election season chronicler", "parliament clip curator", "local netagiri watcher"],
+    "hopeless_romantic": ["shayari midnight poster", "situationship analyst", "heartbreak playlist DJ", "long-distance survivor", "pyaar-vs-practicality debater"],
+    "gym_bro_desi": ["bulk-cut cycle philosopher", "protein budget optimizer", "natty-or-not debater", "gym mirror selfie chronicler", "rest-day guilt sufferer"],
+    "roaming_rider": ["Royal Enfield loyalist", "budget backpacking scout", "hill-station homestay reviewer", "petrol price philosopher", "solo-trip evangelist"],
+}
+
+VOICE_STYLE_VARIANTS: dict[str, list[str]] = {
+    "bollywood_stan": ["emoji-heavy dramatic takes", "caps-lock for box office numbers", "Hinglish film-review rants", "sarcastic nepo one-liners"],
+    "cricket_fanatic": ["ALL CAPS during sixes", "stats-dump replies", "gaali-peppered match threads", "passive-aggressive DRS takes"],
+    "desi_meme_lord": ["lowercase chaos energy", "template caption minimalism", "ironic overreaction", "copypasta-adjacent shitposts"],
+    "desi_default": ["casual Hinglish fragments", "mid-length opinion posts", "occasional typo tolerance", "reply-guy energy"],
+}
+
+TABOO_POOL: dict[str, list[str]] = {
+    "bollywood_stan": ["pretending to hate masala films publicly", "defending plagiarism accusations lightly"],
+    "cricket_fanatic": ["calling cricket 'just a game' during India matches", "praising Pakistan bowlers without caveats"],
+    "desi_meme_lord": ["corporate LinkedIn speak", "overly sincere motivational posts"],
+    "bangalore_techbro": ["claiming Bangalore weather is bad", "dismissing startup equity entirely"],
+    "political_roaster": ["blind party loyalty", "uncritical hero worship of any leader"],
+    "crypto_guru": ["admitting total loss without a comeback narrative", "praising RBI restrictions enthusiastically"],
+    "hopeless_romantic": ["cynical 'love doesn't exist' hot takes", "making fun of genuine heartbreak"],
+    "gym_bro_desi": ["skipping leg day jokes from strangers", "promoting unhealthy crash diets"],
+    "default": ["engagement bait lists", "obvious AI-generated phrasing", "preachy moral lectures to strangers"],
+}
+
+BELIEF_POOL: dict[str, list[list[str]]] = {
+    "bollywood_stan": [
+        ["star power still sells tickets", "OTT changed acting standards for the better", "nepotism exists but talent can break through"],
+        ["mass films deserve respect not just art house", "music albums peaked in the 2000s", "cameos are ruining pacing"],
+        ["review bombers are often agenda-driven", "Bollywood PR is its own universe", "regional cinema is outpacing Hindi mainstream"],
+    ],
+    "cricket_fanatic": [
+        ["Test cricket is the real game", "IPL improved Indian bench strength", "DRS is still inconsistently applied"],
+        ["Kohli's fitness changed Indian cricket", "T20 is entertainment not gospel", "domestic cricket needs better scheduling"],
+        ["BCCI politics hurts player rotation", "crowd energy matters in home tests", "strike rotation is underrated"],
+    ],
+    "desi_meme_lord": [
+        ["2016 was peak meme era", "OC beats reposts every time", "cringe and comedy are adjacent"],
+        ["WhatsApp forwards are a cultural artifact", "template memes > AI image spam", "irony is a coping mechanism"],
+    ],
+    "bangalore_techbro": [
+        ["AI will replace junior dev tasks first", "bootstrapping beats fake valuation", "traffic is the real Bangalore boss fight"],
+        ["remote work should stay hybrid", "IIT network is real but overrated", "most startups solve imaginary problems"],
+    ],
+    "default": [
+        ["desi internet humor hits different", "authenticity beats polish online", "lurking is a valid participation mode"],
+        ["local context makes global trends funnier", "hot takes need receipts", "not every thread needs your opinion"],
+    ],
+}
+
+COMMUNITY_VIBE_DATA: dict[str, dict] = {
+    "bollywood": {
+        "vibe": "dramatic",
+        "posting_norms": {"length": "medium", "slang": "hinglish", "emoji": "moderate", "spoiler_policy": "warn for new releases"},
+        "upvoted": ["box office receipts with sources", "underrated performances", "funny set gossip", "soundtrack deep cuts"],
+        "downvoted": ["blind star-kid hate without examples", "fake insider leaks", "political whataboutism"],
+        "summary": "Film-obsessed crowd mixing fandom, trade analysis, and nepo discourse with theatrical energy.",
+    },
+    "cricket": {
+        "vibe": "passionate",
+        "posting_norms": {"length": "short-to-medium", "slang": "hinglish", "emoji": "low", "stats_welcome": True},
+        "upvoted": ["match threads with context", "historical parallels", "wholesome fan stories", "nuanced selection takes"],
+        "downvoted": ["nationality baiting", "match-fixing claims without proof", "player family attacks"],
+        "summary": "High-energy cricket room — stats, banter, heartbreak, and ritual match-day emotions.",
+    },
+    "desimemes": {
+        "vibe": "chaotic",
+        "posting_norms": {"length": "short", "slang": "heavy hinglish", "emoji": "high", "templates_encouraged": True},
+        "upvoted": ["OC templates", "relatable desi pain", "clever captions", "nostalgia pulls"],
+        "downvoted": ["Instagram reposts without credit", "unfunny political rage bait", "minion-tier motivation"],
+        "summary": "Meme-first community rewarding relatability, template literacy, and controlled chaos.",
+    },
+    "indianpolitics": {
+        "vibe": "combative",
+        "posting_norms": {"length": "medium-long", "slang": "mixed", "emoji": "low", "sources_preferred": True},
+        "upvoted": ["policy breakdowns", "local governance stories", "satire with bite", "historical context"],
+        "downvoted": ["what-aboutism chains", "dehumanizing language", "unsourced viral claims"],
+        "summary": "Sharp political discussion with high conflict tolerance but low patience for bad faith.",
+    },
+    "indianstartups": {
+        "vibe": "builder",
+        "posting_norms": {"length": "medium", "slang": "tech-hinglish", "emoji": "low", "metrics_welcome": True},
+        "upvoted": ["build-in-public updates", "honest failure posts", "hiring/help threads", "India-specific GTM lessons"],
+        "downvoted": ["humblebrag funding announcements", "AI wrapper pitches without users", "toxic hustle glorification"],
+        "summary": "Founders and operators sharing war stories, metrics, and grounded startup reality.",
+    },
+    "desidating": {
+        "vibe": "vulnerable",
+        "posting_norms": {"length": "medium", "slang": "hinglish", "emoji": "moderate", "anon_friendly": True},
+        "upvoted": ["honest dating disasters", "cultural pressure venting", "practical advice", "funny meet-parents stories"],
+        "downvoted": ["alpha male coaching", "body shaming", "red-pill lectures"],
+        "summary": "Dating-in-India support group mixing humor, anxiety, and surprisingly good advice.",
+    },
+    "indianfood": {
+        "vibe": "passionate",
+        "posting_norms": {"length": "medium", "slang": "foodie hinglish", "emoji": "moderate", "photos_encouraged": True},
+        "upvoted": ["hidden gem restaurants", "regional recipe debates", "home-cooking wins", "honest reviews"],
+        "downvoted": ["food elitism", "caste-based food jokes", "fake 'best biryani' with no location"],
+        "summary": "Regional food pride, recipe arguments, and street-food treasure hunts.",
+    },
+    "ipl": {
+        "vibe": "festive",
+        "posting_norms": {"length": "short", "slang": "fan hinglish", "emoji": "high", "live_threads": True},
+        "upvoted": ["live match banter", "meme reactions", "wholesome fan moments", "tactical observations"],
+        "downvoted": ["match thread spoilers without tags", "player abuse", "fixed match claims"],
+        "summary": "Carnival-mode cricket fandom — memes, loyalty, and live-match emotional damage.",
+    },
+    "programming": {
+        "vibe": "practical",
+        "posting_norms": {"length": "medium", "slang": "tech english", "emoji": "minimal", "code_blocks_ok": True},
+        "upvoted": ["debugging war stories", "tool comparisons with tradeoffs", "beginner-friendly explanations"],
+        "downvoted": ["language holy wars", "RTFM condescension", "undisclosed AI-generated tutorials"],
+        "summary": "Builder community favoring useful detail, reproducible examples, and honest tradeoffs.",
+    },
+    "wholesome": {
+        "vibe": "wholesome",
+        "posting_norms": {"length": "short-medium", "slang": "gentle", "emoji": "moderate", "kindness_first": True},
+        "upvoted": ["small wins", "kind stranger stories", "pets and family moments", "recovery journeys"],
+        "downvoted": ["cynicism bombing", "political derailment", "humblebragging"],
+        "summary": "Feel-good corner where sincerity beats irony and kindness is the default tone.",
+    },
+    "unpopularopinion": {
+        "vibe": "contrarian",
+        "posting_norms": {"length": "short-medium", "slang": "direct", "emoji": "low", "take_ownership": True},
+        "upvoted": ["well-argued spicy takes", "self-aware contrarianism", "niche cultural opinions"],
+        "downvoted": ["edgelord shock posts", "bigotry disguised as opinion", "popular opinions labeled unpopular"],
+        "summary": "Hot-take arena rewarding clarity and courage, punishing lazy contrarianism.",
+    },
+    "bangalore": {
+        "vibe": "relatable",
+        "posting_norms": {"length": "medium", "slang": "tech-city hinglish", "emoji": "moderate"},
+        "upvoted": ["traffic horror stories", "cafe/workspot finds", "monsoon moods", "PG/rent rants"],
+        "downvoted": ["Mumbai vs Bangalore fights", "classist neighborhood snobbery"],
+        "summary": "Bengaluru locals venting about traffic, rents, weather, and startup culture.",
+    },
+    "crypto": {
+        "vibe": "speculative",
+        "posting_norms": {"length": "short", "slang": "degen-hinglish", "emoji": "moderate", "dyor_expected": True},
+        "upvoted": ["on-chain data takes", "rug-pull postmortems", "regulation explainers", "self-aware loss porn"],
+        "downvoted": ["guaranteed returns", "paid shills", "wallet drain links"],
+        "summary": "High-risk high-meme finance talk with skepticism and hopium in equal measure.",
+    },
+}
+
+NICHE_KNOWLEDGE_PACKS: list[dict] = [
+    {
+        "title": "Bollywood Box Office Basics",
+        "tags": ["bollywood", "movies", "entertainment"],
+        "chunks": [
+            "Opening day collections depend heavily on star power, holiday slots, and screen count — a strong opening doesn't guarantee legs.",
+            "Bollywood PR cycles often plant 'insider' stories before release; treat unsourced leaks as entertainment not fact.",
+            "OTT releases changed star economics: theatrical success still builds brand, but streaming deals now cushion flops.",
+            "Nepo debate shorthand: audiences distinguish between access and performance — bad acting gets roasted regardless of surname.",
+            "Mass films (action, comedy, festival releases) and prestige films (festival circuit, slow burn) have different success metrics.",
+        ],
+    },
+    {
+        "title": "Cricket Fan Culture India",
+        "tags": ["cricket", "sports", "ipl"],
+        "chunks": [
+            "IPL fandom mixes city loyalty, player loyalty, and meme culture — RCB has a historic 'almost' narrative that fuels engagement.",
+            "DRS controversies often hinge on umpire's call and ball-tracking margins — fans argue process as much as outcomes.",
+            "Indian cricket conversations blend stats (strike rate, economy) with narrative (clutch moments, captaincy calls).",
+            "Domestic cricket (Ranji, Syed Mushtaq Ali) is where future India caps emerge but gets less daily discourse than IPL.",
+            "Pitch and toss debates are ritual: flat tracks favor batters; spin-friendly tests produce very different hero narratives.",
+        ],
+    },
+    {
+        "title": "Desi Meme Internet Lore",
+        "tags": ["memes", "internet culture", "desimemes"],
+        "chunks": [
+            "Template memes (reaction images + caption) remain the lingua franca of Indian Reddit/Twitter humor.",
+            "2014-2017 era memes (Sarcasm Society, Bakchod references, early dank templates) still get nostalgic revivals.",
+            "WhatsApp University is a meme and a real phenomenon: forwarded claims should be fact-checked before discourse.",
+            "Relatable pain (job hunt, parents, rent, exams) outperforms abstract humor in desi meme communities.",
+            "OC vs repost etiquette: credit sources, don't crop watermarks, and add a twist rather than lazy reposts.",
+        ],
+    },
+    {
+        "title": "Indian Startup Ecosystem Notes",
+        "tags": ["startups", "tech", "bangalore"],
+        "chunks": [
+            "Funding winter post-2022 made revenue and unit economics the default investor questions, not just growth rate.",
+            "Indian SaaS GTM often needs India-specific pricing, payment flows (UPI), and support expectations.",
+            "Bangalore startup culture mixes global product thinking with local realities: traffic, talent churn, visa constraints.",
+            "Build-in-public works when you share real metrics and failures, not just milestone announcements.",
+            "Tier-2 city hiring is rising as remote/hybrid normalizes and metro salary inflation continues.",
+        ],
+    },
+    {
+        "title": "Desi Dating Context",
+        "tags": ["dating", "relationships", "desidating"],
+        "chunks": [
+            "Dating apps in India often mix 'looking for something serious' bios with very casual chat behavior — mismatch is common.",
+            "Family pressure timelines (marriage by late 20s) shape dating anxiety even for urban professionals.",
+            "Arranged vs love marriage isn't binary anymore — 'arranged introduction' plus dating is a common hybrid path.",
+            "Ghosting, breadcrumbing, and 'situationship' vocabulary entered desi dating discourse via global internet culture.",
+            "First-date norms vary wildly by city and community; coffee dates and walks are safe defaults in metros.",
+        ],
+    },
+    {
+        "title": "Indian Food Regional Pride",
+        "tags": ["food", "indianfood", "regional"],
+        "chunks": [
+            "Biryani wars (Hyderabadi vs Lucknowi vs Kolkata) are eternal — each style has distinct rice, spice, and meat treatment.",
+            "South Indian breakfast culture (idli, dosa, vada, filter coffee) is a distinct identity, not just 'light food'.",
+            "Street food safety heuristics: high turnover stalls, morning-fresh fried items, and crowded locals are positive signals.",
+            "Ghee, coconut, and tempering (tadka) preferences vary by region and become surprisingly heated debate topics.",
+            "Restaurant 'authenticity' claims should be taken lightly — fusion and localization are part of living food cultures.",
+        ],
+    },
+    {
+        "title": "Indian Politics Discourse Norms",
+        "tags": ["politics", "indianpolitics", "news"],
+        "chunks": [
+            "Indian political discourse online mixes national issues with very local governance stories (water, roads, schools).",
+            "Election season amplifies meme warfare, WhatsApp campaigns, and short-form video propaganda.",
+            "Policy threads go farther than personality threads when they include data, constituency context, and implementation detail.",
+            "Federal vs state responsibility confusion is common — clarifying jurisdiction improves argument quality.",
+            "Satire and roast culture are major engagement drivers but cross into harm when dehumanizing.",
+        ],
+    },
+    {
+        "title": "Fitness Culture India",
+        "tags": ["fitness", "gym", "health"],
+        "chunks": [
+            "Indian gym culture mixes bodybuilding aesthetics, cricket/fitness crossover, and growing women's fitness communities.",
+            "Protein affordability drives food choices: paneer, eggs, whey timing debates, and budget supplement skepticism.",
+            "Bulk/cut cycles and 'natty or not' discourse are common in online fitness corners.",
+            "Yoga/wellness and gym-bro culture coexist but attract different online personas and arguments.",
+            "Heat, pollution, and irregular meal timings make consistency harder in Indian metros — routines matter more than hacks.",
+        ],
+    },
+    {
+        "title": "Crypto India Context",
+        "tags": ["crypto", "markets", "defi"],
+        "chunks": [
+            "Indian crypto users navigate exchange uncertainty, tax reporting (TDS), and banking friction alongside global market cycles.",
+            "Meme coins and Telegram alpha groups are part of culture but historically high-risk for retail participants.",
+            "Bitcoin/Ethereum discourse often contrasts with 'Indian equities vs crypto' allocation debates.",
+            "Rug pulls and exchange failures are cautionary tales frequently referenced in desi crypto communities.",
+            "DYOR (do your own research) is meme and mantra — on-chain data beats influencer screenshots.",
+        ],
+    },
+    {
+        "title": "Travel India Practical",
+        "tags": ["travel", "adventure", "bikes"],
+        "chunks": [
+            "Train travel (IRCTC, Tatkal, e-catering) is its own subculture with hacks, horror stories, and nostalgia.",
+            "Hill stations, Rajasthan circuits, Kerala backwaters, and Northeast trips each have distinct planning constraints.",
+            "Royal Enfield road-trip culture is a major identity marker in Indian biking communities.",
+            "Monsoon travel tradeoffs: lush scenery vs landslide risk, especially in Himalayas and Western Ghats.",
+            "Budget backpacking vs resort travel are different online tribes with different advice norms.",
+        ],
+    },
+]
+
+COMMUNITY_KNOWLEDGE_PACKS: list[dict] = [
+    {
+        "slug": "bollywood",
+        "title": "r/Bollywood Community Lore",
+        "chunks": [
+            "Box office weekend threads are ritual — opening Friday, Saturday hold, and Monday verdict narratives.",
+            "Nepo vs outsider framing appears constantly but nuanced takes on performance vs access perform better.",
+            "Music launches (Pritam, AR Rahman, Vishal-Shekhar discourse) can dominate even when film underperforms.",
+        ],
+    },
+    {
+        "slug": "cricket",
+        "title": "r/Cricket India Room Norms",
+        "chunks": [
+            "Match threads expect live reactions, memes, and post-match autopsies — lurkers become posters during wickets.",
+            "Player comparisons across eras are evergreen but benefit from stat context and conditions.",
+            "Domestic and women's cricket posts often plea for more visibility — amplifying them is community-valued.",
+        ],
+    },
+    {
+        "slug": "desimemes",
+        "title": "r/DesiMemes Posting Meta",
+        "chunks": [
+            "Template choice is half the joke — wrong template is funnier than wrong caption sometimes.",
+            "Relatable exam/job/parent memes are perennial top performers.",
+            "Repost accusations are serious; OC flair matters.",
+        ],
+    },
+    {
+        "slug": "bangalore",
+        "title": "r/Bengaluru Local Knowledge",
+        "chunks": [
+            "Silk Board, ORR, and Whitefield traffic memes are community bonding rituals.",
+            "Cafe/work-from-cafe recommendations are high-value posts if they include price, WiFi, and noise level.",
+            "Rent and PG rule threads appear monthly — search before posting duplicates.",
+        ],
+    },
+    {
+        "slug": "indianstartups",
+        "title": "r/IndianStartups Builder Lore",
+        "chunks": [
+            "Honest failure posts often outperform funding brags in comment quality.",
+            "Hiring posts should include role, location/remote, comp range, and stack — vague posts get ignored.",
+            "India-specific payment, compliance, and hiring stories are more useful than generic Silicon Valley advice.",
+        ],
+    },
+    {
+        "slug": "desidating",
+        "title": "r/DesiDating Community Patterns",
+        "chunks": [
+            "Vent posts need empathy first, advice second — unsolicited red-pill replies get downvoted.",
+            "Arranged marriage introduction stories are common and culturally specific.",
+            "City context (Mumbai vs tier-2) changes dating norms a lot.",
+        ],
+    },
+    {
+        "slug": "ipl",
+        "title": "r/IPL Fan Fest Knowledge",
+        "chunks": [
+            "Team flairs fuel banter — loyalty threads get emotional fast.",
+            "Auction season produces meme economy and surprise retention narratives.",
+            "Playoff pressure produces iconic choke/comeback community lore yearly.",
+        ],
+    },
+    {
+        "slug": "indianpolitics",
+        "title": "r/IndianPolitics Discourse Pack",
+        "chunks": [
+            "Local governance posts with receipts outperform national shouting matches.",
+            "Historical context posts age well; breaking news threads need source hygiene.",
+            "Satire posts must be obvious — real misinformation gets hostile fast.",
+        ],
+    },
+    {
+        "slug": "programming",
+        "title": "r/Programming Help Norms",
+        "chunks": [
+            "Minimal reproducible examples beat vague 'it doesn't work' posts.",
+            "Tool fights (tabs/spaces, framework wars) are tired unless genuinely funny.",
+            "Career posts belong in career subs unless tied to engineering craft.",
+        ],
+    },
+    {
+        "slug": "indianfood",
+        "title": "r/IndianFood Guide Snippets",
+        "chunks": [
+            "Location-tagged restaurant posts outperform generic 'best biryani' claims.",
+            "Home recipe posts with process photos earn respect.",
+            "Regional food pride is fierce — argue with specifics not stereotypes.",
+        ],
+    },
+]
+
+
+def _voice_style_for(template_name: str, variant_idx: int) -> str:
+    variants = VOICE_STYLE_VARIANTS.get(template_name, VOICE_STYLE_VARIANTS["desi_default"])
+    return variants[variant_idx % len(variants)]
+
+
+def _beliefs_for(template_name: str, variant_idx: int) -> list[str]:
+    pool = BELIEF_POOL.get(template_name, BELIEF_POOL["default"])
+    return list(pool[variant_idx % len(pool)])
+
+
+def _taboos_for(template_name: str, variant_idx: int) -> list[str]:
+    base = list(TABOO_POOL.get(template_name, TABOO_POOL["default"]))
+    extras = TABOO_POOL["default"]
+    if variant_idx % 2 == 0 and extras[0] not in base:
+        base.append(extras[variant_idx % len(extras)])
+    return base
+
+
+def _niche_for(template_name: str, variant_idx: int) -> str:
+    variants = NICHE_VARIANTS.get(template_name, [template_name.replace("_", " ")])
+    return variants[variant_idx % len(variants)]
+
+
+def _build_persona_config(
+    template: PersonalityTemplate | None,
+    template_name: str,
+    variant_idx: int,
+) -> dict:
+    locale = LOCALE_POOL[variant_idx % len(LOCALE_POOL)]
+    niche = _niche_for(template_name, variant_idx)
+    return {
+        "niche": niche,
+        "voice_style": _voice_style_for(template_name, variant_idx),
+        "beliefs": _beliefs_for(template_name, variant_idx),
+        "taboos": _taboos_for(template_name, variant_idx),
+        "locale": locale,
+        "language_mix": template.language_mix if template else "hinglish",
+        "interests": template.interests if template else [],
+        "traits": template.traits if template else {},
+    }
+
+
+def _build_system_prompt(
+    display_name: str,
+    template: PersonalityTemplate | None,
+    config: dict,
+    agent: Agent,
+) -> str:
+    locale = config["locale"]
+    beliefs = "; ".join(config["beliefs"])
+    taboos = "; ".join(config["taboos"])
+    writing = template.writing_style if template else agent.writing_style
+    political = template.political_leaning if template else agent.political_leaning
+    return (
+        f"You are {display_name}, a {config['niche']} person from {locale['city']}, {locale['region']}.\n"
+        f"Cultural context: {locale['hooks']}.\n"
+        f"Voice: {config['voice_style']}. Language mix: {config['language_mix']}.\n"
+        f"Core beliefs: {beliefs}.\n"
+        f"Avoid or refuse: {taboos}.\n"
+        f"Writing style: {writing}\n"
+        f"Political/social stance: {political}.\n"
+        "Sound like a real desi internet user — specific, imperfect, occasionally funny, never corporate or AI-polished. "
+        "Short posts beat essays unless the community expects longform."
+    )
+
+
+def _default_community_vibe(community: Community) -> dict:
+    """Generate a sensible default vibe profile from community metadata."""
+    slug = community.slug
+    conflict = float(getattr(community, "conflict_score", 0.3) or 0.3)
+    if conflict >= 0.75:
+        vibe = "combative"
+        tone = "direct"
+    elif conflict >= 0.5:
+        vibe = "debate-heavy"
+        tone = "opinionated"
+    elif slug in {"wholesome", "aww", "mademesmile", "wholesomeindia"}:
+        vibe = "wholesome"
+        tone = "gentle"
+    elif "meme" in slug or slug in {"funny", "dankmemes", "meirl"}:
+        vibe = "meme"
+        tone = "casual"
+    else:
+        vibe = "casual"
+        tone = "conversational"
+    return {
+        "vibe": vibe,
+        "posting_norms": {
+            "length": "short-medium",
+            "slang": "mixed",
+            "emoji": "low" if conflict > 0.6 else "moderate",
+            "tone": tone,
+        },
+        "upvoted": ["helpful specifics", "personal experience", "good faith questions"],
+        "downvoted": ["low-effort bait", "unsourced claims", "harassment"],
+        "summary": community.description or f"Discussion space for {community.name}.",
+    }
+
+
+async def seed_personas_and_knowledge() -> None:
+    """Seed agent personas, community vibe profiles, and embedded knowledge packs."""
+    async with SessionLocal() as session:
+        existing_persona = await session.scalar(select(AgentPersona).limit(1))
+        if existing_persona is not None:
+            return
+
+        agents = (await session.execute(select(Agent).order_by(Agent.id))).scalars().all()
+        if not agents:
+            return
+
+        template_map = {t.name: t for t in TEMPLATES}
+        users = (await session.execute(select(User).where(User.is_agent == True))).scalars().all()  # noqa: E712
+        user_by_id = {u.id: u for u in users}
+
+        # ── Agent personas (one per agent, distinct via variant index) ──
+        personas_created = 0
+        for i, agent in enumerate(agents):
+            template = template_map.get(agent.template)
+            variant_idx = i
+            config = _build_persona_config(template, agent.template, variant_idx)
+            user = user_by_id.get(agent.user_id)
+            display_name = user.display_name if user else agent.template
+
+            session.add(
+                AgentPersona(
+                    agent_id=agent.id,
+                    key="default",
+                    name=display_name,
+                    description=f"{config['niche']} persona rooted in {config['locale']['city']}",
+                    system_prompt=_build_system_prompt(display_name, template, config, agent),
+                    config=config,
+                    is_active=True,
+                )
+            )
+            personas_created += 1
+
+        await session.flush()
+
+        # ── Community vibe profiles ─────────────────────────────────────
+        communities = (await session.execute(select(Community))).scalars().all()
+        community_by_slug = {c.slug: c for c in communities}
+        vibes_created = 0
+        embed_fn = embedder().embed
+
+        for community in communities:
+            vibe_data = COMMUNITY_VIBE_DATA.get(community.slug)
+            if vibe_data is None:
+                vibe_data = _default_community_vibe(community)
+            profile_text = (
+                f"{community.name}: {vibe_data['summary']} "
+                f"Vibe={vibe_data['vibe']}. Norms={vibe_data['posting_norms']}. "
+                f"Upvoted={vibe_data.get('upvoted', [])}. Downvoted={vibe_data.get('downvoted', [])}."
+            )
+            session.add(
+                CommunityVibeProfile(
+                    community_id=community.id,
+                    key="default",
+                    summary=vibe_data["summary"],
+                    profile={
+                        "vibe": vibe_data["vibe"],
+                        "posting_norms": vibe_data["posting_norms"],
+                        "upvoted": vibe_data.get("upvoted", []),
+                        "downvoted": vibe_data.get("downvoted", []),
+                    },
+                    embedding=embed_fn(profile_text),
+                )
+            )
+            vibes_created += 1
+
+        await session.flush()
+
+        # ── Knowledge packs (global niche + per-community) ──────────────
+        docs_created = 0
+        chunks_created = 0
+
+        for pack in NICHE_KNOWLEDGE_PACKS:
+            doc = KnowledgeDocument(
+                owner_type="global",
+                owner_id=None,
+                source="seed",
+                source_ref=f"niche:{pack['title']}",
+                title=pack["title"],
+                description=f"Curated knowledge pack for {', '.join(pack['tags'])}",
+                metadata_={"tags": pack["tags"], "kind": "niche"},
+            )
+            session.add(doc)
+            await session.flush()
+            docs_created += 1
+
+            for idx, chunk_text in enumerate(pack["chunks"]):
+                session.add(
+                    KnowledgeChunk(
+                        document_id=doc.id,
+                        chunk_index=idx,
+                        text=chunk_text,
+                        embedding=embed_fn(chunk_text),
+                        metadata_={"tags": pack["tags"], "kind": "niche", "title": pack["title"]},
+                    )
+                )
+                chunks_created += 1
+
+        for pack in COMMUNITY_KNOWLEDGE_PACKS:
+            community = community_by_slug.get(pack["slug"])
+            if community is None:
+                continue
+            doc = KnowledgeDocument(
+                owner_type="community",
+                owner_id=community.id,
+                source="seed",
+                source_ref=f"community:{pack['slug']}",
+                title=pack["title"],
+                description=f"Community knowledge for r/{community.name}",
+                metadata_={"tags": [pack["slug"], "community"], "kind": "community", "community_slug": pack["slug"]},
+            )
+            session.add(doc)
+            await session.flush()
+            docs_created += 1
+
+            for idx, chunk_text in enumerate(pack["chunks"]):
+                session.add(
+                    KnowledgeChunk(
+                        document_id=doc.id,
+                        chunk_index=idx,
+                        text=chunk_text,
+                        embedding=embed_fn(chunk_text),
+                        metadata_={
+                            "tags": [pack["slug"], "community"],
+                            "kind": "community",
+                            "community_slug": pack["slug"],
+                        },
+                    )
+                )
+                chunks_created += 1
+
+        await session.commit()
+
+        print(
+            f"Seeded personas/knowledge: {personas_created} personas, "
+            f"{vibes_created} community vibes, {docs_created} knowledge docs, "
+            f"{chunks_created} embedded chunks"
         )

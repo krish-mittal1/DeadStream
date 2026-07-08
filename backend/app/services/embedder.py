@@ -48,10 +48,16 @@ class Embedder:
                 from sentence_transformers import SentenceTransformer  # type: ignore[import-untyped]
 
                 logger.info("Loading sentence-transformers model: all-MiniLM-L6-v2")
-                self._model = SentenceTransformer(
-                    "all-MiniLM-L6-v2",
-                    device="cpu",
-                )
+                model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+                if hasattr(model, "get_embedding_dimension"):
+                    dim = int(getattr(model, "get_embedding_dimension")())
+                else:
+                    dim = int(getattr(model, "get_sentence_embedding_dimension")())
+                if dim != self.dimension:
+                    raise RuntimeError(
+                        f"Unexpected embedding dim {dim}; expected {self.dimension}"
+                    )
+                self._model = model
                 self._loaded = True
                 logger.info("Embedder model loaded successfully (384 dim)")
             except ImportError:
@@ -81,8 +87,22 @@ class Embedder:
             # Use real sentence embedding
             import numpy as np  # type: ignore[import-untyped]
 
-            vec = self._model.encode(text, normalize_embeddings=True)
-            return vec.tolist()
+            vec = self._model.encode(
+                [text],
+                normalize_embeddings=True,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+            )
+            arr = np.asarray(vec, dtype=np.float32).reshape(-1)
+            if int(arr.shape[0]) != self.dimension:
+                logger.error(
+                    "Model returned %s dims; expected %s. Falling back.",
+                    int(arr.shape[0]),
+                    self.dimension,
+                )
+                return self._fallback_embed(text)
+            # Ensure we return plain Python floats for JSON serialization / pgvector.
+            return [float(x) for x in arr.tolist()]
 
         # Fallback: deterministic hash-based embedding (64-dim, padded/truncated to 384)
         return self._fallback_embed(text)

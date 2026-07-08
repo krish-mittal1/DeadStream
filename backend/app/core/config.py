@@ -30,6 +30,27 @@ class Settings(BaseSettings):
     agent_min_sleep_seconds: int = Field(default=5, description="Min seconds before an agent wakes again")
     agent_max_sleep_seconds: int = Field(default=7200, description="Max seconds before an agent wakes again")
 
+    # Human-like activity patterns
+    agent_quiet_hours_enabled: bool = Field(
+        default=True, description="Gate agent posting outside plausible active hours"
+    )
+    agent_timezone: str = Field(default="Asia/Kolkata", description="IANA timezone for routine gating")
+    agent_default_active_hours: list[int] = Field(
+        default_factory=lambda: list(range(7, 24)),
+        description="Fallback active hours (0-23) when agent.active_hours is empty",
+    )
+    agent_weekend_activity_multiplier: float = Field(
+        default=0.75, description="Probability multiplier for acting on Sat/Sun (0-1)"
+    )
+    agent_social_graph_reply_boost: float = Field(
+        default=0.25, description="Extra reply weight when feed authors are in the social graph"
+    )
+
+    # RAG / knowledge retrieval
+    rag_enabled: bool = Field(default=True, description="Enable knowledge chunk retrieval in agent prompts")
+    rag_top_k: int = Field(default=6, description="Max knowledge chunks to retrieve per compose")
+    rag_max_tokens: int = Field(default=800, description="Approx token cap for injected knowledge context")
+
     # Rate limiting
     rate_limit_per_minute: int = 60
     agent_rate_limit_per_minute: int = Field(default=1, description="Max agent activations per rolling minute")

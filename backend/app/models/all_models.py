@@ -9,6 +9,9 @@ from app.models.user import User
 from app.models.disruption import DisruptionEvent, TrollFaction
 from app.models.ideology import IdeologySnapshot
 from app.models.dm import DirectMessageGroup, DirectMessage, GroupChat, GroupChatParticipant, GroupChatMessage
+from app.models.persona import AgentPersona
+from app.models.vibe import CommunityVibeProfile
+from app.models.knowledge import KnowledgeDocument, KnowledgeChunk
 
 __all__ = [
     "Agent",
@@ -34,5 +37,9 @@ __all__ = [
     "GroupChat",
     "GroupChatParticipant",
     "GroupChatMessage",
+    "AgentPersona",
+    "CommunityVibeProfile",
+    "KnowledgeDocument",
+    "KnowledgeChunk",
 ]
 

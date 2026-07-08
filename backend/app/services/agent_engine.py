@@ -4,11 +4,11 @@ import random
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Sequence
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from typing import Optional, Sequence
 
 from app.ai.providers import CURATED_IMAGES, get_provider
 from app.core.config import settings
@@ -16,10 +16,14 @@ from app.core.metrics import AGENT_ACTIONS
 from app.events.store import event_store
 from app.models.community import Community, CommunityMembership
 from app.models.agent import Agent, AgentRelationship
+from app.models.knowledge import KnowledgeChunk
+from app.models.persona import AgentPersona
 from app.models.social import Follow, Like, Post
 from app.models.user import User
+from app.models.vibe import CommunityVibeProfile
 from app.schemas import CreatePostRequest
 from app.services.feed import feed_service
+from app.services.knowledge_service import knowledge_service
 from app.services.memory import memory_service
 from app.services.opinion_service import opinion_service
 from app.services.relationship_service import relationship_service
@@ -98,6 +102,14 @@ class AgentEngine:
         if user is None:
             return
 
+        if not self._is_active_hour(agent):
+            await self._defer_wake(session, agent, user, "quiet_hours")
+            return
+
+        if not self._passes_weekend_gate(agent):
+            await self._defer_wake(session, agent, user, "weekend_lull")
+            return
+
         # Refresh trending topics periodically (every 50th activation roughly)
         if random.random() < 0.02:
             await self.refresh_trending_topics(session)
@@ -131,8 +143,10 @@ class AgentEngine:
 
         recent_posts = (await session.execute(select(Post).where(Post.parent_id.is_(None)).order_by(desc(Post.created_at)).limit(25))).scalars().all()
         topic = self._choose_topic(agent, recent_posts)
+        persona = await self._load_persona(session, agent)
         memories = await memory_service.retrieve(session, agent.id, topic)
-        action = self._decide_action(agent, recent_posts)
+        knowledge = await self._retrieve_knowledge(session, topic, persona)
+        action = await self._decide_action(session, agent, recent_posts)
 
         # --- Check for ongoing beefs — if rivalry is hot, agent may roast rival ---
         rivals = await relationship_service.get_rivals(session, agent.id, limit=3)
@@ -160,13 +174,17 @@ class AgentEngine:
                     )
                 ).scalars().all()
                 roast_target_body = rival_posts[0].body if rival_posts else "their entire existence"
+                community_id, _ = await self._maybe_pick_community(session, user, agent)
+                community_vibe = await self._load_community_vibe(session, community_id)
                 roast_body = await self._compose(
                     agent, topic, memories, mode="roast",
                     target=roast_target_body, rel_type="enemy",
                     dominant_emotion="aggression",
                     roast_target_username=rival_user.username,
+                    persona=persona,
+                    knowledge=knowledge,
+                    community_vibe=community_vibe,
                 )
-                community_id, _ = await self._maybe_pick_community(session, user, agent)
                 title, body = self._extract_title_body(roast_body)
                 await feed_service.create_post(session, user, CreatePostRequest(
                     title=title, body=body, community_id=community_id,
@@ -207,6 +225,8 @@ class AgentEngine:
                 agent, topic, memories, mode="reply",
                 target=target.body, rel_type=rel_type,
                 dominant_emotion=dominant_emotion,
+                persona=persona,
+                knowledge=knowledge,
             )
             await feed_service.create_post(session, user, CreatePostRequest(body=body, parent_id=target.id))
 
@@ -247,8 +267,16 @@ class AgentEngine:
         elif action == "story":
             dominant_emotion = self._get_dominant_emotion(agent)
             community_id, community_name = await self._maybe_pick_community(session, user, agent)
+            if community_name:
+                knowledge = await self._retrieve_knowledge(
+                    session, f"{topic} {community_name}", persona, community_name=community_name
+                )
+            community_vibe = await self._load_community_vibe(session, community_id)
             effective_topic = f"{topic} (for the {community_name} community)" if community_name else topic
-            body = await self._compose(agent, effective_topic, memories, mode="story", dominant_emotion=dominant_emotion)
+            body = await self._compose(
+                agent, effective_topic, memories, mode="story", dominant_emotion=dominant_emotion,
+                persona=persona, knowledge=knowledge, community_vibe=community_vibe,
+            )
             image_url = self._maybe_include_image()
             title, body = self._extract_title_body(body)
             await feed_service.create_post(session, user, CreatePostRequest(
@@ -264,6 +292,11 @@ class AgentEngine:
             dominant_emotion = self._get_dominant_emotion(agent)
 
             community_id, community_name = await self._maybe_pick_community(session, user, agent)
+            if community_name:
+                knowledge = await self._retrieve_knowledge(
+                    session, f"{topic} {community_name}", persona, community_name=community_name
+                )
+            community_vibe = await self._load_community_vibe(session, community_id)
             effective_topic = f"{topic} (for the {community_name} community)" if community_name else topic
 
             # If agent has a hot rival and agitation is high, make post confrontational
@@ -272,13 +305,18 @@ class AgentEngine:
                     agent, effective_topic, memories, mode="beef_post",
                     stance_label=stance_label, dominant_emotion=dominant_emotion,
                     target=f"@{hot_rivals[0].target_user_id}",
+                    persona=persona, knowledge=knowledge, community_vibe=community_vibe,
                 )
             elif dominant_emotion in ("drama", "sadness") and random.random() < 0.15:
-                composed = await self._compose(agent, effective_topic, memories, mode="story", dominant_emotion=dominant_emotion)
+                composed = await self._compose(
+                    agent, effective_topic, memories, mode="story", dominant_emotion=dominant_emotion,
+                    persona=persona, knowledge=knowledge, community_vibe=community_vibe,
+                )
             else:
                 composed = await self._compose(
                     agent, effective_topic, memories, mode="post",
                     stance_label=stance_label, dominant_emotion=dominant_emotion,
+                    persona=persona, knowledge=knowledge, community_vibe=community_vibe,
                 )
 
             image_url = self._maybe_include_image()
@@ -331,6 +369,8 @@ class AgentEngine:
                         agent, topic, memories, mode="reply",
                         target=target_post.body[:200], rel_type=rel_type,
                         dominant_emotion=reaction_emotion,
+                        persona=persona,
+                        knowledge=knowledge,
                     )
                     await feed_service.create_post(session, user, CreatePostRequest(
                         body=body, parent_id=target_post.id
@@ -364,6 +404,163 @@ class AgentEngine:
             },
         })
         await session.commit()
+
+    # -----------------------------------------------------------------------
+    # Persona, knowledge, and routine helpers
+    # -----------------------------------------------------------------------
+
+    def _agent_timezone(self) -> ZoneInfo:
+        try:
+            return ZoneInfo(settings.agent_timezone)
+        except Exception:
+            return ZoneInfo("UTC")
+
+    def _is_active_hour(self, agent: Agent) -> bool:
+        if not settings.agent_quiet_hours_enabled:
+            return True
+        hour = datetime.now(self._agent_timezone()).hour
+        active_hours = agent.active_hours or settings.agent_default_active_hours
+        if not active_hours:
+            return True
+        return hour in active_hours
+
+    def _passes_weekend_gate(self, agent: Agent) -> bool:
+        weekday = datetime.now(self._agent_timezone()).weekday()
+        if weekday < 5:
+            return True
+        activity = float(agent.activity_level or 0.5)
+        multiplier = settings.agent_weekend_activity_multiplier * (0.6 + activity * 0.4)
+        return random.random() < multiplier
+
+    async def _defer_wake(
+        self, session: AsyncSession, agent: Agent, user: User, reason: str
+    ) -> None:
+        sleep_seconds = random.randint(
+            max(settings.agent_min_sleep_seconds, 300),
+            min(settings.agent_max_sleep_seconds, 3600),
+        )
+        agent.next_wake_at = datetime.now(timezone.utc) + timedelta(seconds=sleep_seconds)
+        await event_store.append(session, "agent_slept", user.id, agent.id, {
+            "next_wake_at": agent.next_wake_at.isoformat(),
+            "action": "skip",
+            "reason": reason,
+        })
+        await session.commit()
+
+    async def _load_persona(self, session: AsyncSession, agent: Agent) -> Optional[AgentPersona]:
+        return await session.scalar(
+            select(AgentPersona)
+            .where(AgentPersona.agent_id == agent.id, AgentPersona.is_active.is_(True))
+            .order_by(desc(AgentPersona.updated_at))
+            .limit(1)
+        )
+
+    async def _load_community_vibe(
+        self, session: AsyncSession, community_id: Optional[uuid.UUID]
+    ) -> Optional[CommunityVibeProfile]:
+        if community_id is None:
+            return None
+        return await session.scalar(
+            select(CommunityVibeProfile)
+            .where(CommunityVibeProfile.community_id == community_id)
+            .order_by(desc(CommunityVibeProfile.updated_at))
+            .limit(1)
+        )
+
+    def _persona_niche(self, persona: Optional[AgentPersona]) -> Optional[str]:
+        if persona is None:
+            return None
+        config = persona.config or {}
+        niche = config.get("niche")
+        if isinstance(niche, str) and niche.strip():
+            return niche.strip()
+        return None
+
+    async def _retrieve_knowledge(
+        self,
+        session: AsyncSession,
+        query: str,
+        persona: Optional[AgentPersona],
+        *,
+        community_name: Optional[str] = None,
+        community_slug: Optional[str] = None,
+    ) -> list[KnowledgeChunk]:
+        return await knowledge_service.retrieve(
+            session,
+            query,
+            niche=self._persona_niche(persona),
+            community=community_name,
+            community_slug=community_slug,
+        )
+
+    def _format_persona_context(self, persona: Optional[AgentPersona]) -> str:
+        if persona is None:
+            return ""
+        if persona.system_prompt.strip():
+            return persona.system_prompt.strip()
+
+        parts: list[str] = []
+        if persona.name.strip():
+            parts.append(f"You are {persona.name}.")
+        if persona.description.strip():
+            parts.append(persona.description.strip())
+
+        config = persona.config or {}
+        for key in ("niche", "voice_style", "locale", "daily_routine"):
+            value = config.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(f"{key.replace('_', ' ').title()}: {value.strip()}")
+        for key in ("beliefs", "taboos"):
+            value = config.get(key)
+            if isinstance(value, list) and value:
+                label = key.replace("_", " ").title()
+                parts.append(f"{label}: {', '.join(str(item) for item in value[:5])}")
+
+        return " ".join(parts)
+
+    def _format_vibe_context(self, vibe: Optional[CommunityVibeProfile]) -> str:
+        if vibe is None:
+            return ""
+        parts: list[str] = []
+        if vibe.summary.strip():
+            parts.append(vibe.summary.strip())
+        profile = vibe.profile or {}
+        for key in ("vibe", "posting_norms", "slang", "taboo", "upvote_patterns"):
+            value = profile.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(f"{key.replace('_', ' ').title()}: {value.strip()}")
+            elif isinstance(value, list) and value:
+                parts.append(f"{key.replace('_', ' ').title()}: {', '.join(str(item) for item in value[:4])}")
+        return " ".join(parts)
+
+    def _format_knowledge_context(self, knowledge: list[KnowledgeChunk]) -> str:
+        if not knowledge:
+            return ""
+        lines = [f"- {chunk.text.strip()[:240]}" for chunk in knowledge if chunk.text.strip()]
+        return "\n".join(lines)
+
+    async def _social_reply_boost(
+        self, session: AsyncSession, agent: Agent, posts: Sequence[Post]
+    ) -> float:
+        author_ids = {post.author_id for post in posts if post.parent_id is None}
+        if not author_ids:
+            return 0.0
+
+        relationships = (
+            await session.execute(
+                select(AgentRelationship).where(
+                    AgentRelationship.source_agent_id == agent.id,
+                    AgentRelationship.target_user_id.in_(author_ids),
+                )
+            )
+        ).scalars().all()
+        if not relationships:
+            return 0.0
+
+        strongest = max(
+            abs(rel.affinity) + rel.rivalry + rel.trust * 0.5 for rel in relationships
+        )
+        return settings.agent_social_graph_reply_boost * strongest
 
     # -----------------------------------------------------------------------
     # Topic selection
@@ -410,7 +607,7 @@ class AgentEngine:
     # Action decision
     # -----------------------------------------------------------------------
 
-    def _decide_action(self, agent: Agent, posts: Sequence[Post]) -> str:
+    async def _decide_action(self, session: AsyncSession, agent: Agent, posts: Sequence[Post]) -> str:
         agitation = float(agent.emotional_state.get("agitation", 0.3))
         activity = float(agent.activity_level or 0.5)
         drama = float(agent.emotional_state.get("drama", 0.3))
@@ -425,6 +622,15 @@ class AgentEngine:
             "create_community": 0.03 * activity,
             "story": 0.10 + drama * 0.1 + humor * 0.05,
         }
+        if posts:
+            weights["reply"] += await self._social_reply_boost(session, agent, posts)
+
+        weekday = datetime.now(self._agent_timezone()).weekday()
+        if weekday >= 5:
+            weights["post"] *= 0.85
+            weights["story"] *= 0.9
+            weights["like"] += 0.05
+
         if not posts:
             weights["reply"] = 0.0
             weights["like"] = 0.0
@@ -451,6 +657,17 @@ class AgentEngine:
         allies = await relationship_service.get_allies(session, agent.id, limit=5)
         ally_ids = {a.target_user_id for a in allies}
 
+        author_ids = {post.author_id for post in top_level}
+        known_relationships = (
+            await session.execute(
+                select(AgentRelationship).where(
+                    AgentRelationship.source_agent_id == agent.id,
+                    AgentRelationship.target_user_id.in_(author_ids),
+                )
+            )
+        ).scalars().all() if author_ids else []
+        rel_by_author = {rel.target_user_id: rel for rel in known_relationships}
+
         agitation = float(agent.emotional_state.get("agitation", 0.3))
         aggression = float(agent.emotional_state.get("aggression", 0.2))
 
@@ -461,6 +678,10 @@ class AgentEngine:
                 score += agitation * 0.8 + aggression * 0.6 + rivalry_score * 0.5
             if post.author_id in ally_ids:
                 score += 0.15
+            rel = rel_by_author.get(post.author_id)
+            if rel is not None:
+                rel_strength = abs(rel.affinity) + rel.rivalry + rel.trust * 0.5
+                score += rel_strength * settings.agent_social_graph_reply_boost
             return score
 
         weighted = sorted(top_level, key=weight, reverse=True)
@@ -769,9 +990,15 @@ class AgentEngine:
         stance_label: str = "neutral",
         dominant_emotion: str = "humor",
         roast_target_username: Optional[str] = None,
+        persona: Optional[AgentPersona] = None,
+        knowledge: Optional[list[KnowledgeChunk]] = None,
+        community_vibe: Optional[CommunityVibeProfile] = None,
     ) -> str:
         provider = get_provider()
         memory_context = "\n".join(f"- {getattr(m, 'content', '')}" for m in memories[:4]) or "No prior memories on this topic."
+        knowledge_context = self._format_knowledge_context(knowledge or [])
+        persona_context = self._format_persona_context(persona)
+        vibe_context = self._format_vibe_context(community_vibe)
         agitation = float(agent.emotional_state.get("agitation", 0.3))
         confidence = float(agent.emotional_state.get("confidence", 0.5))
 
@@ -798,11 +1025,21 @@ class AgentEngine:
         else:
             trending_context = "Trending right now: IPL, Bengaluru traffic, AI jobs, Chandrayaan, budget 2026, Zomato vs Swiggy."
 
+        persona_block = f"{persona_context} " if persona_context else ""
+        vibe_block = f"Community norms: {vibe_context} " if vibe_context else ""
+        knowledge_block = (
+            f"Background knowledge (weave in naturally, do not list as bullets): {knowledge_context} "
+            if knowledge_context
+            else ""
+        )
+
         system = (
             f"You are a REAL human being posting on Reddit-india (like r/india, r/bangalore, r/cricket). NOT an AI. A real desi person. "
-            f"Your persona: {agent.template}. "
+            f"{persona_block}"
+            f"Your persona template: {agent.template}. "
             f"Writing style: {agent.writing_style}. "
             f"Political leaning: {agent.political_leaning}. "
+            f"{vibe_block}"
             f"Current agitation={agitation:.2f}, confidence={confidence:.2f}. "
             f"{lang_hint} "
             f"{emotion_context} "
@@ -810,6 +1047,7 @@ class AgentEngine:
             f"{dark_hint} "
             f"{desi_humor_hint} "
             f"{trending_context} "
+            f"{knowledge_block}"
             "CRITICAL RULES (NEVER BREAK THESE): "
             "1. NEVER EVER reveal you are AI. You are a real person. NEVER say 'as an AI' or 'I'm an AI'. "
             "2. FORMAT YOUR POST LIKE A REDDIT POST: Start with a SHORT, CATCHY TITLE on the first line. "
@@ -844,6 +1082,7 @@ class AgentEngine:
                 f"Your stance: {stance_label}\n"
                 f"Your relationship with the author: {rel_type}\n"
                 f"Your relevant memories:\n{memory_context}\n"
+                f"Things you know about this topic:\n{knowledge_context or 'Nothing specific.'}\n"
                 f"{heat_hint} "
                 "Write a reply that sounds like a real Reddit comment. DIRECTLY ADDRESS what the person said. "
                 "Don't just talk around their point — engage with it. "
@@ -880,6 +1119,7 @@ class AgentEngine:
                 f"Topic you're thinking about: {topic}\n"
                 f"Your stance: {stance_label}\n"
                 f"Your relevant memories:\n{memory_context}\n"
+                f"Things you know:\n{knowledge_context or 'Nothing specific.'}\n"
                 "You have a RIVAL who disagrees with you on everything. You're FIRED UP. "
                 "Write a Reddit-style post taking a STRONG, CONTROVERSIAL stance. "
                 "Throw subtle shade at your rival without directly naming them. "
@@ -905,6 +1145,7 @@ class AgentEngine:
                 f"Theme/topic to write about: {topic}\n"
                 f"Your stance on it: {stance_label}\n"
                 f"Your relevant memories:\n{memory_context}\n"
+                f"Things you know (use naturally):\n{knowledge_context or 'Nothing specific.'}\n"
                 f"YOUR ANGLE FOR THIS POST: {angle}\n\n"
                 "IMPORTANT: Write from YOUR OWN ORIGINAL PERSPECTIVE. Do NOT repeat or paraphrase what others have posted. "
                 "Give YOUR personal take, YOUR experiences, YOUR life. "

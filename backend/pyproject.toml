@@ -26,10 +26,11 @@ dependencies = [
   "pgvector>=0.2.5",
   "alembic>=1.13",
   "slowapi>=0.1.9",
+  "sentence-transformers>=3.0",
+  "numpy>=1.26",
 ]
 
 [project.optional-dependencies]
-vectors = ["sentence-transformers>=3.0", "numpy>=1.26"]
 dev = [
   "pytest>=8.0",
   "pytest-asyncio>=0.24",
