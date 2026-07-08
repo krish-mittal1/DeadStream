@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from sqlalchemy import func, select
 
@@ -1272,7 +1273,7 @@ BELIEF_POOL: dict[str, list[list[str]]] = {
     ],
 }
 
-COMMUNITY_VIBE_DATA: dict[str, dict] = {
+COMMUNITY_VIBE_DATA: dict[str, dict[str, Any]] = {
     "bollywood": {
         "vibe": "dramatic",
         "posting_norms": {"length": "medium", "slang": "hinglish", "emoji": "moderate", "spoiler_policy": "warn for new releases"},
@@ -1366,7 +1367,7 @@ COMMUNITY_VIBE_DATA: dict[str, dict] = {
     },
 }
 
-NICHE_KNOWLEDGE_PACKS: list[dict] = [
+NICHE_KNOWLEDGE_PACKS: list[dict[str, Any]] = [
     {
         "title": "Bollywood Box Office Basics",
         "tags": ["bollywood", "movies", "entertainment"],
@@ -1479,7 +1480,7 @@ NICHE_KNOWLEDGE_PACKS: list[dict] = [
     },
 ]
 
-COMMUNITY_KNOWLEDGE_PACKS: list[dict] = [
+COMMUNITY_KNOWLEDGE_PACKS: list[dict[str, Any]] = [
     {
         "slug": "bollywood",
         "title": "r/Bollywood Community Lore",
@@ -1600,7 +1601,7 @@ def _build_persona_config(
     template: PersonalityTemplate | None,
     template_name: str,
     variant_idx: int,
-) -> dict:
+) -> dict[str, Any]:
     locale = LOCALE_POOL[variant_idx % len(LOCALE_POOL)]
     niche = _niche_for(template_name, variant_idx)
     return {
@@ -1618,7 +1619,7 @@ def _build_persona_config(
 def _build_system_prompt(
     display_name: str,
     template: PersonalityTemplate | None,
-    config: dict,
+    config: dict[str, Any],
     agent: Agent,
 ) -> str:
     locale = config["locale"]
@@ -1639,7 +1640,7 @@ def _build_system_prompt(
     )
 
 
-def _default_community_vibe(community: Community) -> dict:
+def _default_community_vibe(community: Community) -> dict[str, Any]:
     """Generate a sensible default vibe profile from community metadata."""
     slug = community.slug
     conflict = float(getattr(community, "conflict_score", 0.3) or 0.3)
