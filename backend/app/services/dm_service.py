@@ -302,12 +302,18 @@ class DMService:
             return "agree_reply"
         return "like"
 
-    def _contextual_dm_fallback(self, body: str, own_recent_msgs=None, recent=None) -> str:
+    def _contextual_dm_fallback(
+        self,
+        body: str,
+        own_recent_msgs: Optional[list[str]] = None,
+        recent: Optional[list[DirectMessage]] = None,
+    ) -> str:
         """Context-aware reply used when the LLM is unavailable.
 
         Picks a category from the latest message, then a candidate that the agent
         has NOT already said in this conversation, so it never loops on the same line.
         """
+        _ = recent  # may be used later; keep signature for richer fallbacks
         own_recent_msgs = own_recent_msgs or []
         text = body.strip().lower()
         normalized = text.replace("yaar", "").replace("bhai", "").strip()
