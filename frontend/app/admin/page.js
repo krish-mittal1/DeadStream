@@ -524,10 +524,28 @@ export default function AdminPage() {
   const fetchFactionGraph = useSimulationStore((s) => s.fetchFactionGraph);
   const fetchAlgorithm = useSimulationStore((s) => s.fetchAlgorithm);
   const token = useSimulationStore((s) => s.token);
+  const user = useSimulationStore((s) => s.user);
+
+  // ── Auth gate ──────────────────────────────────────────────
+  if (!token || !user) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 border border-red-500/20">
+          <ShieldAlert size={28} className="text-red-400" />
+        </div>
+        <h1 className="text-xl font-bold text-[var(--color-text)]">Access Restricted</h1>
+        <p className="text-sm text-[var(--color-text-muted)] max-w-xs">
+          You must be logged in to access the admin panel.
+        </p>
+        <Link href="/login" className="btn-primary h-10 px-6">Log In</Link>
+      </div>
+    );
+  }
 
   useEffect(() => {
     fetchFactionGraph();
     fetchAlgorithm();
+
   }, [fetchFactionGraph, fetchAlgorithm]);
 
   const modEvents = useMemo(

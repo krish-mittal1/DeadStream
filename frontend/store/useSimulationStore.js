@@ -16,9 +16,6 @@ export const useSimulationStore = create((set, get) => ({
   communities: [],
   graph: { nodes: [], edges: [] },
   selectedPost: null,
-  selectedProfile: null,
-  selectedCommunity: null,
-  threadReplies: [],
   communityPosts: [],
   panelError: "",
   activeView: "feed",
@@ -246,26 +243,6 @@ export const useSimulationStore = create((set, get) => ({
   clearSelectedPost() { set({ selectedPost: null }); },
   setActiveView(activeView) { set({ activeView }); },
 
-  async openThread(post) {
-    set({ selectedPost: post, panelError: "" });
-    const threadReplies = await api.postReplies(post.id);
-    set({ threadReplies });
-  },
-  closeThread() { set({ selectedPost: null, threadReplies: [] }); },
-
-  async openProfile(userId) {
-    set({ panelError: "" });
-    const selectedProfile = await api.userProfile(userId);
-    set({ selectedProfile });
-  },
-  closeProfile() { set({ selectedProfile: null }); },
-
-  async openCommunity(community) {
-    set({ selectedCommunity: community, activeView: "communities", panelError: "" });
-    const communityPosts = await api.communityFeed(community.id);
-    set({ communityPosts });
-  },
-
   async joinCommunity(communityId) {
     const { token } = get();
     if (!token) throw new Error("login_required");
@@ -282,9 +259,6 @@ export const useSimulationStore = create((set, get) => ({
         p.id === postId ? { ...p, like_count: (p.like_count || 0) + 1 } : p
       ),
       communityPosts: state.communityPosts.map((p) =>
-        p.id === postId ? { ...p, like_count: (p.like_count || 0) + 1 } : p
-      ),
-      threadReplies: state.threadReplies.map((p) =>
         p.id === postId ? { ...p, like_count: (p.like_count || 0) + 1 } : p
       ),
     }));
@@ -308,9 +282,6 @@ export const useSimulationStore = create((set, get) => ({
           p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
         ),
         communityPosts: state.communityPosts.map((p) =>
-          p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
-        ),
-        threadReplies: state.threadReplies.map((p) =>
           p.id === postId ? { ...p, like_count: Math.max(0, (p.like_count || 1) - 1) } : p
         ),
       }));

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { AlertTriangle, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
@@ -173,7 +174,6 @@ function useShowRail(pathname) {
   if (pathname === "/") return false;
   if (pathname.startsWith("/admin")) return false;
   if (pathname.startsWith("/dm")) return false;
-  if (pathname.startsWith("/group-chats")) return false;
   if (pathname.startsWith("/login") || pathname.startsWith("/register")) return false;
   return true;
 }
@@ -186,18 +186,38 @@ function useFullWidth(pathname) {
   if (!pathname) return false;
   if (pathname.startsWith("/admin")) return true;
   if (pathname.startsWith("/dm")) return true;
-  if (pathname.startsWith("/group-chats")) return true;
   if (pathname === "/") return true;
   return false;
 }
 
 function useMainShellClass(pathname) {
   if (!pathname) return "";
-  if (pathname.startsWith("/dm") || pathname.startsWith("/group-chats")) return " chat-shell";
+  if (pathname.startsWith("/dm")) return " chat-shell";
   if (pathname.startsWith("/communities") || pathname.startsWith("/trending")) return " directory-shell";
   if (pathname.startsWith("/admin") || pathname === "/") return " full-width";
   if (pathname.startsWith("/feed") || pathname.startsWith("/post") || pathname.startsWith("/profile")) return " feed-shell";
   return "";
+}
+
+/* ─── Panel error dismissible banner ──────────────────────── */
+function PanelErrorBanner() {
+  const panelError = useSimulationStore((s) => s.panelError);
+  const setPanelError = useCallback(() => useSimulationStore.setState({ panelError: "" }), []);
+  if (!panelError) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-3 px-4 py-2.5 rounded-xl border border-red-500/30 bg-red-500/10 shadow-lg backdrop-blur-md max-w-sm w-[90vw]"
+    >
+      <AlertTriangle size={15} className="text-red-400 shrink-0" />
+      <p className="flex-1 text-[12px] font-medium text-red-300">{panelError}</p>
+      <button onClick={setPanelError} className="btn-icon w-6 h-6 shrink-0 text-red-400 hover:text-red-200">
+        <X size={12} />
+      </button>
+    </motion.div>
+  );
 }
 
 export function ClientShell({ children }) {
@@ -245,6 +265,7 @@ export function ClientShell({ children }) {
 
             </div>
 
+            <PanelErrorBanner />
             <Toasts />
             <BackToTop />
           </GlobalKeyboardHandler>

@@ -64,6 +64,8 @@ export function PostCard({
 
   return (
     <motion.div
+      id={`post-${post.id}`}
+      tabIndex={-1}
       custom={index}
       variants={itemVariants}
       initial="hidden"

@@ -6,21 +6,11 @@ import { useEffect, useState, useCallback, useRef } from "react";
 
 const shortcuts = [
   { keys: ["?"], desc: "Show this modal" },
+  { keys: ["Ctrl", "K"], desc: "Open global search" },
+  { keys: ["Escape"], desc: "Close modals / go back" },
   { keys: ["J"], desc: "Next post in feed" },
   { keys: ["K"], desc: "Previous post in feed" },
   { keys: ["L"], desc: "Like selected post" },
-  { keys: ["R"], desc: "Reply to selected post" },
-  { keys: ["Enter"], desc: "Open selected post" },
-  { keys: ["Escape"], desc: "Close modals / go back" },
-  { keys: ["Ctrl", "K"], desc: "Open global search" },
-  { keys: ["/"], desc: "Focus composer" },
-  { keys: ["N"], desc: "New post" },
-  { keys: ["B"], desc: "Toggle bookmark" },
-  { keys: ["T"], desc: "Go to trending" },
-  { keys: ["H"], desc: "Go to feed (home)" },
-  { keys: ["M"], desc: "Toggle theme (mode)" },
-  { keys: ["G", "then", "P"], desc: "Go to profile" },
-  { keys: ["G", "then", "N"], desc: "Go to notifications" },
 ];
 
 function Key({ children }) {

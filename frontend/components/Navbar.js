@@ -1,30 +1,15 @@
 "use client";
 
 import {
-  Bell, Bookmark, Bot, Flame, HelpCircle, Home,
-  LogIn, LogOut, MessageSquare, MessagesSquare, Moon, Search, Sun, UserPlus, Users,
+  Bell, Bookmark, Bot, ChevronRight, Flame, HelpCircle, Home,
+  LogIn, LogOut, MessageSquare, Moon, MoreHorizontal, Search, Sun, UserPlus, Users, X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
-
-const avatarGradients = [
-  "linear-gradient(135deg,#ff4500,#ff6534)",
-  "linear-gradient(135deg,#4f8cff,#9b6cff)",
-  "linear-gradient(135deg,#10d48e,#14b8a6)",
-  "linear-gradient(135deg,#fb4785,#f5a623)",
-  "linear-gradient(135deg,#9b6cff,#4f8cff)",
-  "linear-gradient(135deg,#f5a623,#ff4500)",
-  "linear-gradient(135deg,#22d3ee,#4f8cff)",
-  "linear-gradient(135deg,#2ecc71,#10d48e)",
-];
-
-function getAvatarBg(username) {
-  const i = username?.split("").reduce((a, c) => a + c.charCodeAt(0), 0) ?? 0;
-  return avatarGradients[i % avatarGradients.length];
-}
+import { getAvatarBg } from "../lib/ui";
 
 function openSearch() {
   window.dispatchEvent(new CustomEvent("deadstream:open-search"));
@@ -79,10 +64,94 @@ function SidebarSection({ label }) {
   );
 }
 
+/* ─── Mobile "More" bottom-sheet ──────────────────────────── */
+function MobileMoreSheet({ open, onClose, user, unreadCount }) {
+  const pathname = usePathname();
+  const links = [
+    ...(user ? [{ href: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount }] : []),
+    ...(user ? [{ href: "/bookmarks", label: "Bookmarks", icon: Bookmark }] : []),
+    { href: "/trending", label: "Trending", icon: Flame },
+  ];
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          {/* Sheet */}
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", stiffness: 380, damping: 36 }}
+            className="fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl border-t border-[var(--color-line)] bg-[var(--color-panel)] pb-[max(env(safe-area-inset-bottom),16px)]"
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-2.5 pb-1">
+              <div className="w-9 h-1 rounded-full bg-[var(--color-text-dim)]" />
+            </div>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-line)]">
+              <span className="text-sm font-bold text-[var(--color-text)]">More</span>
+              <button onClick={onClose} className="btn-icon">
+                <X size={15} />
+              </button>
+            </div>
+            {/* Links */}
+            <div className="p-3 space-y-1">
+              {links.map(({ href, label, icon: Icon, badge }) => {
+                const isActive = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={onClose}
+                    className={`flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 ${
+                      isActive
+                        ? "bg-[var(--color-accent)]/10 text-[var(--color-accent)]"
+                        : "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
+                    }`}
+                  >
+                    <Icon size={19} strokeWidth={isActive ? 2.5 : 1.8} />
+                    <span className="flex-1 text-sm font-semibold">{label}</span>
+                    {badge > 0 && (
+                      <span className="badge text-[9px]">{badge > 9 ? "9+" : badge}</span>
+                    )}
+                    <ChevronRight size={14} className="text-[var(--color-text-dim)]" />
+                  </Link>
+                );
+              })}
+              {!user && (
+                <div className="pt-2 space-y-2">
+                  <Link href="/login" onClick={onClose} className="btn-secondary w-full justify-center h-10 text-sm">
+                    <LogIn size={15} /> Log In
+                  </Link>
+                  <Link href="/register" onClick={onClose} className="btn-primary w-full justify-center h-10 text-sm">
+                    <UserPlus size={15} /> Sign Up
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function MobileBottomNav() {
   const pathname = usePathname();
   const user = useSimulationStore((s) => s.user);
   const dmUnread = useSimulationStore((s) => s.dmUnread);
+  const unreadCount = useSimulationStore((s) => s.unreadCount);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const items = [
     { href: "/feed", label: "Feed", icon: Home },
@@ -91,69 +160,121 @@ function MobileBottomNav() {
     { href: user ? `/profile/${user.id}` : "/login", label: "Profile", icon: Bot },
   ];
 
+  const moreActive =
+    pathname.startsWith("/notifications") ||
+    pathname.startsWith("/bookmarks") ||
+    pathname.startsWith("/trending");
+
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex items-center md:hidden"
-      style={{
-        background: "rgba(7,7,9,0.92)",
-        backdropFilter: "blur(20px)",
-        borderTop: "1px solid var(--color-line)",
-        paddingBottom: "max(env(safe-area-inset-bottom), 8px)",
-      }}
-    >
-      {items.map(({ href, label, icon: Icon, badge }) => {
-        const base = href.replace(/\/[^/]+$/, "");
-        const isActive =
-          href === "/feed"
-            ? pathname.startsWith("/feed")
-            : href === "/communities"
-              ? pathname.startsWith("/communities")
-              : href === "/dm"
-                ? pathname.startsWith("/dm")
-                : pathname.startsWith(base) || pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            className="relative flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-all duration-200"
-          >
-            <motion.div
-              whileTap={{ scale: 0.85 }}
-              className={`relative flex items-center justify-center w-10 h-8 rounded-full transition-all duration-200 ${
-                isActive ? "bg-[rgba(255,69,0,0.12)]" : "bg-transparent"
-              }`}
+    <>
+      <MobileMoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        user={user}
+        unreadCount={unreadCount}
+      />
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex items-center md:hidden"
+        style={{
+          background: "rgba(7,7,9,0.92)",
+          backdropFilter: "blur(20px)",
+          borderTop: "1px solid var(--color-line)",
+          paddingBottom: "max(env(safe-area-inset-bottom), 8px)",
+        }}
+      >
+        {items.map(({ href, label, icon: Icon, badge }) => {
+          const isActive =
+            href === "/feed"
+              ? pathname.startsWith("/feed")
+              : href === "/communities"
+                ? pathname.startsWith("/communities")
+                : href === "/dm"
+                  ? pathname.startsWith("/dm")
+                  : pathname.startsWith(href.replace(/\/[^/]+$/, "")) || pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className="relative flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-all duration-200"
             >
-              <Icon
-                size={19}
-                strokeWidth={isActive ? 2.5 : 1.8}
-                className={isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"}
-              />
-              {badge > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="badge absolute -top-1 -right-1 text-[8px]"
-                >
-                  {badge > 9 ? "9+" : badge}
-                </motion.span>
-              )}
-            </motion.div>
-            <span className={`text-[9px] font-bold tracking-wide ${
-              isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"
-            }`}>
-              {label}
-            </span>
-            {isActive && (
               <motion.div
-                layoutId="mobile-indicator"
-                className="absolute -top-px left-1/4 right-1/4 h-0.5 rounded-full bg-[var(--color-accent)]"
-                transition={{ type: "spring", stiffness: 500, damping: 38 }}
-              />
+                whileTap={{ scale: 0.85 }}
+                className={`relative flex items-center justify-center w-10 h-8 rounded-full transition-all duration-200 ${
+                  isActive ? "bg-[rgba(255,69,0,0.12)]" : "bg-transparent"
+                }`}
+              >
+                <Icon
+                  size={19}
+                  strokeWidth={isActive ? 2.5 : 1.8}
+                  className={isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"}
+                />
+                {badge > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="badge absolute -top-1 -right-1 text-[8px]"
+                  >
+                    {badge > 9 ? "9+" : badge}
+                  </motion.span>
+                )}
+              </motion.div>
+              <span className={`text-[9px] font-bold tracking-wide ${
+                isActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"
+              }`}>
+                {label}
+              </span>
+              {isActive && (
+                <motion.div
+                  layoutId="mobile-indicator"
+                  className="absolute -top-px left-1/4 right-1/4 h-0.5 rounded-full bg-[var(--color-accent)]"
+                  transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                />
+              )}
+            </Link>
+          );
+        })}
+
+        {/* More button */}
+        <button
+          onClick={() => setMoreOpen(true)}
+          className="relative flex flex-1 flex-col items-center gap-0.5 py-2.5 transition-all duration-200"
+        >
+          <motion.div
+            whileTap={{ scale: 0.85 }}
+            className={`relative flex items-center justify-center w-10 h-8 rounded-full transition-all duration-200 ${
+              moreActive ? "bg-[rgba(255,69,0,0.12)]" : "bg-transparent"
+            }`}
+          >
+            <MoreHorizontal
+              size={19}
+              strokeWidth={moreActive ? 2.5 : 1.8}
+              className={moreActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"}
+            />
+            {unreadCount > 0 && (
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="badge absolute -top-1 -right-1 text-[8px]"
+              >
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </motion.span>
             )}
-          </Link>
-        );
-      })}
-    </nav>
+          </motion.div>
+          <span className={`text-[9px] font-bold tracking-wide ${
+            moreActive ? "text-[var(--color-accent)]" : "text-[var(--color-text-muted)]"
+          }`}>
+            More
+          </span>
+          {moreActive && (
+            <motion.div
+              layoutId="mobile-indicator"
+              className="absolute -top-px left-1/4 right-1/4 h-0.5 rounded-full bg-[var(--color-accent)]"
+              transition={{ type: "spring", stiffness: 500, damping: 38 }}
+            />
+          )}
+        </button>
+      </nav>
+    </>
   );
 }
 
@@ -219,7 +340,6 @@ export function Navbar() {
 
   const discoverLinks = [
     { href: "/trending", label: "Trending", icon: Flame },
-    { href: "/group-chats", label: "Group Chats", icon: MessagesSquare },
   ];
 
   const secondaryLinks = user
