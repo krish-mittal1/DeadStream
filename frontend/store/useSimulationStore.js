@@ -88,8 +88,17 @@ export const useSimulationStore = create((set, get) => ({
 
   connectSocket() {
     if (get().socket) return;
-    const socket = io(SOCKET_URL, { transports: ["polling", "websocket"], reconnection: true });
-    socket.on("connect", () => set({ connected: true }));
+    const userId = get().user?.id;
+    const socket = io(SOCKET_URL, {
+      transports: ["polling", "websocket"],
+      reconnection: true,
+      auth: userId ? { user_id: userId } : undefined,
+    });
+    socket.on("connect", () => {
+      set({ connected: true });
+      const uid = get().user?.id;
+      if (uid) socket.emit("join_user", { user_id: uid });
+    });
     socket.on("disconnect", () => set({ connected: false }));
     socket.on("event", (event) => {
       set((state) => ({ events: [event, ...state.events].slice(0, 160) }));
@@ -108,6 +117,21 @@ export const useSimulationStore = create((set, get) => ({
           set({ _lastNotifFetch: now });
           get().fetchNotifications();
         }
+      }
+    });
+    socket.on("dm:new", (payload) => {
+      if (!get().token) return;
+      const groupId = payload?.dm_group_id;
+      get().fetchDMGroups();
+      get().fetchDMUnread();
+      if (groupId && get().activeDMGroup?.id === groupId) {
+        get().fetchDMMessages(groupId);
+      }
+    });
+    socket.on("dm:typing", (payload) => {
+      const groupId = payload?.dm_group_id;
+      if (groupId && get().activeDMGroup?.id === groupId) {
+        set({ _dmTyping: !!payload?.typing });
       }
     });
     socket.on("feed:new", () => {
@@ -168,6 +192,8 @@ export const useSimulationStore = create((set, get) => ({
       localStorage.setItem("deadstream-token", auth.token);
       localStorage.setItem("deadstream-user", JSON.stringify(userData));
     }
+    const sock = get().socket;
+    if (sock && userData.id) sock.emit("join_user", { user_id: userData.id });
     get().fetchNotifications();
   },
   async register(username, password, displayName) {
@@ -178,6 +204,8 @@ export const useSimulationStore = create((set, get) => ({
       localStorage.setItem("deadstream-token", auth.token);
       localStorage.setItem("deadstream-user", JSON.stringify(userData));
     }
+    const sock = get().socket;
+    if (sock && userData.id) sock.emit("join_user", { user_id: userData.id });
     get().fetchNotifications();
   },
   logout() {

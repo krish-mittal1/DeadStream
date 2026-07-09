@@ -967,7 +967,7 @@ class GeminiProvider(AIProvider):
                                 "temperature": 0.9,
                                 "topP": 0.95,
                                 "topK": 40,
-                                "maxOutputTokens": 360,
+                                "maxOutputTokens": settings.gemini_max_output_tokens,
                             },
                         },
                     )
@@ -987,6 +987,9 @@ class GeminiProvider(AIProvider):
                 resp = getattr(e, "response", None)
                 if resp is not None and 400 <= resp.status_code < 500:
                     if resp.status_code == 429:
+                        from app.ai.gateway import llm_gateway
+
+                        await llm_gateway.record_rate_limit()
                         break
                     raise
                 if attempt < self.MAX_RETRIES:
@@ -1012,7 +1015,7 @@ class OllamaProvider(AIProvider):
             return str(response.json().get("response", ""))
 
 
-def get_provider() -> AIProvider:
+def _raw_provider() -> AIProvider:
     if settings.ai_provider == "openai":
         return OpenAIProvider()
     if settings.ai_provider == "gemini":
@@ -1023,3 +1026,10 @@ def get_provider() -> AIProvider:
     if settings.gemini_api_key:
         return GeminiProvider()
     return MockProvider()
+
+
+def get_provider() -> AIProvider:
+    """Return the configured provider wrapped in the global LLM budget gateway."""
+    from app.ai.gateway import BudgetedProvider
+
+    return BudgetedProvider(_raw_provider())  # type: ignore[return-value]

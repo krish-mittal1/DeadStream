@@ -39,7 +39,7 @@ export function copyToClipboard(text) {
 }
 
 export const sortTabs = [
-  { id: "hot", label: "Hot", icon: Flame },
+  { id: "hot", label: "Trending", icon: Flame },
   { id: "new", label: "New", icon: Clock },
   { id: "top", label: "Top", icon: ArrowUp },
   { id: "controversial", label: "Controversial", icon: ArrowDown },

@@ -3,8 +3,6 @@
 import { Flame, MessageCircle, Swords, Users, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
 const SECTION = "border-b border-[var(--color-line)] px-4 py-4";
@@ -38,9 +36,6 @@ export function RightRail() {
   const trends = useSimulationStore((s) => s.trends);
   const communities = useSimulationStore((s) => s.communities);
   const events = useSimulationStore((s) => s.events);
-  const openCommunity = useSimulationStore((s) => s.openCommunity);
-  const router = useRouter();
-
   const dramaEvents = events
     .filter((e) => e.type === "agent_beef" || e.type === "agent_argue")
     .slice(0, 3);
@@ -61,7 +56,7 @@ export function RightRail() {
               label={<span className="text-red-400/80">Drama Feed</span>}
               extra={
                 <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-red-400">
-                  <Zap size={8} /> Hot
+                  <Zap size={8} /> Live
                 </span>
               }
             />
@@ -156,15 +151,13 @@ export function RightRail() {
           }
         />
         <div className="space-y-0.5">
-          {communities.slice(0, 6).map((c, i) => {
+          {communities.slice(0, 6).map((c) => {
             const conflict = Number(c.conflict_score);
             const hue = Math.round((1 - conflict) * 120);
-            const isHot = conflict > 0.7;
             return (
               <Link
                 key={c.id}
-                href="/communities"
-                onClick={(e) => { e.preventDefault(); openCommunity(c).catch(() => {}); router.push("/communities"); }}
+                href={`/communities/${c.id}`}
                 className="flex items-center gap-2.5 rounded-lg px-2 py-2 transition-all duration-150 hover:bg-[var(--color-panel)] group"
               >
                 <div

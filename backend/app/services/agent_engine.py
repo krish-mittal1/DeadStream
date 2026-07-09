@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import random
 import re
 import uuid
@@ -162,6 +163,9 @@ class AgentEngine:
             conf_delta = 0.01 if nudge * stance > 0 else -0.005
             await opinion_service.update_stance(session, agent.id, topic, nudge, conf_delta)
 
+        # One meaningful action per wake: beef roast OR decided action, never both.
+        acted = False
+
         # --- If beefing, roast the rival publicly ---
         if is_beefing and hot_rivals:
             rival_rel = random.choice(hot_rivals)
@@ -215,19 +219,38 @@ class AgentEngine:
                     session.add(notif)
                 AGENT_ACTIONS.labels(action="roast").inc()
                 action = "roast"
+                acted = True
 
-        # --- Decide and execute action ---
-        if action == "reply" and recent_posts:
+        # --- Decide and execute action (skip if beef already posted) ---
+        if not acted and action == "reply" and recent_posts:
             target = await self._pick_target_smart(session, agent, recent_posts)
             rel_type = await self._get_relation_label(session, agent, target.author_id)
             dominant_emotion = self._get_dominant_emotion(agent)
+            thread_history = await self._load_thread_history(session, target)
+            own_recent_replies = await self._own_recent_replies(session, user.id, target.id)
+            # Short typing-style delay before feed replies (1–4s). Safe: only on reply path,
+            # does not block the whole scheduler tick beyond this single agent activation.
+            await asyncio.sleep(random.uniform(1.0, 4.0))
             body = await self._compose(
                 agent, topic, memories, mode="reply",
                 target=target.body, rel_type=rel_type,
                 dominant_emotion=dominant_emotion,
                 persona=persona,
                 knowledge=knowledge,
+                thread_history=thread_history,
+                own_recent_replies=own_recent_replies,
             )
+            # Anti-repeat: if we echoed a prior reply, nudge with a short unique fallback
+            if body in own_recent_replies:
+                body = await self._compose(
+                    agent, topic, memories, mode="reply",
+                    target=target.body, rel_type=rel_type,
+                    dominant_emotion=dominant_emotion,
+                    persona=persona,
+                    knowledge=knowledge,
+                    thread_history=thread_history,
+                    own_recent_replies=own_recent_replies + [body],
+                )
             await feed_service.create_post(session, user, CreatePostRequest(body=body, parent_id=target.id))
 
             interaction = "argue_reply" if target.controversy_score > 0.4 else "agree_reply"
@@ -240,8 +263,9 @@ class AgentEngine:
                 "reply": body[:200], "target": target.body[:200], "emotion": dominant_emotion
             })
             AGENT_ACTIONS.labels(action="reply").inc()
+            acted = True
 
-        elif action == "like" and recent_posts:
+        elif not acted and action == "like" and recent_posts:
             target = await self._pick_like_target(session, agent, recent_posts, user)
             if target:
                 existing = await session.scalar(select(Like).where(Like.user_id == user.id, Like.post_id == target.id))
@@ -256,15 +280,18 @@ class AgentEngine:
                         from app.services.notification_service import notification_service as notif_svc
                         await notif_svc.create(session, user_id=target.author_id, actor_id=user.id, type="like", entity_id=target.id)
                     AGENT_ACTIONS.labels(action="like").inc()
+                    acted = True
 
-        elif action == "follow":
+        elif not acted and action == "follow":
             await self._maybe_follow(session, agent, user)
+            acted = True
 
-        elif action == "create_community" and random.random() < 0.07:
+        elif not acted and action == "create_community" and random.random() < 0.07:
             await self._maybe_create_community(session, agent, user)
             AGENT_ACTIONS.labels(action="community").inc()
+            acted = True
 
-        elif action == "story":
+        elif not acted and action == "story":
             dominant_emotion = self._get_dominant_emotion(agent)
             community_id, community_name = await self._maybe_pick_community(session, user, agent)
             if community_name:
@@ -284,8 +311,9 @@ class AgentEngine:
             ))
             await memory_service.remember(session, agent.id, f"Told a story: {body[:120]}", "story", 0.5)
             AGENT_ACTIONS.labels(action="story").inc()
+            acted = True
 
-        else:
+        elif not acted:
             # Regular post — use opinion stance as context
             stance, _ = await opinion_service.get_stance(session, agent.id, topic)
             stance_label = opinion_service.stance_to_label(stance)
@@ -326,6 +354,8 @@ class AgentEngine:
             ))
             await memory_service.remember(session, agent.id, f"Posted about {topic}: {body[:120]}", "post", 0.3)
             AGENT_ACTIONS.labels(action="post").inc()
+            acted = True
+            action = "post" if action not in ("beef_post", "story") else action
 
         # --- Check if agent was recently roasted/replied to — might escalate ---
         recent_replies_to_me = [p for p in recent_posts if p.parent_id and p.author_id != user.id]
@@ -350,41 +380,7 @@ class AgentEngine:
         await memory_service.decay(session, agent.id)
         await memory_service.maybe_summarize(session, agent.id, get_provider())
 
-        # --- Agent-to-agent reaction: notice trending posts from other agents ---
-        # Only triggers if main action was NOT already a post/reply/roast (avoid double-posting)
-        if action not in ("post", "story", "roast") and recent_posts and random.random() < 0.12:
-            # Check for high-virality posts by OTHER agents (not self, not replied to already)
-            hot_posts = [
-                p for p in recent_posts[:15]
-                if p.author_id != user.id
-                and p.virality_score > 0.5
-            ]
-            if hot_posts:
-                target_post = random.choice(hot_posts[:3])
-                target_user = await session.get(User, target_post.author_id)
-                if target_user:
-                    rel_type = await self._get_relation_label(session, agent, target_post.author_id)
-                    reaction_emotion = self._get_dominant_emotion(agent)
-                    body = await self._compose(
-                        agent, topic, memories, mode="reply",
-                        target=target_post.body[:200], rel_type=rel_type,
-                        dominant_emotion=reaction_emotion,
-                        persona=persona,
-                        knowledge=knowledge,
-                    )
-                    await feed_service.create_post(session, user, CreatePostRequest(
-                        body=body, parent_id=target_post.id
-                    ))
-                    await relationship_service.update_after_interaction(
-                        session, agent.id, target_post.author_id,
-                        "agree_reply" if target_post.controversy_score < 0.3 else "argue_reply",
-                        intensity=target_post.controversy_score * 0.3
-                    )
-                    await event_store.append(session, "agent_reaction", user.id, target_post.author_id, {
-                        "reply": body[:200],
-                        "target_post": target_post.body[:150],
-                        "type": "hot_post_reaction",
-                    })
+        # Secondary hot-reaction double-posts disabled: one meaningful action per wake.
 
         self._drift_emotion(agent)
         agent.last_wake_at = datetime.now(timezone.utc)
@@ -398,6 +394,7 @@ class AgentEngine:
             "action": action,
             "thought_log": {
                 "action_taken": action,
+                "acted": acted,
                 "dominant_emotion": self._get_dominant_emotion(agent),
                 "agitation_after": round(float(agent.emotional_state.get("agitation", 0.3)), 2),
                 "topic": topic[:80],
@@ -494,9 +491,10 @@ class AgentEngine:
         )
 
     def _format_persona_context(self, persona: Optional[AgentPersona]) -> str:
+        """Prefer AgentPersona.system_prompt; only fall back to template fields when empty."""
         if persona is None:
             return ""
-        if persona.system_prompt.strip():
+        if persona.system_prompt and persona.system_prompt.strip():
             return persona.system_prompt.strip()
 
         parts: list[str] = []
@@ -517,6 +515,41 @@ class AgentEngine:
                 parts.append(f"{label}: {', '.join(str(item) for item in value[:5])}")
 
         return " ".join(parts)
+
+    async def _load_thread_history(
+        self, session: AsyncSession, target: Post, limit: int = 8
+    ) -> list[str]:
+        """Load recent replies under the same parent (or the post itself) for continuity."""
+        root_id = target.parent_id or target.id
+        rows = (
+            await session.execute(
+                select(Post)
+                .where(
+                    (Post.id == root_id) | (Post.parent_id == root_id)
+                )
+                .order_by(desc(Post.created_at))
+                .limit(limit)
+            )
+        ).scalars().all()
+        lines: list[str] = []
+        for post in reversed(list(rows)):
+            author = await session.get(User, post.author_id)
+            name = author.username if author else "unknown"
+            lines.append(f"@{name}: {(post.body or '')[:180]}")
+        return lines
+
+    async def _own_recent_replies(
+        self, session: AsyncSession, user_id: uuid.UUID, parent_id: uuid.UUID, limit: int = 5
+    ) -> list[str]:
+        rows = (
+            await session.execute(
+                select(Post.body)
+                .where(Post.author_id == user_id, Post.parent_id == parent_id)
+                .order_by(desc(Post.created_at))
+                .limit(limit)
+            )
+        ).scalars().all()
+        return [b for b in rows if b]
 
     def _format_vibe_context(self, vibe: Optional[CommunityVibeProfile]) -> str:
         if vibe is None:
@@ -993,6 +1026,8 @@ class AgentEngine:
         persona: Optional[AgentPersona] = None,
         knowledge: Optional[list[KnowledgeChunk]] = None,
         community_vibe: Optional[CommunityVibeProfile] = None,
+        thread_history: Optional[list[str]] = None,
+        own_recent_replies: Optional[list[str]] = None,
     ) -> str:
         provider = get_provider()
         memory_context = "\n".join(f"- {getattr(m, 'content', '')}" for m in memories[:4]) or "No prior memories on this topic."
@@ -1025,7 +1060,17 @@ class AgentEngine:
         else:
             trending_context = "Trending right now: IPL, Bengaluru traffic, AI jobs, Chandrayaan, budget 2026, Zomato vs Swiggy."
 
-        persona_block = f"{persona_context} " if persona_context else ""
+        # Persona-first: system_prompt is the primary identity; template is a light fallback only.
+        if persona_context:
+            persona_block = f"{persona_context} "
+            template_block = ""
+        else:
+            persona_block = ""
+            template_block = (
+                f"Your persona template: {agent.template}. "
+                f"Writing style: {agent.writing_style}. "
+                f"Political leaning: {agent.political_leaning}. "
+            )
         vibe_block = f"Community norms: {vibe_context} " if vibe_context else ""
         knowledge_block = (
             f"Background knowledge (weave in naturally, do not list as bullets): {knowledge_context} "
@@ -1036,9 +1081,7 @@ class AgentEngine:
         system = (
             f"You are a REAL human being posting on Reddit-india (like r/india, r/bangalore, r/cricket). NOT an AI. A real desi person. "
             f"{persona_block}"
-            f"Your persona template: {agent.template}. "
-            f"Writing style: {agent.writing_style}. "
-            f"Political leaning: {agent.political_leaning}. "
+            f"{template_block}"
             f"{vibe_block}"
             f"Current agitation={agitation:.2f}, confidence={confidence:.2f}. "
             f"{lang_hint} "
@@ -1076,15 +1119,20 @@ class AgentEngine:
             # Determine if the target has controversial content for a more heated reply
             is_heated = random.random() < 0.3 and rel_type in ("rival", "enemy")
             heat_hint = "You STRONGLY disagree with this. Push back with arguments but stay coherent. Be spicy, not abusive." if is_heated else ""
+            thread_block = "\n".join(thread_history or []) or "(no prior thread)"
+            avoid_block = "\n".join(f"- {r[:120]}" for r in (own_recent_replies or [])[:4]) or "(none)"
             prompt = (
                 f"You're replying to this post: \"{target}\"\n"
                 f"Topic context: {topic}\n"
                 f"Your stance: {stance_label}\n"
-                f"Your relationship with the author: {rel_type}\n"
+                f"Your relationship with the author: {rel_type}. {tone_hint}\n"
+                f"Thread so far (oldest to newest):\n{thread_block}\n"
                 f"Your relevant memories:\n{memory_context}\n"
                 f"Things you know about this topic:\n{knowledge_context or 'Nothing specific.'}\n"
+                f"Do NOT repeat these earlier replies of yours:\n{avoid_block}\n"
                 f"{heat_hint} "
                 "Write a reply that sounds like a real Reddit comment. DIRECTLY ADDRESS what the person said. "
+                "Continue the existing thread — do not restart with a greeting if the thread is already going. "
                 "Don't just talk around their point — engage with it. "
                 "Can be short and snappy or detailed depending on your mood. "
                 "If the post is funny, be funny back. If it's serious, match the tone. "

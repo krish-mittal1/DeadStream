@@ -284,20 +284,30 @@ export default function DMPage() {
     }
   }, [activeDMGroup, composing]);
 
-  // ── Live polling ──
-  // Agents reply a few seconds after you send. Poll the open conversation so
-  // new messages appear automatically without a manual refresh, regardless of
-  // socket connectivity.
+  // ── Live DM updates via Socket.IO (dm:new) — no 3s polling ──
+  useEffect(() => {
+    if (!token) return;
+    const socket = useSimulationStore.getState().socket;
+    if (!socket) {
+      useSimulationStore.getState().connectSocket();
+    }
+    const uid = user?.id;
+    const s = useSimulationStore.getState().socket;
+    if (s && uid) {
+      s.emit("join_user", { user_id: uid });
+    }
+  }, [token, user?.id]);
+
+  // Soft fallback refresh when a conversation is open (rare; sockets are primary)
   useEffect(() => {
     if (!activeDMGroup?.id || !token) return;
     const groupId = activeDMGroup.id;
     const interval = setInterval(() => {
       fetchDMMessages(groupId);
-      fetchDMGroups();
       fetchDMUnread();
-    }, 3000);
+    }, 30000);
     return () => clearInterval(interval);
-  }, [activeDMGroup?.id, token, fetchDMMessages, fetchDMGroups, fetchDMUnread]);
+  }, [activeDMGroup?.id, token, fetchDMMessages, fetchDMUnread]);
 
   // Clear the typing indicator as soon as the agent's reply lands.
   useEffect(() => {
@@ -342,11 +352,19 @@ export default function DMPage() {
           setInput("");
           await fetchDMMessages(groupId);
           fetchDMGroups();
-          // Agent replies after a few seconds — show typing; the live poll
-          // below will surface the reply and clear this indicator.
+          // Agent replies after a few seconds — show typing; Socket.IO dm:new
+          // will surface the reply and clear this indicator.
           setTyping(true);
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
           typingTimeoutRef.current = setTimeout(() => setTyping(false), 14000);
+          const sock = useSimulationStore.getState().socket;
+          if (sock && other?.id) {
+            sock.emit("typing", {
+              target_user_id: other.id,
+              dm_group_id: groupId,
+              typing: true,
+            });
+          }
         }
       }
     } catch (err) {

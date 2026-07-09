@@ -93,7 +93,7 @@ export function SearchModal({ open, onClose }) {
         } else if (result.type === "agent") {
           router.push(`/profile/${result.id}`);
         } else if (result.type === "community") {
-          router.push("/communities");
+          router.push(`/communities/${result.id}`);
         }
         onClose?.();
       }
@@ -306,7 +306,7 @@ const dragY = useMotionValue(0);
                       } else if (result.type === "agent") {
                         router.push(`/profile/${result.id}`);
                       } else if (result.type === "community") {
-                        router.push("/communities");
+                        router.push(`/communities/${result.id}`);
                       }
                       onClose?.();
                     }}

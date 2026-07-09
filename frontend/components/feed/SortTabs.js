@@ -3,9 +3,15 @@
 import { motion } from "framer-motion";
 import { sortTabs } from "./helpers";
 
-export function SortTabs({ activeSort, onSortChange }) {
+export function SortTabs({ activeSort, onSortChange, sticky = true }) {
   return (
-    <div className="flex items-center gap-0.5 border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-sm px-4 md:px-6 py-2 overflow-x-auto shrink-0 sticky top-0 z-10">
+    <div
+      className={`flex items-center gap-0.5 px-4 md:px-6 py-1.5 overflow-x-auto shrink-0 ${
+        sticky
+          ? "sticky top-0 z-10 border-b border-[var(--color-line)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-sm"
+          : ""
+      }`}
+    >
       {sortTabs.map((tab) => {
         const isActive = activeSort === tab.id;
         return (

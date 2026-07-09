@@ -133,6 +133,17 @@ class DMService:
         recipient_id: uuid.UUID,
         body: str,
     ) -> None:
+        # Optional typing hint to the human sender's room before the delay finishes
+        try:
+            from app.realtime.gateway import sio, user_room
+
+            await sio.emit(
+                "dm:typing",
+                {"dm_group_id": str(dm_group_id), "user_id": str(recipient_id), "typing": True},
+                room=user_room(str(sender_id)),
+            )
+        except Exception:
+            pass
         await asyncio.sleep(random.uniform(3.0, 8.0))
         async with SessionLocal() as session:
             try:
@@ -627,6 +638,49 @@ class DMService:
             body=body,
             created_at=msg.created_at,
         )
+
+    async def delayed_ai_replies_in_group(
+        self,
+        group_chat_id: uuid.UUID,
+        human_sender_id: uuid.UUID,
+        topic: str,
+    ) -> None:
+        """Staggered AI participant replies after a human message (BackgroundTasks)."""
+        async with SessionLocal() as session:
+            try:
+                participants = await self.get_group_participants(session, group_chat_id)
+            except Exception as exc:
+                logger.warning("group_ai_participants_failed", error=str(exc))
+                return
+
+        agent_user_ids = [
+            p.user_id for p in participants if p.is_agent and p.user_id != human_sender_id
+        ]
+        if not agent_user_ids:
+            return
+
+        # Reply with up to 2 agents, staggered so it feels like a real chat
+        selected = random.sample(agent_user_ids, k=min(2, len(agent_user_ids)))
+        for i, agent_user_id in enumerate(selected):
+            await asyncio.sleep(random.uniform(2.0, 5.0) + i * random.uniform(1.5, 3.0))
+            async with SessionLocal() as session:
+                try:
+                    agent = await session.scalar(
+                        select(AgentModel).where(AgentModel.user_id == agent_user_id)
+                    )
+                    if not agent:
+                        continue
+                    chat = await session.get(GroupChat, group_chat_id)
+                    chat_topic = (chat.topic if chat else None) or topic
+                    await self.ai_reply_in_group(session, group_chat_id, agent.id, chat_topic)
+                except Exception as exc:
+                    await session.rollback()
+                    logger.warning(
+                        "group_ai_reply_failed",
+                        group_chat_id=str(group_chat_id),
+                        agent_user_id=str(agent_user_id),
+                        error=str(exc),
+                    )
 
     async def get_group_chats_for_user(
         self, session: AsyncSession, user_id: uuid.UUID, limit: int = 20

@@ -12,7 +12,7 @@ import { NewPostsToast } from "./feed/NewPostsToast";
 import { EmptyFeed } from "./feed/EmptyFeed";
 import { PostCard } from "./feed/PostCard";
 
-export function Feed({ compact = false }) {
+export function Feed({ compact = false, hideSort = false }) {
   const posts = useSimulationStore((s) => s.posts);
   const loading = useSimulationStore((s) => s.loading);
   const user = useSimulationStore((s) => s.user);
@@ -65,7 +65,9 @@ export function Feed({ compact = false }) {
 
   return (
     <div className="w-full max-w-[950px] mx-auto">
-      <SortTabs activeSort={feedSort} onSortChange={setFeedSort} />
+      {!hideSort && (
+        <SortTabs activeSort={feedSort} onSortChange={setFeedSort} />
+      )}
       <NewPostsToast count={newPostCount} onLoad={loadNewPosts} />
 
       {!posts.length ? (

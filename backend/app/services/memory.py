@@ -75,46 +75,45 @@ class MemoryService:
         self, session: AsyncSession, agent_id: uuid.UUID, query: str, limit: int = 6
     ) -> list[AgentMemory]:
         """
-        Retrieve top-k memories for an agent using pgvector ANN search (cosine distance).
-
-        Uses pgvector's `<=>` operator for approximate nearest neighbor search when
-        there are many memories; falls back to the Python-level scoring for smaller sets.
+        Retrieve top-k memories via pgvector cosine distance (same pattern as knowledge_service),
+        then re-rank with keyword / importance / recency bonuses.
         """
         query_vec = self.embed(query)
         now = datetime.now(timezone.utc)
 
-        # Count memories for this agent
-        count = await session.scalar(
-            select(func.count()).select_from(AgentMemory).where(AgentMemory.agent_id == agent_id)
-        ) or 0
+        distance = AgentMemory.embedding.cosine_distance(query_vec)
+        fetch_limit = max(limit * 4, limit)
 
-        # Use ORM-based similarity search for all memory sizes.
-        # For large sets, pre-filter by importance then compute cosine similarity in Python
-        # to avoid raw SQL text() injection risks.
-        fetch_limit = limit * 3 if count > 100 else 80
-        memories = (
+        candidates = (
             await session.execute(
                 select(AgentMemory)
                 .where(AgentMemory.agent_id == agent_id)
-                .order_by(desc(AgentMemory.importance))
+                .order_by(distance)
                 .limit(fetch_limit)
             )
         ).scalars().all()
 
-        query_vec_norm = math.sqrt(sum(v * v for v in query_vec)) or 1.0
+        if not candidates:
+            return []
 
         def score(memory: AgentMemory) -> float:
-            # Cosine similarity via dot product
-            dot = sum(a * b for a, b in zip(query_vec, memory.embedding, strict=False))
-            mem_norm = math.sqrt(sum(v * v for v in memory.embedding)) or 1.0
-            similarity = dot / (query_vec_norm * mem_norm)
-
+            # Lower cosine distance => higher similarity; pgvector already ordered by distance,
+            # but we blend with importance/recency/keywords for final ranking.
             keyword_bonus = self._keyword_overlap(query, memory.content) * 0.3
             created_at = memory.created_at
             if created_at.tzinfo is None:
                 created_at = created_at.replace(tzinfo=timezone.utc)
             age_hours = max(1.0, (now - created_at).total_seconds() / 3600)
             recency = math.exp(-memory.decay_rate * age_hours)
+            # Approximate similarity from position isn't available; use embedding cosine in Python
+            # only for the small candidate set (already ANN-filtered by pgvector).
+            try:
+                dot = sum(a * b for a, b in zip(query_vec, memory.embedding, strict=False))
+                qn = math.sqrt(sum(v * v for v in query_vec)) or 1.0
+                mn = math.sqrt(sum(v * v for v in memory.embedding)) or 1.0
+                similarity = dot / (qn * mn)
+            except Exception:
+                similarity = 0.0
             return (
                 similarity * 0.45
                 + keyword_bonus
@@ -123,12 +122,10 @@ class MemoryService:
                 + memory.emotional_intensity * 0.05
             )
 
-        ranked = sorted(memories, key=score, reverse=True)[:limit]
-        result = ranked
-
-        for memory in result:
+        ranked = sorted(candidates, key=score, reverse=True)[:limit]
+        for memory in ranked:
             memory.last_accessed_at = datetime.now(timezone.utc)
-        return result
+        return ranked
 
     async def decay(self, session: AsyncSession, agent_id: uuid.UUID) -> None:
         memories = (
@@ -165,7 +162,7 @@ class MemoryService:
                 .limit(200)
             )
         ).scalars().all()
-        
+
         compress = list(all_memories[KEEP_TOP_N:])
 
         if not compress:

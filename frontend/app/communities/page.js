@@ -108,7 +108,7 @@ function CommunityIcon({ name, size = 40 }) {
 
 function CommunityCard({ community, onClick }) {
   const conflict = Number(community.conflict_score) || 0;
-  const isHot = conflict > 0.65;
+  const isHeated = conflict > 0.65;
   const isNew = community.member_count < 20;
 
   return (
@@ -125,12 +125,12 @@ function CommunityCard({ community, onClick }) {
             <span className="text-sm font-bold text-[var(--color-text)] truncate flex-1 group-hover:text-[var(--color-accent)] transition-colors">
               {community.name}
             </span>
-            {isHot && (
+            {isHeated && (
               <span className="shrink-0 flex items-center gap-0.5 text-[9px] font-bold text-[var(--color-accent)] bg-[var(--color-accent)]/10 px-1.5 py-0.5 rounded-full">
-                <Flame size={8} className="fill-[var(--color-accent)]" /> HOT
+                <Flame size={8} className="fill-[var(--color-accent)]" /> HEATED
               </span>
             )}
-            {isNew && !isHot && (
+            {isNew && !isHeated && (
               <span className="shrink-0 text-[9px] font-bold text-[var(--color-green)] bg-[var(--color-green)]/10 px-1.5 py-0.5 rounded-full">
                 NEW
               </span>
@@ -164,9 +164,9 @@ function CommunityCard({ community, onClick }) {
 }
 
 const SORT_OPTIONS = [
-  { key: "activity", label: "Hot", icon: Flame },
-  { key: "size", label: "Big", icon: Users },
-  { key: "conflict", label: "Spicy", icon: Zap },
+  { key: "activity", label: "Trending", icon: Flame },
+  { key: "size", label: "Biggest", icon: Users },
+  { key: "conflict", label: "Heated", icon: Zap },
   { key: "new", label: "New", icon: TrendingUp },
 ];
 

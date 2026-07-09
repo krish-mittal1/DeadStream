@@ -51,10 +51,27 @@ function AmbientOrbs() {
   );
 }
 
+function isHighFrequencyRoute(pathname) {
+  if (!pathname) return false;
+  return (
+    pathname.startsWith("/feed") ||
+    pathname.startsWith("/post") ||
+    pathname.startsWith("/profile")
+  );
+}
+
 function PageTransition({ children }) {
   const pathname = usePathname();
   const dirRef = useRef("forward");
   const prevPathRef = useRef(pathname);
+
+  // Soften transitions on high-frequency routes (feed ↔ post ↔ profile)
+  if (isHighFrequencyRoute(pathname) && isHighFrequencyRoute(prevPathRef.current)) {
+    if (prevPathRef.current !== pathname) {
+      prevPathRef.current = pathname;
+    }
+    return <>{children}</>;
+  }
 
   // Detect navigation direction by comparing pathname hierarchies
   if (prevPathRef.current !== pathname) {
@@ -63,9 +80,6 @@ function PageTransition({ children }) {
     const prevDepth = prev.split("/").filter(Boolean).length;
     const currDepth = curr.split("/").filter(Boolean).length;
 
-    // Going deeper (e.g. /feed → /post/123) or to a sibling → forward
-    // Going shallower (e.g. /post/123 → /feed) → backward
-    // Same depth but different path → forward
     if (
       currDepth < prevDepth ||
       (currDepth === prevDepth && curr < prev)
@@ -133,6 +147,12 @@ function GlobalKeyboardHandler({ children }) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
+
+  useEffect(() => {
+    const openFromUi = () => setSearchOpen(true);
+    window.addEventListener("deadstream:open-search", openFromUi);
+    return () => window.removeEventListener("deadstream:open-search", openFromUi);
+  }, []);
 
   return (
     <>

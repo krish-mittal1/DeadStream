@@ -48,6 +48,7 @@ from app.schemas import (
     VoteRequest,
 )
 from app.core.exceptions import AppError
+from app.core.config import settings
 from app.services.auth import auth_service
 from app.services.feed import feed_service
 from app.services.notification_service import notification_service
@@ -58,6 +59,14 @@ from app.services.dm_service import dm_service
 from app.services.election_service import election_service
 
 api_router = APIRouter()
+
+
+def _require_admin_extras() -> None:
+    if not settings.admin_extras_enabled:
+        raise HTTPException(
+            status_code=404,
+            detail="admin_extras_disabled",
+        )
 
 
 # ── Health ───────────────────────────────────────────────────────────
@@ -499,6 +508,7 @@ async def faction_graph(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
+    _require_admin_extras()
     return await feed_service.get_faction_graph(session)
 
 
@@ -534,6 +544,7 @@ async def inject_fake_news(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DisruptionEventResponse:
+    _require_admin_extras()
     event = await disruption_service.inject_fake_news(session, request.title, request.body, request.source)
     return disruption_service._to_response(event)  # type: ignore[private-usage]
 
@@ -545,6 +556,7 @@ async def spawn_troll_farm(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> TrollFarmAttackResponse:
+    _require_admin_extras()
     disruption = await disruption_service.spawn_troll_farm(session, title, count)
     return TrollFarmAttackResponse(
         disruption_id=disruption.id,
@@ -558,6 +570,7 @@ async def list_disruptions(
     active_only: bool = Query(default=False),
     session: AsyncSession = Depends(get_session),
 ) -> list[DisruptionEventResponse]:
+    _require_admin_extras()
     if active_only:
         return await disruption_service.get_active_disruptions(session)
     return await disruption_service.get_all_disruptions(session)
@@ -569,6 +582,7 @@ async def stop_disruption(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, str]:
+    _require_admin_extras()
     await disruption_service.stop_disruption(session, disruption_id)
     return {"status": "stopped"}
 
@@ -579,6 +593,7 @@ async def simulate_spread(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, object]:
+    _require_admin_extras()
     rate = await disruption_service.simulate_spread(session, disruption_id)
     return {"infection_rate": rate}
 
@@ -591,6 +606,7 @@ async def agent_brain_evolution(
     days: int = Query(default=7, ge=1, le=30),
     session: AsyncSession = Depends(get_session),
 ) -> BrainEvolutionResponse:
+    _require_admin_extras()
     evolution = await cognitive_drift_service.get_brain_evolution(session, agent_id, days)
     if evolution is None:
         raise HTTPException(status_code=404, detail="agent_not_found")
@@ -711,14 +727,29 @@ async def get_group_chat(
 async def send_group_message(
     group_chat_id: uuid.UUID,
     request: GroupChatMessageRequest,
+    background_tasks: BackgroundTasks,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> GroupChatMessageResponse:
     try:
-        return await dm_service.send_group_message(session, group_chat_id, user.id, request.body)
+        message = await dm_service.send_group_message(session, group_chat_id, user.id, request.body)
     except ValueError as exc:
         status_code = 403 if str(exc) == "not_a_participant" else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+    # Staggered AI replies from agent participants (skip if sender is already an agent)
+    if not user.is_agent:
+        from app.models.dm import GroupChat
+
+        chat = await session.get(GroupChat, group_chat_id)
+        topic = chat.topic if chat else ""
+        background_tasks.add_task(
+            dm_service.delayed_ai_replies_in_group,
+            group_chat_id,
+            user.id,
+            topic or "",
+        )
+    return message
 
 
 @api_router.get("/group-chats/{group_chat_id}/messages", response_model=list[GroupChatMessageResponse])

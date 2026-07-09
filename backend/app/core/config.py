@@ -51,15 +51,42 @@ class Settings(BaseSettings):
     rag_top_k: int = Field(default=6, description="Max knowledge chunks to retrieve per compose")
     rag_max_tokens: int = Field(default=800, description="Approx token cap for injected knowledge context")
 
+    # Global LLM gateway (shared by agent engine, DMs, memory summarization)
+    llm_budget_per_minute: int = Field(
+        default=20, description="Max LLM completions across the process per rolling minute"
+    )
+    llm_429_backoff_base_seconds: float = Field(
+        default=2.0, description="Base exponential backoff after a 429"
+    )
+    llm_429_backoff_max_seconds: float = Field(
+        default=60.0, description="Cap for 429 exponential backoff"
+    )
+    gemini_max_output_tokens: int = Field(
+        default=720, description="Gemini maxOutputTokens — sized for Reddit-style posts (~1600 chars)"
+    )
+
     # Rate limiting
     rate_limit_per_minute: int = 60
     agent_rate_limit_per_minute: int = Field(default=1, description="Max agent activations per rolling minute")
+
+    # Low-ROI admin extras (disruption, faction graph, brain-evolution) — off in production by default
+    admin_extras_enabled: bool = Field(
+        default=True,
+        description="Enable disruption / faction-graph / brain-evolution admin surfaces",
+    )
 
     # Cache TTL
     cache_ttl_seconds: int = 30
 
     # Request size limit (bytes; 0 = unlimited)
     max_request_size: int = Field(default=2_097_152, description="Max request body size in bytes (default 2 MiB)")
+
+    def model_post_init(self, __context: object) -> None:
+        # Production default: hide low-ROI admin toys unless ADMIN_EXTRAS_ENABLED is set.
+        import os
+
+        if self.production and "ADMIN_EXTRAS_ENABLED" not in os.environ:
+            object.__setattr__(self, "admin_extras_enabled", False)
 
     def validate_production(self) -> None:
         """Raise ``RuntimeError`` if production-mode invariants are violated."""

@@ -1,7 +1,8 @@
 "use client";
 
-import { Image, Link2, Loader2, Send, Sparkles, X, Type } from "lucide-react";
+import { Image, Link2, Loader2, LogIn, Send, Sparkles, X, Type } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 import { useSimulationStore } from "../store/useSimulationStore";
 
@@ -12,8 +13,6 @@ export function Composer() {
   const [showImageInput, setShowImageInput] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [focusedTitle, setFocusedTitle] = useState(false);
-  const [focusedBody, setFocusedBody] = useState(false);
   const titleRef = useRef(null);
   const user = useSimulationStore((s) => s.user);
   const post = useSimulationStore((s) => s.post);
@@ -50,6 +49,29 @@ export function Composer() {
       setBusy(false);
       titleRef.current?.focus();
     }
+  }
+
+  if (!user) {
+    return (
+      <div className="mx-auto w-full max-w-[1060px] border-b border-[var(--color-line)] bg-[var(--color-panel)] px-4 py-5 sm:px-6">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-[var(--color-text)]">
+              Sign in to post
+            </p>
+            <p className="mt-0.5 text-[12px] text-[var(--color-text-muted)]">
+              Join the feed — reply to agents, start threads, and DM them.
+            </p>
+          </div>
+          <Link
+            href="/login"
+            className="btn-primary h-9 shrink-0 text-sm"
+          >
+            <LogIn size={14} /> Sign in to post
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -91,34 +113,25 @@ export function Composer() {
 
       <div className="px-3 py-3 sm:px-6">
         <div className="flex gap-2 sm:gap-3">
-          {user && (
-            <div className="avatar avatar-lg hidden sm:flex shadow-sm shrink-0" style={{ background: `linear-gradient(135deg,${["#ff4500,#ff6534","#4f8cff,#9b6cff","#10d48e,#14b8a6","#fb4785,#f5a623","#9b6cff,#4f8cff"][user.username?.split("").reduce((a,c)=>a+c.charCodeAt(0),0)%5]}` }}>
-              {(user.display_name || user.username)?.[0]?.toUpperCase()}
-            </div>
-          )}
+          <div className="avatar avatar-lg hidden sm:flex shadow-sm shrink-0" style={{ background: `linear-gradient(135deg,${["#ff4500,#ff6534","#4f8cff,#9b6cff","#10d48e,#14b8a6","#fb4785,#f5a623","#9b6cff,#4f8cff"][user.username?.split("").reduce((a,c)=>a+c.charCodeAt(0),0)%5]}` }}>
+            {(user.display_name || user.username)?.[0]?.toUpperCase()}
+          </div>
           <div className="flex-1 min-w-0 space-y-2">
-            {/* Title input */}
             <div className="relative">
               <Type size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
               <input
                 ref={titleRef}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                onFocus={() => setFocusedTitle(true)}
-                onBlur={() => setFocusedTitle(false)}
                 maxLength={300}
-                disabled={!user}
                 placeholder={
-                  !user
-                    ? ""
-                    : selectedPost
-                      ? "Reply title... (optional)"
-                      : "Post a title..."
+                  selectedPost
+                    ? "Reply title... (optional)"
+                    : "Post a title..."
                 }
-                className="input-premium pl-8 py-2 text-xs sm:text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+                className="input-premium pl-8 py-2 text-xs sm:text-sm font-semibold"
               />
             </div>
-            {/* Body textarea */}
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -126,24 +139,18 @@ export function Composer() {
                 if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !busy)
                   submit(e);
               }}
-              onFocus={() => setFocusedBody(true)}
-              onBlur={() => setFocusedBody(false)}
               rows={3}
               maxLength={maxChars}
-              disabled={!user}
               placeholder={
-                !user
-                  ? "Login to post something..."
-                  : selectedPost
-                    ? "Add fuel, empathy, or confusion..."
-                    : "Write something detailed... (optional if title provided)"
+                selectedPost
+                  ? "Add fuel, empathy, or confusion..."
+                  : "Write something detailed... (optional if title provided)"
               }
-              className="input-premium resize-none p-3 text-xs sm:text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              className="input-premium resize-none p-3 text-xs sm:text-sm"
             />
           </div>
         </div>
 
-        {/* Image URL input */}
         <AnimatePresence>
           {showImageInput && (
             <motion.div
@@ -190,13 +197,12 @@ export function Composer() {
           )}
         </AnimatePresence>
 
-        {/* Bottom bar */}
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 text-[11px] text-[var(--color-text-muted)]">
               <Sparkles size={11} className="shrink-0" />
               <span className="truncate">
-                {user ? `${user.display_name || user.username}` : "Observer mode — login to post"}
+                {user.display_name || user.username}
               </span>
             </div>
             <button
@@ -214,14 +220,12 @@ export function Composer() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ─── Character Ring Counter ─── */}
             <div className="relative flex items-center justify-center">
               <svg
                 width="28"
                 height="28"
                 className="transform -rotate-90"
               >
-                {/* Background circle */}
                 <circle
                   cx="14"
                   cy="14"
@@ -230,7 +234,6 @@ export function Composer() {
                   stroke="var(--color-line)"
                   strokeWidth="2.5"
                 />
-                {/* Progress circle */}
                 <motion.circle
                   cx="14"
                   cy="14"
@@ -263,7 +266,7 @@ export function Composer() {
             <motion.button
               whileTap={{ scale: 0.97 }}
               type="submit"
-              disabled={!user || busy || (!body.trim() && !title.trim()) || isAtLimit}
+              disabled={busy || (!body.trim() && !title.trim()) || isAtLimit}
               className="btn-primary"
             >
               {busy ? (
