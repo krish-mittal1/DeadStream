@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
-from typing import Optional
 
 from app.core.config import settings
 from app.core.logging import get_logger
