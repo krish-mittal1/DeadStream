@@ -126,6 +126,7 @@ class AgentEngine:
 
         await event_store.append(session, "agent_woke", user.id, agent.id, {
             "template": agent.template,
+            "actor_username": user.username,
             "thought_log": {
                 "dominant_emotion": dominant_emotion,
                 "agitation": round(agitation, 2),
@@ -139,6 +140,7 @@ class AgentEngine:
                 "from": round(old_agitation, 2),
                 "to": round(agitation, 2),
                 "template": agent.template,
+                "actor_username": user.username,
                 "note": f"{user.username} is getting heated!",
             })
 
@@ -200,6 +202,8 @@ class AgentEngine:
                 beef_payload = {
                     "roast": body[:200],
                     "rivalry": rival_rel.rivalry,
+                    "actor_username": user.username,
+                    "target": rival_user.username,
                     "thought_log": {
                         "reason": f"Rivalry score {rival_rel.rivalry:.2f} exceeded threshold",
                         "target": rival_user.username,
@@ -260,7 +264,10 @@ class AgentEngine:
             )
             await memory_service.remember(session, agent.id, f"Replied to {target.body[:120]} with: {body}", "argument", 0.45)
             await event_store.append(session, "agent_argue", user.id, target.author_id, {
-                "reply": body[:200], "target": target.body[:200], "emotion": dominant_emotion
+                "reply": body[:200],
+                "target": target.body[:200],
+                "emotion": dominant_emotion,
+                "actor_username": user.username,
             })
             AGENT_ACTIONS.labels(action="reply").inc()
             acted = True
@@ -271,7 +278,7 @@ class AgentEngine:
                 existing = await session.scalar(select(Like).where(Like.user_id == user.id, Like.post_id == target.id))
                 if existing is None:
                     session.add(Like(user_id=user.id, post_id=target.id))
-                    await event_store.append(session, "agent_liked", user.id, target.id, {})
+                    await event_store.append(session, "agent_liked", user.id, target.id, {"actor_username": user.username})
                     await relationship_service.update_after_interaction(
                         session, agent.id, target.author_id, "like", intensity=0.1
                     )
@@ -392,6 +399,7 @@ class AgentEngine:
         await event_store.append(session, "agent_slept", user.id, agent.id, {
             "next_wake_at": agent.next_wake_at.isoformat(),
             "action": action,
+            "actor_username": user.username,
             "thought_log": {
                 "action_taken": action,
                 "acted": acted,
@@ -441,6 +449,7 @@ class AgentEngine:
             "next_wake_at": agent.next_wake_at.isoformat(),
             "action": "skip",
             "reason": reason,
+            "actor_username": user.username,
         })
         await session.commit()
 
@@ -743,7 +752,7 @@ class AgentEngine:
             )
             if existing is None:
                 session.add(Follow(follower_id=user.id, followee_id=rel.target_user_id, strength=rel.affinity))
-                await event_store.append(session, "agent_followed_user", user.id, rel.target_user_id, {})
+                await event_store.append(session, "agent_followed_user", user.id, rel.target_user_id, {"actor_username": user.username})
                 target = await session.get(User, rel.target_user_id)
                 if target and not target.is_agent:
                     await notif_svc.create(session, user_id=rel.target_user_id, actor_id=user.id, type="follow")
@@ -763,7 +772,7 @@ class AgentEngine:
             )
             if existing is None:
                 session.add(Follow(follower_id=user.id, followee_id=target_user.id, strength=0.12))
-                await event_store.append(session, "agent_followed_user", user.id, target_user.id, {})
+                await event_store.append(session, "agent_followed_user", user.id, target_user.id, {"actor_username": user.username})
                 if not target_user.is_agent:
                     await notif_svc.create(session, user_id=target_user.id, actor_id=user.id, type="follow")
                 AGENT_ACTIONS.labels(action="follow").inc()
@@ -826,7 +835,7 @@ class AgentEngine:
         )
         if existing is None:
             session.add(CommunityMembership(user_id=user.id, community_id=community.id, role="member"))
-            await event_store.append(session, "community_joined", user.id, community.id, {"agent": True})
+            await event_store.append(session, "community_joined", user.id, community.id, {"agent": True, "actor_username": user.username})
         return community.id, community.name
 
     async def _maybe_create_community(

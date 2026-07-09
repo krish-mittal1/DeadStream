@@ -82,6 +82,8 @@ class CommunityResponse(BaseModel):
     conflict_score: float
     member_count: int = 0
     post_count: int = 0
+    election_active: bool = False
+    mod_election: bool = False
 
 
 class UserProfileResponse(BaseModel):
@@ -339,25 +341,28 @@ class CommunityDetailResponse(BaseModel):
     description: str
     ideology_center: float
     conflict_score: float
+    created_at: datetime
     is_dynamic: bool = False
     moderator_id: Optional[uuid.UUID] = None
     moderator_username: Optional[str] = None
     member_count: int = 0
     post_count: int = 0
     election_active: bool = False
-    created_at: datetime
+    mod_election: bool = False
+
 
 
 class ElectionResponse(BaseModel):
     id: uuid.UUID
     community_id: uuid.UUID
     status: str
+    total_votes: int
+    created_at: datetime
     winner_id: Optional[uuid.UUID] = None
     winner_username: Optional[str] = None
-    total_votes: int
     candidates: list[dict[str, Any]] = Field(default_factory=list)
-    created_at: datetime
     ended_at: Optional[datetime] = None
+
 
 
 class VoteRequest(BaseModel):

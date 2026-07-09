@@ -99,6 +99,7 @@ class FeedService:
                 "parent_id": str(post.parent_id) if post.parent_id else None,
                 "community_id": str(post.community_id) if post.community_id else None,
                 "is_agent": author.is_agent,
+                "author_username": author.username,
             },
         )
         # Create notification for replies
@@ -267,7 +268,7 @@ class FeedService:
                     type="like",
                     entity_id=post_id,
                 )
-            await event_store.append(session, "user_liked", user.id, post_id, {})
+            await event_store.append(session, "user_liked", user.id, post_id, {"actor_username": user.username})
             try:
                 await session.commit()
             except IntegrityError:
@@ -287,7 +288,7 @@ class FeedService:
         )
         if existing is None:
             session.add(Follow(follower_id=follower.id, followee_id=followee_id, strength=0.15))
-            await event_store.append(session, "user_followed_user", follower.id, followee_id, {})
+            await event_store.append(session, "user_followed_user", follower.id, followee_id, {"actor_username": follower.username})
             try:
                 await session.commit()
             except IntegrityError:
@@ -302,7 +303,7 @@ class FeedService:
         )
         if existing is None:
             session.add(CommunityMembership(user_id=user.id, community_id=community_id))
-            await event_store.append(session, "community_joined", user.id, community_id, {})
+            await event_store.append(session, "community_joined", user.id, community_id, {"actor_username": user.username})
             try:
                 await session.commit()
             except IntegrityError:
@@ -412,8 +413,20 @@ class FeedService:
             )
             post_count_map: dict[uuid.UUID, int] = dict(post_rows.all())  # type: ignore[arg-type]
 
+            # Batch-fetch active elections to determine election status without N database roundtrips
+            from app.models.community import CommunityElection
+            election_rows = await session.execute(
+                select(CommunityElection.community_id)
+                .where(
+                    CommunityElection.community_id.in_(community_ids),
+                    CommunityElection.status == "active",
+                )
+            )
+            active_election_ids = set(election_rows.scalars().all())
+
             responses: list[CommunityResponse] = []
             for community in communities:
+                has_election = community.id in active_election_ids
                 responses.append(
                     CommunityResponse(
                         id=community.id,
@@ -424,6 +437,8 @@ class FeedService:
                         conflict_score=community.conflict_score,
                         member_count=int(member_count_map.get(community.id, 0)),
                         post_count=int(post_count_map.get(community.id, 0)),
+                        election_active=has_election,
+                        mod_election=has_election,
                     )
                 )
             return responses
@@ -1033,6 +1048,7 @@ class FeedService:
             member_count=int(member_count),
             post_count=int(post_count),
             election_active=election_active,
+            mod_election=election_active,
             created_at=community.created_at,
         )
 

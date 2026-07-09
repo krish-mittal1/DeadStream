@@ -112,7 +112,7 @@ async def redis_listener() -> None:
                 payload = json.loads(message["data"])
                 await sio.emit("event", payload, room="global-feed")
                 event_type = payload.get("type", "")
-                if event_type.endswith("posted") or event_type == "user_replied":
+                if event_type.endswith("posted") or event_type.endswith("replied"):
                     await sio.emit("feed:new", payload, room="global-feed")
                 if event_type == "dm_sent":
                     await _fanout_dm(payload)
